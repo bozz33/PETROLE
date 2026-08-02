@@ -1,0 +1,28 @@
+# Normalisation des fins de ligne : LF dans le dépôt, conversion locale par Git.
+* text=auto eol=lf
+
+*.py    text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.json  text eol=lf
+*.toml  text eol=lf
+*.sql   text eol=lf
+*.csv   text eol=lf
+*.sh    text eol=lf
+
+*.bat   text eol=crlf
+*.ps1   text eol=crlf
+
+# Binaires
+*.docx  binary
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.xlsx  binary
+
+# Jeux de validation figés : toute modification doit être revue scientifiquement (D10 § 13).
+datasets/reference_cases/** linguist-generated=false

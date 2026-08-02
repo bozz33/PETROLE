@@ -1,0 +1,131 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hydro-platform"
+version = "0.1.0"
+description = "Plateforme de transport et de stockage des hydrocarbures — MVP liquide en régime permanent"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Équipe Plateforme Hydrocarbures" }]
+
+dependencies = [
+    # Noyau scientifique (DEC-ENGINE-001)
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pint>=0.23",
+    "fluids>=1.0",
+    "CoolProp>=6.6",
+    # Optimisation (DEC-ENGINE-002)
+    "Pyomo>=6.7",
+    # Backend central (DEC-ARCH-001)
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.4",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    "geoalchemy2>=0.15",
+    "python-multipart>=0.0.9",
+    "passlib[bcrypt]>=1.7",
+    "bcrypt>=4.0",
+    "pyjwt>=2.9",
+    "email-validator>=2.2",
+    "structlog>=24.1",
+    "orjson>=3.10",
+    # Données et rapports
+    "pandas>=2.2",
+    "openpyxl>=3.1",
+    "reportlab>=4.2",
+    "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "types-python-dateutil",
+]
+# Moteur secondaire : intégré par adaptateur après preuve de concept (DEC-ENGINE-002 du D-v2)
+pandapipes = ["pandapipes>=0.11"]
+
+[project.scripts]
+hydro-validate = "hydro_validation.cli:main"
+hydro-api = "hydro_api.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "packages/shared/hydro_shared",
+    "packages/domain/hydro_domain",
+    "packages/hydroliquid/hydroliquid",
+    "packages/tank_transfer/hydro_tanks",
+    "packages/optimization/hydro_optimization",
+    "packages/reporting/hydro_reporting",
+    "packages/validation/hydro_validation",
+    "apps/api/hydro_api",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = [
+    "packages/shared",
+    "packages/domain",
+    "packages/hydroliquid",
+    "packages/tank_transfer",
+    "packages/optimization",
+    "packages/reporting",
+    "packages/validation",
+    "apps/api",
+]
+addopts = "-ra --strict-markers"
+markers = [
+    "scientific: cas de validation scientifique figés (D10)",
+    "integration: tests nécessitant la base de données ou le worker",
+    "slow: tests longs exclus de la boucle rapide",
+]
+filterwarnings = ["ignore::DeprecationWarning:pyomo.*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = [
+    "packages/shared",
+    "packages/domain",
+    "packages/hydroliquid",
+    "packages/tank_transfer",
+    "packages/optimization",
+    "packages/reporting",
+    "packages/validation",
+    "apps/api",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+ignore = ["E501", "N803", "N806", "RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["N802"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+warn_redundant_casts = true
+no_implicit_optional = true
+mypy_path = "packages/shared:packages/domain:packages/hydroliquid:packages/tank_transfer:packages/optimization:packages/reporting:packages/validation:apps/api"
+
+[[tool.mypy.overrides]]
+module = ["fluids.*", "CoolProp.*", "pyomo.*", "pandapipes.*", "geoalchemy2.*", "reportlab.*", "matplotlib.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+branch = true
+source = ["packages", "apps/api"]
+omit = ["*/tests/*", "*/__main__.py"]

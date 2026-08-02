@@ -1,0 +1,141 @@
+# Plateforme de transport et de stockage des hydrocarbures — MVP
+
+> Pipelines liquides • Stations de pompage • Réservoirs • Transferts • Scénarios • Optimisation
+
+Application web d'ingénierie destinée à modéliser et simuler le **transport stationnaire de
+produits pétroliers liquides** dans des pipelines comprenant plusieurs tronçons, plusieurs
+stations de pompage et plusieurs réservoirs. Elle permet également de simuler des transferts
+bac-à-bac, d'étudier des modes dégradés et de proposer une configuration d'exploitation
+techniquement réalisable et énergétiquement intéressante.
+
+Ce dépôt implémente le **MVP** défini par la *Documentation complète du MVP v2.0*
+(voir [`docs/specifications/`](docs/specifications/)).
+
+---
+
+## Positionnement
+
+Le MVP n'est ni un prototype graphique, ni un SCADA, ni un logiciel de commande. C'est un
+premier produit utilisable de bout en bout, avec moteur scientifique validé, traçabilité,
+interface métier et rapports.
+
+**Limites fondamentales assumées** (voir §1.2 de la documentation) :
+
+- écoulement monophasique liquide, conduite pleine, régime principalement permanent ;
+- pas de gazoduc complet, pas de line-pack, pas de compresseurs avancés ;
+- pas de coup de bélier industriel ni de simulation transitoire détaillée ;
+- pas de connexion temps réel au SCADA et **aucune commande directe d'équipement**
+  ([ADR-009](docs/adr/adr-009-lecture-seule-avant-controle.md)) ;
+- pas de détection de fuite certifiée ni de conformité réglementaire automatique complète ;
+- pas de calcul structurel complet des conduites ou des réservoirs.
+
+---
+
+## Architecture
+
+```text
+┌─────────────────────────────────────────────────────┐
+│ FRONTEND — apps/web                                 │
+│ Shadcn Admin + React Flow + ECharts + MapLibre      │
+└──────────────────────────┬──────────────────────────┘
+                           │  REST /api/v1 (OpenAPI)
+┌──────────────────────────▼──────────────────────────┐
+│ BACKEND CENTRAL — apps/api                          │
+│ Python + FastAPI + Pydantic + SQLAlchemy + Alembic  │
+│ Projets, équipements, scénarios, règles, rapports   │
+└────────┬──────────────┬──────────────┬──────────────┘
+         │              │              │
+         ▼              ▼              ▼
+  HydroLiquid Core  Tank & Transfer  Operations Optimizer
+  fluids/SciPy/     Core             Pyomo + énumération
+  CoolProp/Pint     + barémage         filtrée
+  + adaptateur
+    pandapipes
+                             │
+                             ▼
+                 PostgreSQL + PostGIS
+```
+
+Le noyau scientifique ne dépend **ni de FastAPI, ni de SQLAlchemy, ni du frontend**. Il reçoit
+des objets typés et retourne des résultats typés (D11 § 4). Il est utilisable comme
+bibliothèque Python autonome.
+
+### Organisation du dépôt
+
+```text
+hydro-platform/
+├── apps/
+│   ├── api/                 # FastAPI — hydro_api
+│   └── web/                 # React + TypeScript + Vite
+├── packages/
+│   ├── shared/              # hydro_shared      — unités (Pint), erreurs, codes, journal
+│   ├── domain/              # hydro_domain      — modèle métier pur, paquet d'entrée canonique
+│   ├── hydroliquid/         # hydroliquid       — HydroLiquid Core
+│   ├── tank_transfer/       # hydro_tanks       — Tank & Transfer Core
+│   ├── optimization/        # hydro_optimization— Operations Optimizer
+│   ├── reporting/           # hydro_reporting   — PDF / XLSX / CSV / JSON
+│   └── validation/          # hydro_validation  — cas de référence D10 et rapport de preuve
+├── database/migrations/     # Alembic
+├── datasets/reference_cases/# jeux d'entrée immuables + résultats attendus
+├── deployment/              # Docker Compose, images, sauvegarde/restauration
+├── docs/                    # ADR, spécifications, guides
+└── tests/                   # unitaires, composants, intégration, scientifiques
+```
+
+---
+
+## Démarrage rapide
+
+### Bibliothèque scientifique seule (sans base de données)
+
+```bash
+python -m venv .venv && .venv/Scripts/activate   # Linux/macOS : source .venv/bin/activate
+pip install -e ".[dev]"
+pytest -m "not integration"
+```
+
+### Pile complète
+
+```bash
+docker compose -f deployment/docker-compose.yml up --build
+```
+
+- API et documentation interactive : <http://localhost:8000/docs>
+- Interface web : <http://localhost:5173>
+
+### Exécuter le dossier de validation scientifique
+
+```bash
+hydro-validate --report var/validation/rapport.md
+```
+
+---
+
+## Intégrité scientifique
+
+Chaque calcul enregistre ses entrées figées, la version du moteur, la méthode, les tolérances,
+les résidus et les avertissements. Le produit **refuse de déclarer valide** un résultat dont la
+convergence ou le bilan de masse dépasse la tolérance (NFR-SCI-005).
+
+Les contrôles obligatoires `C-001` à `C-012` (conservation de masse, pression sous la pression
+de vapeur, NPSH, pression admissible, vitesse, domaine de courbe, puissance moteur, niveaux de
+bac, non-convergence, extrapolation, résidu) sont implémentés dans le moteur et remontés dans
+chaque résultat.
+
+Le dossier de validation couvre les cas `V-001` à `V-020` et les familles `VAL-LIQ-*`,
+`VAL-PMP-*`, `VAL-TNK-*` du plan D10, avec tolérances explicites par grandeur.
+
+---
+
+## Avertissement
+
+Ce logiciel structure et outille la conception. Il ne remplace ni les textes normatifs officiels,
+ni la validation d'un ingénieur habilité, ni une étude de dangers, ni une autorisation
+réglementaire ou une certification de site. Les référentiels (ASME, API, ISO, IEC, ISA) sont
+enregistrés et versionnés ; **seules les règles effectivement codées et validées sont évaluées**,
+et le produit n'affiche jamais une conformité complète lorsqu'il n'a vérifié qu'un sous-ensemble.
+
+## Licence
+
+Apache-2.0 — voir [LICENSE](LICENSE). L'inventaire des dépendances open source, de leurs
+licences et de leur justification est tenu dans [`docs/dependances.md`](docs/dependances.md).

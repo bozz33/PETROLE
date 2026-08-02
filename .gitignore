@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+dist/
+build/
+
+# Node
+node_modules/
+apps/web/dist/
+apps/web/.vite/
+*.tsbuildinfo
+
+# Environnement / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Données locales et artefacts d'exécution
+var/
+storage/
+outputs/
+*.sqlite3
+*.db
+
+# Éditeurs / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Sources documentaires brutes fournies par le porteur de projet.
+# Elles contiennent des ouvrages tiers sous droits (PDF académiques) qui ne
+# doivent pas être redistribués. Les documents de projet D00-D20 sont publiés
+# sous docs/specifications/ (voir docs/specifications/README.md).
+doc/

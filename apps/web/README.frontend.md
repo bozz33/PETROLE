@@ -36,6 +36,7 @@ Les modes clair, sombre et système sont pris en charge et le choix est mémoris
 cd apps/web
 npm ci
 npm run check
+npm run test:e2e
 npm run dev
 ```
 
@@ -62,6 +63,9 @@ La CI frontend exécute :
 1. `npm ci` ;
 2. le typage TypeScript strict ;
 3. le build de production Vite ;
-4. `npm audit --audit-level=high`.
+4. `npm audit --audit-level=high` ;
+5. les parcours Playwright sur les vues bureau et mobile.
+
+La validation de pull request conserve les essais backend rapides et reproductibles. Les campagnes de qualification marquées `slow`, notamment les mesures de très grande capacité, restent séparées afin de ne pas bloquer chaque modification du frontend.
 
 La branche de migration est `feature/frontend-shadcn-admin` et reste isolée du développement backend jusqu'à la revue visuelle et fonctionnelle.

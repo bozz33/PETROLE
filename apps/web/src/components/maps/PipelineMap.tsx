@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import { cn } from "@/lib/utils";
@@ -80,7 +80,12 @@ export function PipelineMap({ points, styleUrl, className }: PipelineMapProps) {
 
   if (!points.length) {
     return (
-      <div className={cn("grid min-h-80 place-items-center rounded-xl border bg-muted text-sm text-muted-foreground", className)}>
+      <div
+        className={cn(
+          "grid min-h-80 place-items-center rounded-xl border bg-muted text-sm text-muted-foreground",
+          className,
+        )}
+      >
         Aucun point géographique disponible.
       </div>
     );

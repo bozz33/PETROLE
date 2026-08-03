@@ -8,6 +8,7 @@ import { NavigationProvider } from "./routing";
 import { ThemeProvider } from "./theme";
 import "./styles.css";
 import "./petrole-theme.css";
+import "./shadcn-shell.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

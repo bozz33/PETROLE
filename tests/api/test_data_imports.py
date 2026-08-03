@@ -16,6 +16,8 @@ from hydro_api.application import create_application
 from hydro_api.config import Settings
 from hydro_api.database.base import Base
 from hydro_api.database.session import get_session
+from hydro_api.services.data_import import _start_import_hash
+from hydro_shared.hashing import canonical_json, sha256_of
 
 
 @pytest.fixture
@@ -271,3 +273,23 @@ def test_mapping_rejects_missing_required_fields(import_client) -> None:
 
     assert response.status_code == 422
     assert "elevation_m" in response.json()["detail"]
+
+
+def test_import_hash_streaming_matches_canonical_hash() -> None:
+    """Garantit que le traitement par lots ne change pas l'identité du jeu importé."""
+
+    file_hash = "sha256:fichier"
+    mapping = {"units": {"Débit": "m3/s"}, "fields": {"flow_m3_s": "Débit"}}
+    rows = [
+        {"flow_m3_s": 0.125, "quality": "good"},
+        {"flow_m3_s": 0.25, "quality": "estimé"},
+    ]
+    digest = _start_import_hash(file_hash, mapping)
+    for index, row in enumerate(rows):
+        if index:
+            digest.update(b",")
+        digest.update(canonical_json(row).encode("utf-8"))
+    digest.update(b"]}")
+
+    expected = sha256_of({"file_hash": file_hash, "mapping": mapping, "rows": rows})
+    assert f"sha256:{digest.hexdigest()}" == expected

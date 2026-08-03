@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import math
 import uuid
@@ -10,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, insert, select
 from sqlalchemy.orm import Session
 
 from hydro_api.database.base import utc_now
@@ -26,7 +27,7 @@ from hydro_api.models import (
 )
 from hydro_api.schemas.data import DatasetCreate, DatasetMapping
 from hydro_api.storage import ObjectStorage
-from hydro_shared.hashing import sha256_of, sha256_of_bytes
+from hydro_shared.hashing import canonical_json, sha256_of_bytes
 
 SUPPORTED_EXTENSIONS = {".csv", ".xlsx"}
 REQUIRED_FIELDS: dict[str, frozenset[str]] = {
@@ -51,6 +52,7 @@ NUMERIC_FIELDS = frozenset(
     }
 )
 QUALITY_CODES = frozenset({"good", "uncertain", "bad", "substituted", "estimated"})
+IMPORT_BATCH_SIZE = 5_000
 
 
 def _audit(
@@ -130,6 +132,14 @@ def _frame_rows(frame: pd.DataFrame) -> list[dict[str, Any]]:
         {str(column): _json_value(value) for column, value in row.items()}
         for row in frame.to_dict(orient="records")
     ]
+
+
+def _iter_frame_rows(frame: pd.DataFrame):
+    """Parcourt un grand tableau sans créer une seconde liste de toutes ses lignes."""
+
+    columns = [str(column) for column in frame.columns]
+    for values in frame.itertuples(index=False, name=None):
+        yield {column: _json_value(value) for column, value in zip(columns, values, strict=True)}
 
 
 def get_file(session: Session, file_id: uuid.UUID) -> StoredFile:
@@ -402,29 +412,47 @@ def _normalize_row(
     return normalized, errors
 
 
-def _append_monotonicity_errors(kind: str, rows: list[DatasetRow]) -> None:
+def _append_row_monotonicity_errors(
+    kind: str,
+    normalized: dict[str, Any],
+    source_row: int,
+    previous_values: dict[str, float],
+    errors: list[dict[str, Any]],
+) -> None:
+    """Contrôle la monotonie en flux, sans conserver le million de lignes en mémoire."""
+
     fields_by_kind = {
         "profile": ("chainage_m",),
         "pump_curve": ("flow_m3_s",),
         "strapping": ("level_m", "volume_m3"),
     }
-    fields = fields_by_kind.get(kind, ())
-    for field in fields:
-        previous: float | None = None
-        for row in rows:
-            value = row.normalized_payload.get(field)
-            if not isinstance(value, int | float):
-                continue
-            if previous is not None and value <= previous:
-                error = {
-                    "row": row.source_row,
+    for field in fields_by_kind.get(kind, ()):
+        value = normalized.get(field)
+        if not isinstance(value, int | float):
+            continue
+        previous = previous_values.get(field)
+        if previous is not None and value <= previous:
+            errors.append(
+                {
+                    "row": source_row,
                     "field": field,
                     "code": "NOT_STRICTLY_INCREASING",
                     "message": f"Le champ {field} doit être strictement croissant.",
                 }
-                row.errors = [*row.errors, error]
-                row.quality = "bad"
-            previous = float(value)
+            )
+        previous_values[field] = float(value)
+
+
+def _start_import_hash(file_hash: str, mapping: dict[str, Any]) -> hashlib._Hash:
+    """Initialise une empreinte identique à ``sha256_of`` sans matérialiser toutes les lignes."""
+
+    digest = hashlib.sha256()
+    digest.update(b'{"file_hash":')
+    digest.update(canonical_json(file_hash).encode("utf-8"))
+    digest.update(b',"mapping":')
+    digest.update(canonical_json(mapping).encode("utf-8"))
+    digest.update(b',"rows":[')
+    return digest
 
 
 def import_dataset(
@@ -452,43 +480,61 @@ def import_dataset(
     stored_file = get_file(session, dataset.file_id)
     content = storage.get_bytes(stored_file.object_key)
     frame = _read_frame(content, stored_file.filename, max_rows=max_rows)
-    raw_rows = _frame_rows(frame)
     session.execute(delete(DatasetRow).where(DatasetRow.dataset_id == dataset.id))
 
-    rows: list[DatasetRow] = []
-    for source_row, raw in enumerate(raw_rows, start=2):
+    digest = _start_import_hash(stored_file.content_hash, dataset.mapping)
+    batch: list[dict[str, Any]] = []
+    all_errors: list[dict[str, Any]] = []
+    previous_values: dict[str, float] = {}
+    accepted_count = 0
+    row_count = 0
+    first_hash_row = True
+    for source_row, raw in enumerate(_iter_frame_rows(frame), start=2):
+        row_count += 1
         normalized, errors = _normalize_row(raw, dataset.mapping, source_row)
-        rows.append(
-            DatasetRow(
-                dataset_id=dataset.id,
-                source_row=source_row,
-                raw_payload=raw,
-                normalized_payload=normalized,
-                corrected_payload=None,
-                quality="bad" if errors else str(normalized.get("quality", "good")),
-                errors=errors,
-            )
+        _append_row_monotonicity_errors(
+            dataset.kind,
+            normalized,
+            source_row,
+            previous_values,
+            errors,
         )
-    _append_monotonicity_errors(dataset.kind, rows)
-    session.add_all(rows)
-    all_errors = [error for row in rows for error in row.errors]
-    accepted_count = sum(not row.errors for row in rows)
+        if not errors:
+            accepted_count += 1
+        all_errors.extend(errors)
+        batch.append(
+            {
+                "id": uuid.uuid4(),
+                "dataset_id": dataset.id,
+                "source_row": source_row,
+                "raw_payload": raw,
+                "normalized_payload": normalized,
+                "corrected_payload": None,
+                "quality": "bad" if errors else str(normalized.get("quality", "good")),
+                "errors": errors,
+            }
+        )
+        if not first_hash_row:
+            digest.update(b",")
+        digest.update(canonical_json(normalized).encode("utf-8"))
+        first_hash_row = False
+        if len(batch) >= IMPORT_BATCH_SIZE:
+            session.execute(insert(DatasetRow), batch)
+            batch.clear()
+    if batch:
+        session.execute(insert(DatasetRow), batch)
+    digest.update(b"]}")
+
     status = "completed" if not all_errors else "completed_with_errors"
     finished_at = utc_now()
     import_run = DatasetImport(
         dataset_id=dataset.id,
         idempotency_key=idempotency_key,
         status=status,
-        row_count=len(rows),
+        row_count=row_count,
         accepted_count=accepted_count,
-        rejected_count=len(rows) - accepted_count,
-        content_hash=sha256_of(
-            {
-                "file_hash": stored_file.content_hash,
-                "mapping": dataset.mapping,
-                "rows": [row.normalized_payload for row in rows],
-            }
-        ),
+        rejected_count=row_count - accepted_count,
+        content_hash=f"sha256:{digest.hexdigest()}",
         errors=all_errors,
         created_at=finished_at,
         finished_at=finished_at,

@@ -144,6 +144,9 @@ npm audit --audit-level=moderate
 
 La variable `E2E_BASE_URL` permet de viser une autre instance que `http://localhost:5173`.
 
+Le dernier procès-verbal de recette locale du backend est disponible dans
+[`docs/validation/recette_backend_mvp.md`](docs/validation/recette_backend_mvp.md).
+
 ### Exécuter le dossier de validation scientifique
 
 Après installation locale du projet en mode éditable :

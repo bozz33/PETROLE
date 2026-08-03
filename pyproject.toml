@@ -95,7 +95,9 @@ addopts = "-ra --strict-markers"
 markers = [
     "scientific: cas de validation scientifique figés (D10)",
     "integration: tests nécessitant la base de données ou le worker",
+    "performance: objectifs de capacité et de durée du MVP (D-v2 § 12.1)",
     "slow: tests longs exclus de la boucle rapide",
+    "qualification: campagne de recette complète du backend MVP",
 ]
 filterwarnings = ["ignore::DeprecationWarning:pyomo.*"]
 

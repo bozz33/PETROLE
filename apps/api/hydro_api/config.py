@@ -19,7 +19,9 @@ class Settings(BaseSettings):
 
     application_name: str = "Plateforme Hydrocarbures"
     environment: Literal["development", "test", "staging", "production"] = "development"
-    host: str = "0.0.0.0"
+    # L'écoute sur toutes les interfaces est requise dans le conteneur. Le port exposé et
+    # son filtrage restent sous la responsabilité de la configuration de déploiement.
+    host: str = "0.0.0.0"  # nosec B104
     port: int = Field(default=8000, ge=1, le=65535)
     reload: bool = False
     log_level: Literal["critical", "error", "warning", "info", "debug", "trace"] = "info"

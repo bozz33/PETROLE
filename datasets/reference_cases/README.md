@@ -17,5 +17,10 @@ Toute nouvelle donnée placée ici doit fournir :
 - une empreinte SHA-256 lorsque la donnée provient d'un fichier externe ;
 - la décision de revue scientifique ayant autorisé son emploi.
 
+Le fichier `external_benchmarks_v1.json` fige désormais six réseaux officiels pandapipes
+provenant de STANET ou OpenModelica, ainsi que le cas pompe U03 du rapport officiel DWSIM.
+Leurs empreintes et leurs limites d'emploi y sont enregistrées. Les exécuteurs correspondants
+se trouvent dans `packages/validation/hydro_validation/external_cases.py`.
+
 Les rapports générés par `hydro-validate` sont des preuves d'exécution. Ils sont écrits sous
 `var/validation/` et ne remplacent pas les données de référence versionnées.

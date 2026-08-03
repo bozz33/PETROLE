@@ -39,7 +39,8 @@ SCRYPT_N = 2**14
 SCRYPT_R = 8
 SCRYPT_P = 1
 PASSWORD_DERIVED_BYTES = 32
-DUMMY_PASSWORD_HASH = (
+# Valeur factice publique : elle égalise le coût d'une connexion à un compte inconnu.
+DUMMY_PASSWORD_HASH = (  # nosec B105
     "scrypt$16384$8$1$N2ZpeGVkLWR1bW15LXNhbHQ$uBvyxajDjcBtgFphwTnVe2gNdUswfSJACrsMlEz9m4M"
 )
 

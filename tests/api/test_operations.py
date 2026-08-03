@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Generator
 
 import pytest
@@ -293,6 +294,7 @@ def test_baremage_non_monotone_est_refuse(operations_client) -> None:
     assert response.status_code == 422
 
 
+@pytest.mark.performance
 def test_comparaison_persistante_de_calculs(operations_client) -> None:
     organization = _organization(operations_client)
     project = _project(operations_client, organization["id"])
@@ -305,12 +307,15 @@ def test_comparaison_persistante_de_calculs(operations_client) -> None:
     _, first = _calculation(operations_client, project["id"], first_input, "A")
     _, second = _calculation(operations_client, project["id"], second_input, "B")
 
+    started = time.perf_counter()
     response = operations_client.post(
         f"/api/v1/projects/{project['id']}/comparisons",
         headers={"Idempotency-Key": "comparaison-001"},
         json={"calculation_ids": [first["id"], second["id"]]},
     )
+    comparison_duration_s = time.perf_counter() - started
     assert response.status_code == 201, response.text
+    assert comparison_duration_s < 60.0
     comparison = response.json()
     assert comparison["result_payload"]["reference_calculation_id"] == first["id"]
     assert len(comparison["result_payload"]["ranked"]) == 2

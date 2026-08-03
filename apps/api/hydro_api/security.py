@@ -269,6 +269,8 @@ def _allowed_roles(request: Request) -> frozenset[str]:
         return frozenset({"admin", "approver"})
     if "/members" in path:
         return frozenset({"admin"})
+    if path.endswith(("/activate", "/archive", "/restore")):
+        return frozenset({"admin"})
     if path.endswith("/approve"):
         return frozenset({"admin", "approver"})
     if request.method in {"GET", "HEAD", "OPTIONS"}:

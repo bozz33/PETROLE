@@ -22,6 +22,7 @@ from hydro_api.models import (
     Organization,
     OrganizationMembership,
     Project,
+    RuleSet,
     ScenarioRecord,
     Site,
     StoredFile,
@@ -36,6 +37,7 @@ from hydro_api.schemas import (
     ProjectUpdate,
     ReportApproval,
     ReportCreate,
+    ScenarioCloneCreate,
     ScenarioCreate,
     ScenarioUpdate,
 )
@@ -177,7 +179,17 @@ def create_project(session: Session, data: ProjectCreate) -> Project:
             raise ResourceConflictError(
                 "Le site et le projet doivent appartenir à la même organisation."
             )
-    project = Project(**data.model_dump())
+    _validate_project_references(
+        session,
+        data.organization_id,
+        rule_set_ids=data.rule_set_ids,
+        responsible_user_ids=data.responsible_user_ids,
+    )
+    project = Project(
+        **data.model_dump(exclude={"rule_set_ids", "responsible_user_ids"}),
+        rule_set_ids=[str(identifier) for identifier in data.rule_set_ids],
+        responsible_user_ids=[str(identifier) for identifier in data.responsible_user_ids],
+    )
     if project.country_code is not None:
         project.country_code = project.country_code.upper()
     session.add(project)
@@ -202,10 +214,14 @@ def list_projects(
     organization_id: uuid.UUID | None,
     limit: int,
     offset: int,
+    include_archived: bool = False,
     allowed_organization_ids: tuple[uuid.UUID, ...] | None = None,
 ) -> tuple[list[Project], int]:
     query = select(Project)
     count_query = select(func.count()).select_from(Project)
+    if not include_archived:
+        query = query.where(Project.status != "archived")
+        count_query = count_query.where(Project.status != "archived")
     if organization_id is not None:
         query = query.where(Project.organization_id == organization_id)
         count_query = count_query.where(Project.organization_id == organization_id)
@@ -221,13 +237,62 @@ def list_projects(
     return items, total
 
 
+def _validate_project_references(
+    session: Session,
+    organization_id: uuid.UUID,
+    *,
+    rule_set_ids: list[uuid.UUID],
+    responsible_user_ids: list[uuid.UUID],
+) -> None:
+    """Vérifie que les référentiels et responsables appartiennent au projet."""
+
+    for identifier in rule_set_ids:
+        rule_set = session.get(RuleSet, identifier)
+        if rule_set is None or rule_set.organization_id != organization_id:
+            raise ResourceConflictError(
+                "Un jeu de règles sélectionné n'appartient pas à l'organisation du projet."
+            )
+        if rule_set.status != "approved":
+            raise ResourceConflictError(
+                "Un jeu de règles doit être approuvé avant sa sélection dans un projet."
+            )
+    for identifier in responsible_user_ids:
+        membership = session.scalar(
+            select(OrganizationMembership).where(
+                OrganizationMembership.organization_id == organization_id,
+                OrganizationMembership.user_id == identifier,
+            )
+        )
+        if membership is None:
+            raise ResourceConflictError(
+                "Un responsable doit être membre de l'organisation du projet."
+            )
+
+
 def update_project(
     session: Session,
     project_id: uuid.UUID,
     data: ProjectUpdate,
 ) -> Project:
     project = get_project(session, project_id)
+    if project.status == "archived":
+        raise ResourceConflictError("Un projet archivé ne peut pas être modifié.")
     changes = data.model_dump(exclude_unset=True)
+    rule_set_ids = changes.pop("rule_set_ids", None)
+    responsible_user_ids = changes.pop("responsible_user_ids", None)
+    if rule_set_ids is not None or responsible_user_ids is not None:
+        _validate_project_references(
+            session,
+            project.organization_id,
+            rule_set_ids=rule_set_ids or [],
+            responsible_user_ids=responsible_user_ids or [],
+        )
+        if rule_set_ids is not None:
+            project.rule_set_ids = [str(identifier) for identifier in rule_set_ids]
+            changes["rule_set_ids"] = project.rule_set_ids
+        if responsible_user_ids is not None:
+            project.responsible_user_ids = [str(identifier) for identifier in responsible_user_ids]
+            changes["responsible_user_ids"] = project.responsible_user_ids
     if "site_id" in changes and changes["site_id"] is not None:
         site = session.get(Site, changes["site_id"])
         if site is None:
@@ -237,7 +302,7 @@ def update_project(
                 "Le site et le projet doivent appartenir à la même organisation."
             )
     for field, value in changes.items():
-        if field in {"name", "status"} and value is None:
+        if field in {"name", "project_type", "unit_system"} and value is None:
             continue
         if field == "country_code" and value is not None:
             value = value.upper()
@@ -251,6 +316,89 @@ def update_project(
         details={"fields": sorted(changes)},
     )
     _flush(session, "La mise à jour du projet entre en conflit avec une donnée existante.")
+    return project
+
+
+def activate_project(
+    session: Session,
+    project_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> Project:
+    """Active un projet brouillon par une transition explicite et auditée."""
+
+    project = session.scalar(select(Project).where(Project.id == project_id).with_for_update())
+    if project is None:
+        raise ResourceNotFoundError("Projet", project_id)
+    if project.status != "draft":
+        raise ResourceConflictError("Seul un projet au statut brouillon peut être activé.")
+    project.status = "active"
+    _audit(
+        session,
+        organization_id=project.organization_id,
+        action="project.activated",
+        object_type="project",
+        object_id=project.id,
+        actor_id=actor_id,
+    )
+    _flush(session, "Impossible d'activer le projet.")
+    return project
+
+
+def archive_project(
+    session: Session,
+    project_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> Project:
+    """Archive un projet en mémorisant son dernier statut opérationnel."""
+
+    project = session.scalar(select(Project).where(Project.id == project_id).with_for_update())
+    if project is None:
+        raise ResourceNotFoundError("Projet", project_id)
+    if project.status == "archived":
+        raise ResourceConflictError("Le projet est déjà archivé.")
+    project.archived_from_status = project.status
+    project.status = "archived"
+    _audit(
+        session,
+        organization_id=project.organization_id,
+        action="project.archived",
+        object_type="project",
+        object_id=project.id,
+        actor_id=actor_id,
+        details={"previous_status": project.archived_from_status},
+    )
+    _flush(session, "Impossible d'archiver le projet.")
+    return project
+
+
+def restore_project(
+    session: Session,
+    project_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> Project:
+    """Restaure un projet dans le statut précédant son archivage."""
+
+    project = session.scalar(select(Project).where(Project.id == project_id).with_for_update())
+    if project is None:
+        raise ResourceNotFoundError("Projet", project_id)
+    if project.status != "archived":
+        raise ResourceConflictError("Seul un projet archivé peut être restauré.")
+    restored_status = project.archived_from_status or "draft"
+    project.status = restored_status
+    project.archived_from_status = None
+    _audit(
+        session,
+        organization_id=project.organization_id,
+        action="project.restored",
+        object_type="project",
+        object_id=project.id,
+        actor_id=actor_id,
+        details={"restored_status": restored_status},
+    )
+    _flush(session, "Impossible de restaurer le projet.")
     return project
 
 
@@ -269,6 +417,10 @@ def create_model_version(
     project = session.scalar(select(Project).where(Project.id == project_id).with_for_update())
     if project is None:
         raise ResourceNotFoundError("Projet", project_id)
+    if project.status == "archived":
+        raise ResourceConflictError(
+            "Une nouvelle version ne peut pas être créée dans un projet archivé."
+        )
     if data.parent_id is not None:
         parent = get_model_version(session, data.parent_id)
         if parent.project_id != project_id:
@@ -449,6 +601,10 @@ def create_scenario(
     data: ScenarioCreate,
 ) -> ScenarioRecord:
     model = get_model_version(session, model_id)
+    if model.status != "draft":
+        raise ResourceConflictError(
+            "Une version approuvée ou archivée ne peut plus recevoir de nouveau scénario."
+        )
     if data.parent_id is not None:
         parent = get_scenario(session, data.parent_id)
         if parent.model_version_id != model_id:
@@ -477,6 +633,26 @@ def create_scenario(
     )
     _flush(session, "Impossible d'enregistrer l'événement d'audit.")
     return item
+
+
+def clone_scenario(
+    session: Session,
+    scenario_id: uuid.UUID,
+    data: ScenarioCloneCreate,
+) -> ScenarioRecord:
+    """Crée une variante indépendante en conservant la filiation."""
+
+    source = get_scenario(session, scenario_id)
+    return create_scenario(
+        session,
+        source.model_version_id,
+        ScenarioCreate(
+            name=data.name,
+            parent_id=source.id,
+            description=source.description,
+            payload=deepcopy(source.payload),
+        ),
+    )
 
 
 def list_scenarios(
@@ -540,6 +716,66 @@ def get_calculation(session: Session, calculation_id: uuid.UUID) -> CalculationR
     return calculation
 
 
+def calculation_payload(session: Session, calculation: CalculationRun) -> dict[str, Any]:
+    """Expose l'exécution avec l'identifiant et la progression de sa tâche."""
+
+    job = session.scalar(
+        select(BackgroundJob).where(
+            BackgroundJob.kind == "calculation",
+            BackgroundJob.resource_id == calculation.id,
+        )
+    )
+    if calculation.status == "SIM_QUEUED":
+        phase, progress = "queued", 0
+    elif calculation.status == "SIM_RUNNING":
+        phase, progress = "running", 50
+    elif calculation.status == "SIM_CANCELLED":
+        phase, progress = "cancelled", 100
+    elif job is not None and job.status == "failed":
+        phase, progress = "failed", 100
+    else:
+        phase, progress = "completed", 100
+    return {
+        "id": calculation.id,
+        "job_id": job.id if job is not None else None,
+        "scenario_id": calculation.scenario_id,
+        "idempotency_key": calculation.idempotency_key,
+        "engine": calculation.engine,
+        "engine_version": calculation.engine_version,
+        "status": calculation.status,
+        "phase": phase,
+        "progress_percent": progress,
+        "input_hash": calculation.input_hash,
+        "created_at": calculation.created_at,
+        "started_at": calculation.started_at,
+        "finished_at": calculation.finished_at,
+    }
+
+
+def list_calculations(
+    session: Session,
+    scenario_id: uuid.UUID,
+    *,
+    limit: int,
+    offset: int,
+) -> tuple[list[CalculationRun], int]:
+    """Liste l'historique immuable d'un scénario, du plus récent au plus ancien."""
+
+    get_scenario(session, scenario_id)
+    condition = CalculationRun.scenario_id == scenario_id
+    total = session.scalar(select(func.count()).select_from(CalculationRun).where(condition)) or 0
+    items = list(
+        session.scalars(
+            select(CalculationRun)
+            .where(condition)
+            .order_by(CalculationRun.created_at.desc(), CalculationRun.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    )
+    return items, int(total)
+
+
 def canonical_payload_for_calculation(
     session: Session,
     model: ModelVersion,
@@ -596,6 +832,10 @@ def canonical_payload_for_calculation(
 
     network_id = network.get("id", "") if isinstance(network, dict) else ""
     fluid_id = fluid.get("id", "") if isinstance(fluid, dict) else ""
+    rules = model_payload.get("rules")
+    if rules is None:
+        project = get_project(session, model.project_id)
+        rules = {"rule_set_ids": project.rule_set_ids}
     return {
         "manifest": {
             "schema_version": source_manifest.get(
@@ -613,7 +853,7 @@ def canonical_payload_for_calculation(
         "network": network,
         "equipment": equipment,
         "scenario": scenario_payload,
-        "rules": model_payload.get("rules", {"rule_set_ids": []}),
+        "rules": rules,
         "provenance": Provenance.now(
             project_id=str(model.project_id),
             model_version_id=str(model.id),
@@ -1000,6 +1240,61 @@ def get_report(session: Session, report_id: uuid.UUID) -> GeneratedReport:
     if report is None:
         raise ResourceNotFoundError("Rapport", report_id)
     return report
+
+
+def list_reports(
+    session: Session,
+    *,
+    organization_id: uuid.UUID | None,
+    calculation_id: uuid.UUID | None,
+    limit: int,
+    offset: int,
+    allowed_organization_ids: tuple[uuid.UUID, ...] | None = None,
+) -> tuple[list[GeneratedReport], int]:
+    """Liste les rapports accessibles avec filtres de source et de tenant."""
+
+    conditions = []
+    if organization_id is not None:
+        conditions.append(GeneratedReport.organization_id == organization_id)
+    if calculation_id is not None:
+        conditions.append(GeneratedReport.calculation_id == calculation_id)
+    if allowed_organization_ids is not None:
+        if not allowed_organization_ids:
+            return [], 0
+        conditions.append(GeneratedReport.organization_id.in_(allowed_organization_ids))
+    total = session.scalar(
+        select(func.count()).select_from(GeneratedReport).where(*conditions)
+    ) or 0
+    items = list(
+        session.scalars(
+            select(GeneratedReport)
+            .where(*conditions)
+            .order_by(GeneratedReport.created_at.desc(), GeneratedReport.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    )
+    return items, int(total)
+
+
+def audit_report_download(
+    session: Session,
+    report: GeneratedReport,
+    *,
+    actor_id: uuid.UUID | None,
+) -> None:
+    """Journalise un export de rapport sans modifier son contenu figé."""
+
+    _audit(
+        session,
+        organization_id=report.organization_id,
+        action="report.downloaded",
+        object_type="report",
+        object_id=report.id,
+        actor_id=actor_id,
+        details={"content_hash": report.content_hash, "format": report.format},
+    )
+    _flush(session, "Impossible de journaliser le téléchargement du rapport.")
 
 
 def get_report_file(session: Session, report: GeneratedReport) -> StoredFile:

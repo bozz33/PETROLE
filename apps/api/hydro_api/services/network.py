@@ -21,6 +21,7 @@ from hydro_api.models import (
     ModelVersion,
     NetworkEdge,
     NetworkNode,
+    ScenarioRecord,
 )
 from hydro_api.schemas.network import (
     AssetInstanceCreate,
@@ -225,6 +226,13 @@ def clone_model_version(
         ),
     )
     nodes, edges, assets = _model_components(session, source.id)
+    scenarios = list(
+        session.scalars(
+            select(ScenarioRecord)
+            .where(ScenarioRecord.model_version_id == source.id)
+            .order_by(ScenarioRecord.created_at, ScenarioRecord.id)
+        )
+    )
     node_ids: dict[uuid.UUID, uuid.UUID] = {}
     for node in nodes:
         copied_node = NetworkNode(
@@ -279,6 +287,23 @@ def clone_model_version(
                 payload=deepcopy(asset.payload),
             )
         )
+    scenario_ids: dict[uuid.UUID, uuid.UUID] = {}
+    copied_scenarios: dict[uuid.UUID, ScenarioRecord] = {}
+    for scenario in scenarios:
+        copied_scenario = ScenarioRecord(
+            model_version_id=clone.id,
+            parent_id=None,
+            name=scenario.name,
+            description=scenario.description,
+            payload=deepcopy(scenario.payload),
+        )
+        session.add(copied_scenario)
+        session.flush()
+        scenario_ids[scenario.id] = copied_scenario.id
+        copied_scenarios[scenario.id] = copied_scenario
+    for scenario in scenarios:
+        if scenario.parent_id is not None and scenario.parent_id in scenario_ids:
+            copied_scenarios[scenario.id].parent_id = scenario_ids[scenario.parent_id]
     session.flush()
     refresh_model_hash(session, clone)
     _audit(
@@ -293,6 +318,7 @@ def clone_model_version(
             "nodes": len(nodes),
             "edges": len(edges),
             "assets": len(assets),
+            "scenarios": len(scenarios),
         },
     )
     session.flush()
@@ -367,6 +393,41 @@ def update_network_node(
         details={"fields": sorted(changes)},
     )
     return node
+
+
+def delete_network_node(
+    session: Session,
+    node_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> None:
+    """Supprime un nœud isolé d'un brouillon sans cascade implicite."""
+
+    node = get_network_node(session, node_id)
+    model = _get_model(session, node.model_version_id, mutable=True)
+    edge_reference = session.scalar(
+        select(NetworkEdge.id).where(
+            (NetworkEdge.from_node_id == node.id) | (NetworkEdge.to_node_id == node.id)
+        )
+    )
+    asset_reference = session.scalar(select(AssetInstance.id).where(AssetInstance.node_id == node.id))
+    if edge_reference is not None or asset_reference is not None:
+        raise ResourceConflictError(
+            "Supprimez d'abord les tronçons et équipements qui référencent ce nœud."
+        )
+    code = node.code
+    session.delete(node)
+    session.flush()
+    refresh_model_hash(session, model)
+    _audit(
+        session,
+        model,
+        "network_node.deleted",
+        "network_node",
+        node.id,
+        actor_id=actor_id,
+        details={"code": code},
+    )
 
 
 def _validate_material(session: Session, model: ModelVersion, item_id: uuid.UUID | None) -> None:
@@ -512,6 +573,36 @@ def update_network_edge(
     return edge
 
 
+def delete_network_edge(
+    session: Session,
+    edge_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> None:
+    """Supprime un tronçon sans supprimer ses équipements par surprise."""
+
+    edge = get_network_edge(session, edge_id)
+    model = _get_model(session, edge.model_version_id, mutable=True)
+    asset_reference = session.scalar(select(AssetInstance.id).where(AssetInstance.edge_id == edge.id))
+    if asset_reference is not None:
+        raise ResourceConflictError(
+            "Supprimez d'abord les équipements placés sur ce tronçon."
+        )
+    code = edge.code
+    session.delete(edge)
+    session.flush()
+    refresh_model_hash(session, model)
+    _audit(
+        session,
+        model,
+        "network_edge.deleted",
+        "network_edge",
+        edge.id,
+        actor_id=actor_id,
+        details={"code": code},
+    )
+
+
 def _validate_asset_location(
     session: Session,
     model: ModelVersion,
@@ -630,6 +721,31 @@ def update_asset_instance(
         details={"fields": sorted(changes)},
     )
     return asset
+
+
+def delete_asset_instance(
+    session: Session,
+    asset_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> None:
+    """Retire un équipement d'un brouillon en conservant sa version de catalogue."""
+
+    asset = get_asset_instance(session, asset_id)
+    model = _get_model(session, asset.model_version_id, mutable=True)
+    code = asset.code
+    session.delete(asset)
+    session.flush()
+    refresh_model_hash(session, model)
+    _audit(
+        session,
+        model,
+        "asset_instance.deleted",
+        "asset_instance",
+        asset.id,
+        actor_id=actor_id,
+        details={"code": code},
+    )
 
 
 def validate_network(session: Session, model_id: uuid.UUID) -> NetworkValidationReport:
@@ -1032,6 +1148,9 @@ __all__ = [
     "create_asset_instance",
     "create_network_edge",
     "create_network_node",
+    "delete_asset_instance",
+    "delete_network_edge",
+    "delete_network_node",
     "get_asset_instance",
     "get_network_edge",
     "get_network_node",

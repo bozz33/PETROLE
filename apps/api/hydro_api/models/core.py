@@ -290,6 +290,16 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "status IN ('draft', 'active', 'archived')",
             name="status_valid",
         ),
+        CheckConstraint(
+            "(status = 'archived' AND archived_from_status IN ('draft', 'active')) "
+            "OR (status != 'archived' AND archived_from_status IS NULL)",
+            name="archive_state_valid",
+        ),
+        CheckConstraint(
+            "project_type IN ('liquid_pipeline', 'terminal', 'gas_pipeline', 'combined')",
+            name="project_type_valid",
+        ),
+        CheckConstraint("unit_system IN ('SI')", name="unit_system_valid"),
         Index("ix_projects_organization_status", "organization_id", "status"),
     )
 
@@ -305,8 +315,17 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     code: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
+    project_type: Mapped[str] = mapped_column(
+        String(30),
+        default="liquid_pipeline",
+        nullable=False,
+    )
     country_code: Mapped[str | None] = mapped_column(String(2))
+    unit_system: Mapped[str] = mapped_column(String(20), default="SI", nullable=False)
+    rule_set_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    responsible_user_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
+    archived_from_status: Mapped[str | None] = mapped_column(String(20))
 
     organization: Mapped[Organization] = relationship(back_populates="projects")
     site: Mapped[Site | None] = relationship(back_populates="projects")

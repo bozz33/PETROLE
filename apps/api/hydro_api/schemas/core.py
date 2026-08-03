@@ -52,15 +52,47 @@ class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     code: str = Field(min_length=1, max_length=50, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     description: str | None = Field(default=None, max_length=10_000)
+    project_type: Literal[
+        "liquid_pipeline",
+        "terminal",
+        "gas_pipeline",
+        "combined",
+    ] = "liquid_pipeline"
     country_code: str | None = Field(default=None, min_length=2, max_length=2)
+    unit_system: Literal["SI"] = "SI"
+    rule_set_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
+    responsible_user_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
+
+    @field_validator("rule_set_ids", "responsible_user_ids")
+    @classmethod
+    def unique_identifiers(cls, value: list[uuid.UUID]) -> list[uuid.UUID]:
+        return list(dict.fromkeys(value))
 
 
 class ProjectUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     site_id: uuid.UUID | None = None
     name: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=10_000)
+    project_type: Literal[
+        "liquid_pipeline",
+        "terminal",
+        "gas_pipeline",
+        "combined",
+    ] | None = None
     country_code: str | None = Field(default=None, min_length=2, max_length=2)
-    status: str | None = Field(default=None, pattern=r"^(draft|active|archived)$")
+    unit_system: Literal["SI"] | None = None
+    rule_set_ids: list[uuid.UUID] | None = Field(default=None, max_length=100)
+    responsible_user_ids: list[uuid.UUID] | None = Field(default=None, max_length=100)
+
+    @field_validator("rule_set_ids", "responsible_user_ids")
+    @classmethod
+    def unique_optional_identifiers(
+        cls,
+        value: list[uuid.UUID] | None,
+    ) -> list[uuid.UUID] | None:
+        return None if value is None else list(dict.fromkeys(value))
 
 
 class ProjectRead(BaseModel):
@@ -72,7 +104,11 @@ class ProjectRead(BaseModel):
     name: str
     code: str
     description: str | None
+    project_type: str
     country_code: str | None
+    unit_system: str
+    rule_set_ids: list[uuid.UUID]
+    responsible_user_ids: list[uuid.UUID]
     status: str
     created_at: datetime
     updated_at: datetime
@@ -112,6 +148,12 @@ class ScenarioCreate(BaseModel):
     parent_id: uuid.UUID | None = None
     description: str | None = Field(default=None, max_length=10_000)
     payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class ScenarioCloneCreate(BaseModel):
+    """Nom de la variante dérivée d'un scénario existant."""
+
+    name: str = Field(min_length=1, max_length=200)
 
 
 class ScenarioUpdate(BaseModel):
@@ -179,11 +221,14 @@ class CalculationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    job_id: uuid.UUID | None = None
     scenario_id: uuid.UUID
     idempotency_key: str | None
     engine: str
     engine_version: str
     status: str
+    phase: str
+    progress_percent: int = Field(ge=0, le=100)
     input_hash: str
     created_at: datetime
     started_at: datetime | None

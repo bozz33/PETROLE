@@ -339,6 +339,35 @@ def get_transfer(session: Session, transfer_id: uuid.UUID) -> TransferRun:
     return record
 
 
+def list_transfers(
+    session: Session,
+    organization_id: uuid.UUID,
+    *,
+    tank_id: uuid.UUID | None,
+    limit: int,
+    offset: int,
+) -> tuple[list[TransferRun], int]:
+    """Liste les simulations d'une organisation, avec filtre facultatif par bac."""
+
+    conditions = [TransferRun.organization_id == organization_id]
+    if tank_id is not None:
+        conditions.append(
+            (TransferRun.source_tank_id == tank_id)
+            | (TransferRun.destination_tank_id == tank_id)
+        )
+    total = session.scalar(select(func.count()).select_from(TransferRun).where(*conditions)) or 0
+    items = list(
+        session.scalars(
+            select(TransferRun)
+            .where(*conditions)
+            .order_by(TransferRun.created_at.desc(), TransferRun.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    )
+    return items, int(total)
+
+
 def compute_balance(
     session: Session,
     transfer_id: uuid.UUID,
@@ -513,6 +542,33 @@ def get_comparison(
     if comparison is None:
         raise ResourceNotFoundError("Comparaison", comparison_id)
     return comparison
+
+
+def list_comparisons(
+    session: Session,
+    project_id: uuid.UUID,
+    *,
+    limit: int,
+    offset: int,
+) -> tuple[list[ScenarioComparison], int]:
+    """Liste les comparaisons persistées d'un projet."""
+
+    if session.get(Project, project_id) is None:
+        raise ResourceNotFoundError("Projet", project_id)
+    condition = ScenarioComparison.project_id == project_id
+    total = session.scalar(
+        select(func.count()).select_from(ScenarioComparison).where(condition)
+    ) or 0
+    items = list(
+        session.scalars(
+            select(ScenarioComparison)
+            .where(condition)
+            .order_by(ScenarioComparison.created_at.desc(), ScenarioComparison.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    )
+    return items, int(total)
 
 
 def _evaluation_payload(evaluation: CandidateEvaluation) -> dict[str, Any]:
@@ -742,6 +798,33 @@ def get_optimization(
     if record is None:
         raise ResourceNotFoundError("Optimisation", optimization_id)
     return record
+
+
+def list_optimizations(
+    session: Session,
+    scenario_id: uuid.UUID,
+    *,
+    limit: int,
+    offset: int,
+) -> tuple[list[OptimizationRun], int]:
+    """Liste les recherches de configuration d'un scénario."""
+
+    if session.get(ScenarioRecord, scenario_id) is None:
+        raise ResourceNotFoundError("Scénario", scenario_id)
+    condition = OptimizationRun.scenario_id == scenario_id
+    total = session.scalar(
+        select(func.count()).select_from(OptimizationRun).where(condition)
+    ) or 0
+    items = list(
+        session.scalars(
+            select(OptimizationRun)
+            .where(condition)
+            .order_by(OptimizationRun.created_at.desc(), OptimizationRun.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    )
+    return items, int(total)
 
 
 __all__ = [

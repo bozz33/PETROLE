@@ -118,6 +118,28 @@ def simulate_transfer(
 
 
 @router.get(
+    "/organizations/{organization_id}/transfers",
+    response_model=Page[TransferRead],
+    summary="Lister les transferts d'une organisation",
+)
+def list_transfers(
+    organization_id: uuid.UUID,
+    session: DatabaseSession,
+    tank_id: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    items, total = operations.list_transfers(
+        session,
+        organization_id,
+        tank_id=tank_id,
+        limit=limit,
+        offset=offset,
+    )
+    return Page(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get(
     "/transfers/{transfer_id}",
     response_model=TransferRead,
     summary="Lire une simulation de transfert",
@@ -160,6 +182,26 @@ def create_comparison(
 
 
 @router.get(
+    "/projects/{project_id}/comparisons",
+    response_model=Page[ComparisonRead],
+    summary="Lister les comparaisons d'un projet",
+)
+def list_comparisons(
+    project_id: uuid.UUID,
+    session: DatabaseSession,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    items, total = operations.list_comparisons(
+        session,
+        project_id,
+        limit=limit,
+        offset=offset,
+    )
+    return Page(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get(
     "/comparisons/{comparison_id}",
     response_model=ComparisonRead,
     summary="Lire une comparaison persistée",
@@ -186,6 +228,26 @@ def run_optimization(
         data,
         idempotency_key=idempotency_key,
     )
+
+
+@router.get(
+    "/scenarios/{scenario_id}/optimizations",
+    response_model=Page[OptimizationRead],
+    summary="Lister les optimisations d'un scénario",
+)
+def list_optimizations(
+    scenario_id: uuid.UUID,
+    session: DatabaseSession,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    items, total = operations.list_optimizations(
+        session,
+        scenario_id,
+        limit=limit,
+        offset=offset,
+    )
+    return Page(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get(

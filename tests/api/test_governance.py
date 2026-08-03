@@ -169,8 +169,12 @@ def test_cycle_normatif_et_evaluation_d_un_calcul(governance_api) -> None:
             "organization_id": organization["id"],
             "name": "Projet avec règles",
             "code": "RULE-01",
+            "project_type": "liquid_pipeline",
+            "unit_system": "SI",
+            "rule_set_ids": [rule_set["id"]],
         },
     ).json()
+    assert project["rule_set_ids"] == [rule_set["id"]]
     model = client.post(
         f"/api/v1/projects/{project['id']}/models",
         json={
@@ -180,7 +184,6 @@ def test_cycle_normatif_et_evaluation_d_un_calcul(governance_api) -> None:
                 "fluid": canonical["fluid"],
                 "network": canonical["network"],
                 "equipment": canonical["equipment"],
-                "rules": {"rule_set_ids": [rule_set["id"]]},
             },
         },
     ).json()

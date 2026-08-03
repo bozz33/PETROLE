@@ -27,3 +27,17 @@ uniquement lorsqu'une réinitialisation explicite des données locales est souha
 
 Cette commande utilise l'étage « runtime » : code copié dans l'image, processus
 non privilégié et rechargement désactivé.
+
+## Sauvegarde et restauration locales
+
+La sauvegarde cohérente regroupe PostgreSQL et le stockage objet dans un dossier horodaté. Chaque archive est contrôlée puis accompagnée d'un manifeste SHA-256 :
+
+    powershell -ExecutionPolicy Bypass -File deployment/scripts/backup.ps1
+
+La restauration remplace intégralement la base et les fichiers. Elle exige donc une autorisation explicite, vérifie les empreintes avant toute suppression, applique les migrations restantes, puis redémarre l'API et le processus de calcul :
+
+    powershell -ExecutionPolicy Bypass -File deployment/scripts/restore.ps1 `
+      -BackupDirectory var/backups/AAAAMMJJTHHMMSSZ `
+      -ConfirmRestore
+
+Le résultat de l'exercice est écrit dans « restore-result.json ». Conserver au moins une copie chiffrée hors de la machine pour respecter l'objectif de reprise après incident.

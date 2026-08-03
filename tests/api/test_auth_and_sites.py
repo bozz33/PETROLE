@@ -267,6 +267,55 @@ def test_roles_cloisonnement_et_protection_du_dernier_administrateur(
     )
     assert forbidden_write.status_code == 403
 
+    promoted = client.patch(
+        f"/api/v1/organizations/{organization_id}/members/{member.json()['id']}",
+        headers=admin_headers,
+        json={"role": "engineer"},
+    )
+    assert promoted.status_code == 200, promoted.text
+    engineer_login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "lecteur@transport.example",
+            "password": MOT_DE_PASSE_LECTEUR,
+        },
+    )
+    engineer_headers = _headers(engineer_login.json()["access_token"])
+    engineer_project = client.post(
+        "/api/v1/projects",
+        headers=engineer_headers,
+        json={
+            "organization_id": organization_id,
+            "name": "Projet ingénierie",
+            "code": "ING-01",
+            "responsible_user_ids": [member.json()["id"]],
+        },
+    )
+    assert engineer_project.status_code == 201, engineer_project.text
+    assert engineer_project.json()["responsible_user_ids"] == [member.json()["id"]]
+    project_id = engineer_project.json()["id"]
+    assert (
+        client.post(
+            f"/api/v1/projects/{project_id}/activate",
+            headers=engineer_headers,
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            f"/api/v1/projects/{project_id}/archive",
+            headers=engineer_headers,
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            f"/api/v1/projects/{project_id}/activate",
+            headers=admin_headers,
+        ).status_code
+        == 200
+    )
+
     with Session(engine) as session:
         other_organization = Organization(
             name="Transport Sud",

@@ -294,6 +294,11 @@ def test_clone_reseau_remappe_les_references_sans_modifier_la_source(network_api
         start=source,
         end=terminal,
     )
+    source_scenario = client.post(
+        f"/api/v1/models/{model['id']}/scenarios",
+        json={"name": "Nominal", "payload": {"imposed_flow_m3_s": 0.2}},
+    )
+    assert source_scenario.status_code == 201, source_scenario.text
     source_model = client.get(f"/api/v1/models/{model['id']}").json()
 
     response = client.post(
@@ -308,9 +313,13 @@ def test_clone_reseau_remappe_les_references_sans_modifier_la_source(network_api
     assert clone["content_hash"] == source_model["content_hash"]
     cloned_nodes = client.get(f"/api/v1/models/{clone['id']}/nodes").json()["items"]
     cloned_edges = client.get(f"/api/v1/models/{clone['id']}/edges").json()["items"]
+    cloned_scenarios = client.get(f"/api/v1/models/{clone['id']}/scenarios").json()["items"]
     assert {item["code"] for item in cloned_nodes} == {"SRC", "DST"}
     assert {item["id"] for item in cloned_nodes}.isdisjoint({source["id"], terminal["id"]})
     assert cloned_edges[0]["from_node_id"] in {item["id"] for item in cloned_nodes}
+    assert len(cloned_scenarios) == 1
+    assert cloned_scenarios[0]["id"] != source_scenario.json()["id"]
+    assert cloned_scenarios[0]["payload"] == source_scenario.json()["payload"]
     mutation = client.patch(
         f"/api/v1/nodes/{cloned_nodes[0]['id']}",
         json={"elevation_m": 80.0},
@@ -353,6 +362,52 @@ def test_calcul_assemble_automatiquement_le_reseau_normalise(network_api) -> Non
     result = client.get(f"/api/v1/calculations/{calculation.json()['id']}/results")
     assert result.json()["result"]["segment_count"] == 1
     assert result.json()["result"]["flow_m3_s"] > 0
+
+
+def test_suppressions_reseau_refusent_les_cascades_implicites(network_api) -> None:
+    client = network_api
+    organization, model = create_model(client)
+    source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
+    terminal = create_node(client, model["id"], code="DST", kind="terminal", elevation_m=90.0)
+    edge = create_edge(
+        client,
+        model["id"],
+        code="T-01",
+        sequence=1,
+        start=source,
+        end=terminal,
+    )
+    valve = client.post(
+        "/api/v1/catalog/valves",
+        json={
+            "organization_id": organization["id"],
+            "code": "V-ISO-01",
+            "name": "Vanne d'isolement",
+            "payload": {"kind": "gate_valve", "k_coefficient": 0.2},
+            "source": "Fiche constructeur validée",
+        },
+    )
+    assert valve.status_code == 201, valve.text
+    valve = client.post(f"/api/v1/catalog/items/{valve.json()['id']}/approve").json()
+    asset = client.post(
+        f"/api/v1/models/{model['id']}/assets",
+        json={
+            "catalog_item_id": valve["id"],
+            "edge_id": edge["id"],
+            "code": "T-01-V1",
+            "name": "Vanne principale",
+            "role": "isolation",
+            "payload": {"chainage_m": 500.0, "opening_ratio": 1.0},
+        },
+    )
+    assert asset.status_code == 201, asset.text
+
+    assert client.delete(f"/api/v1/nodes/{source['id']}").status_code == 409
+    assert client.delete(f"/api/v1/edges/{edge['id']}").status_code == 409
+    assert client.delete(f"/api/v1/assets/{asset.json()['id']}").status_code == 204
+    assert client.delete(f"/api/v1/edges/{edge['id']}").status_code == 204
+    assert client.delete(f"/api/v1/nodes/{source['id']}").status_code == 204
+    assert client.delete(f"/api/v1/nodes/{terminal['id']}").status_code == 204
 
 
 def test_schema_openapi_expose_reseau_normalise(network_api) -> None:

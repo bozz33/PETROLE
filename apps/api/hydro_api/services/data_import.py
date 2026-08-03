@@ -139,6 +139,31 @@ def get_file(session: Session, file_id: uuid.UUID) -> StoredFile:
     return stored_file
 
 
+def audit_file_download(
+    session: Session,
+    stored_file: StoredFile,
+    *,
+    actor_id: uuid.UUID | None,
+) -> None:
+    """Journalise le téléchargement d'un fichier privé."""
+
+    session.add(
+        AuditEvent(
+            organization_id=stored_file.organization_id,
+            actor_id=actor_id,
+            action="file.downloaded",
+            object_type="file",
+            object_id=stored_file.id,
+            details={
+                "content_hash": stored_file.content_hash,
+                "media_type": stored_file.media_type,
+            },
+            created_at=utc_now(),
+        )
+    )
+    session.flush()
+
+
 def store_file(
     session: Session,
     storage: ObjectStorage,

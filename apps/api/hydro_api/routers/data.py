@@ -95,11 +95,17 @@ def read_file(file_id: uuid.UUID, session: DatabaseSession):
 )
 def download_file(
     file_id: uuid.UUID,
+    request: Request,
     session: DatabaseSession,
     storage: ObjectStorageDependency,
 ):
     stored_file = data_import.get_file(session, file_id)
     content = storage.get_bytes(stored_file.object_key)
+    data_import.audit_file_download(
+        session,
+        stored_file,
+        actor_id=request.state.access_context.user_id,
+    )
     safe_name = stored_file.filename.replace('"', "")
     return Response(
         content=content,

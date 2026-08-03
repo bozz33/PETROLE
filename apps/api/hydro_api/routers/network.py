@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Response, status
 
 from hydro_api.schemas.core import ModelVersionRead, Page
 from hydro_api.schemas.network import (
@@ -134,6 +134,20 @@ def update_node(
     )
 
 
+@router.delete(
+    "/nodes/{node_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Supprimer un nœud isolé du brouillon",
+)
+def delete_node(
+    node_id: uuid.UUID,
+    session: DatabaseSession,
+    access: ApplicationAccess,
+) -> Response:
+    network.delete_network_node(session, node_id, actor_id=access.user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.post(
     "/models/{model_id}/edges",
     response_model=NetworkEdgeRead,
@@ -203,6 +217,20 @@ def update_edge(
     )
 
 
+@router.delete(
+    "/edges/{edge_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Supprimer un tronçon sans équipement",
+)
+def delete_edge(
+    edge_id: uuid.UUID,
+    session: DatabaseSession,
+    access: ApplicationAccess,
+) -> Response:
+    network.delete_network_edge(session, edge_id, actor_id=access.user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.post(
     "/models/{model_id}/assets",
     response_model=AssetInstanceRead,
@@ -270,6 +298,20 @@ def update_asset(
     return AssetInstanceRead.model_validate(
         network.update_asset_instance(session, asset_id, data, actor_id=access.user_id)
     )
+
+
+@router.delete(
+    "/assets/{asset_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Retirer un équipement placé",
+)
+def delete_asset(
+    asset_id: uuid.UUID,
+    session: DatabaseSession,
+    access: ApplicationAccess,
+) -> Response:
+    network.delete_asset_instance(session, asset_id, actor_id=access.user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

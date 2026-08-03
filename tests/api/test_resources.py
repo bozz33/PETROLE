@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Generator
 
 import pytest
@@ -139,6 +140,82 @@ def test_workflow_projet_version_scenario(client):
     assert scenarios["total"] == 1
     assert scenarios["items"][0]["id"] == scenario["id"]
 
+    clone_response = client.post(
+        f"/api/v1/scenarios/{scenario['id']}/clone",
+        json={"name": "Nominal dégradé"},
+    )
+    assert clone_response.status_code == 201, clone_response.text
+    cloned_scenario = clone_response.json()
+    assert cloned_scenario["parent_id"] == scenario["id"]
+    assert cloned_scenario["payload"] == scenario["payload"]
+    assert client.patch(
+        f"/api/v1/scenarios/{cloned_scenario['id']}",
+        json={"payload": {"flow_m3_s": 0.3}},
+    ).status_code == 200
+    assert client.get(f"/api/v1/scenarios/{scenario['id']}").json()["payload"] == scenario[
+        "payload"
+    ]
+
+
+def test_cycle_de_vie_projet_et_restauration_du_statut(client, database_engine):
+    organization = create_organization(client)
+    project = create_project(client, organization["id"])
+
+    direct_status = client.patch(
+        f"/api/v1/projects/{project['id']}",
+        json={"status": "archived"},
+    )
+    assert direct_status.status_code == 422
+
+    activated = client.post(f"/api/v1/projects/{project['id']}/activate")
+    assert activated.status_code == 200, activated.text
+    assert activated.json()["status"] == "active"
+    assert client.post(f"/api/v1/projects/{project['id']}/activate").status_code == 409
+
+    archived = client.post(f"/api/v1/projects/{project['id']}/archive")
+    assert archived.status_code == 200, archived.text
+    assert archived.json()["status"] == "archived"
+    assert client.post(f"/api/v1/projects/{project['id']}/archive").status_code == 409
+
+    visible = client.get(
+        "/api/v1/projects",
+        params={"organization_id": organization["id"]},
+    ).json()
+    complete = client.get(
+        "/api/v1/projects",
+        params={"organization_id": organization["id"], "include_archived": True},
+    ).json()
+    assert visible["total"] == 0
+    assert complete["total"] == 1
+    assert complete["items"][0]["status"] == "archived"
+
+    blocked_update = client.patch(
+        f"/api/v1/projects/{project['id']}",
+        json={"name": "Modification interdite"},
+    )
+    assert blocked_update.status_code == 409
+    blocked_model = client.post(
+        f"/api/v1/projects/{project['id']}/models",
+        json={"name": "Version interdite"},
+    )
+    assert blocked_model.status_code == 409
+
+    restored = client.post(f"/api/v1/projects/{project['id']}/restore")
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["status"] == "active"
+    assert client.post(f"/api/v1/projects/{project['id']}/restore").status_code == 409
+    assert create_model(client, project["id"])["version_number"] == 1
+
+    with Session(database_engine) as session:
+        actions = set(
+            session.scalars(
+                select(AuditEvent.action).where(
+                    AuditEvent.object_id == uuid.UUID(project["id"])
+                )
+            )
+        )
+    assert {"project.activated", "project.archived", "project.restored"} <= actions
+
 
 def test_numerotation_et_filiation_des_versions(client):
     organization = create_organization(client)
@@ -199,6 +276,11 @@ def test_approbation_unique_et_immutabilite_scenario(client):
     )
     assert still_immutable.status_code == 409
     assert client.post(f"/api/v1/models/{second['id']}/approve").status_code == 200
+    forbidden_scenario = client.post(
+        f"/api/v1/models/{second['id']}/scenarios",
+        json={"name": "Ajout tardif"},
+    )
+    assert forbidden_scenario.status_code == 409
 
 
 def test_conflit_unicite_retourne_409(client):
@@ -240,10 +322,7 @@ def test_audit_append_only_cree_un_evenement_par_mutation(client, database_engin
         f"/api/v1/models/{model['id']}/scenarios",
         json={"name": "Nominal"},
     )
-    client.patch(
-        f"/api/v1/projects/{project['id']}",
-        json={"status": "active"},
-    )
+    client.post(f"/api/v1/projects/{project['id']}/activate")
 
     with Session(database_engine) as session:
         count = session.scalar(select(func.count()).select_from(AuditEvent))
@@ -255,7 +334,7 @@ def test_audit_append_only_cree_un_evenement_par_mutation(client, database_engin
         "project.created",
         "model_version.created",
         "scenario.created",
-        "project.updated",
+        "project.activated",
     ]
 
 
@@ -312,16 +391,23 @@ def test_calcul_persistant_et_lecture_des_resultats(client):
     assert response.status_code == 202, response.text
     calculation = response.json()
     assert calculation["status"].startswith("SIM_")
+    assert calculation["job_id"]
+    assert calculation["phase"] == "completed"
+    assert calculation["progress_percent"] == 100
     assert len(calculation["input_hash"]) == 71
     assert calculation["finished_at"] is not None
 
     state = client.get(f"/api/v1/calculations/{calculation['id']}")
     summary = client.get(f"/api/v1/calculations/{calculation['id']}/summary")
     results = client.get(f"/api/v1/calculations/{calculation['id']}/results")
+    history = client.get(f"/api/v1/scenarios/{scenario['id']}/calculations")
 
     assert state.status_code == 200
     assert summary.status_code == 200
     assert results.status_code == 200
+    assert history.status_code == 200
+    assert history.json()["total"] == 1
+    assert history.json()["items"][0]["job_id"] == calculation["job_id"]
     assert summary.json()["summary"]["input_hash"] == calculation["input_hash"]
     assert "profile" not in summary.json()["summary"]
     assert results.json()["result"]["profile"]
@@ -412,8 +498,15 @@ def test_generation_telechargement_et_approbation_du_rapport(
     assert report["content_hash"].startswith("sha256:")
 
     metadata = client.get(f"/api/v1/reports/{report['id']}")
+    listed = client.get(
+        "/api/v1/reports",
+        params={"calculation_id": calculation["id"]},
+    )
     download = client.get(f"/api/v1/reports/{report['id']}/download")
     assert metadata.status_code == 200
+    assert listed.status_code == 200
+    assert listed.json()["total"] == 1
+    assert listed.json()["items"][0]["id"] == report["id"]
     assert download.status_code == 200
     assert download.headers["content-type"] == "application/pdf"
     assert "attachment;" in download.headers["content-disposition"]
@@ -437,5 +530,11 @@ def test_generation_telechargement_et_approbation_du_rapport(
     with Session(database_engine) as session:
         report_count = session.scalar(select(func.count()).select_from(GeneratedReport))
         file_count = session.scalar(select(func.count()).select_from(StoredFile))
+        download_audit_count = session.scalar(
+            select(func.count())
+            .select_from(AuditEvent)
+            .where(AuditEvent.action == "report.downloaded")
+        )
     assert report_count == 1
     assert file_count == 1
+    assert download_audit_count == 1

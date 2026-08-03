@@ -28,6 +28,7 @@ from hydro_api.schemas import (
     ReportApproval,
     ReportCreate,
     ReportRead,
+    ScenarioCloneCreate,
     ScenarioCreate,
     ScenarioRead,
     ScenarioUpdate,
@@ -128,6 +129,7 @@ def list_projects(
     request: Request,
     session: DatabaseSession,
     organization_id: uuid.UUID | None = None,
+    include_archived: bool = False,
     limit: Limit = 50,
     offset: Offset = 0,
 ):
@@ -136,6 +138,7 @@ def list_projects(
     items, total = core.list_projects(
         session,
         organization_id=organization_id,
+        include_archived=include_archived,
         limit=limit,
         offset=offset,
         allowed_organization_ids=allowed_ids,
@@ -163,6 +166,45 @@ def update_project(
     session: DatabaseSession,
 ):
     return core.update_project(session, project_id, data)
+
+
+@router.post(
+    "/projects/{project_id}/activate",
+    response_model=ProjectRead,
+    summary="Activer un projet brouillon",
+)
+def activate_project(project_id: uuid.UUID, request: Request, session: DatabaseSession):
+    return core.activate_project(
+        session,
+        project_id,
+        actor_id=request.state.access_context.user_id,
+    )
+
+
+@router.post(
+    "/projects/{project_id}/archive",
+    response_model=ProjectRead,
+    summary="Archiver un projet",
+)
+def archive_project(project_id: uuid.UUID, request: Request, session: DatabaseSession):
+    return core.archive_project(
+        session,
+        project_id,
+        actor_id=request.state.access_context.user_id,
+    )
+
+
+@router.post(
+    "/projects/{project_id}/restore",
+    response_model=ProjectRead,
+    summary="Restaurer un projet archivé",
+)
+def restore_project(project_id: uuid.UUID, request: Request, session: DatabaseSession):
+    return core.restore_project(
+        session,
+        project_id,
+        actor_id=request.state.access_context.user_id,
+    )
 
 
 @router.post(
@@ -296,6 +338,20 @@ def read_scenario(scenario_id: uuid.UUID, session: DatabaseSession):
     return core.get_scenario(session, scenario_id)
 
 
+@router.post(
+    "/scenarios/{scenario_id}/clone",
+    response_model=ScenarioRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Cloner un scénario dans la version en brouillon",
+)
+def clone_scenario(
+    scenario_id: uuid.UUID,
+    data: ScenarioCloneCreate,
+    session: DatabaseSession,
+):
+    return core.clone_scenario(session, scenario_id, data)
+
+
 @router.patch(
     "/scenarios/{scenario_id}",
     response_model=ScenarioRead,
@@ -323,17 +379,44 @@ def create_calculation(
     idempotency_key: IdempotencyKey,
 ):
     if request.app.state.settings.background_jobs_enabled:
-        return core.queue_calculation(
+        calculation = core.queue_calculation(
             session,
             scenario_id,
             data,
             idempotency_key=idempotency_key,
         )
-    return core.create_calculation(
+    else:
+        calculation = core.create_calculation(
+            session,
+            scenario_id,
+            data,
+            idempotency_key=idempotency_key,
+        )
+    return core.calculation_payload(session, calculation)
+
+
+@router.get(
+    "/scenarios/{scenario_id}/calculations",
+    response_model=Page[CalculationRead],
+    summary="Lister les calculs d'un scénario",
+)
+def list_calculations(
+    scenario_id: uuid.UUID,
+    session: DatabaseSession,
+    limit: Limit = 50,
+    offset: Offset = 0,
+):
+    items, total = core.list_calculations(
         session,
         scenario_id,
-        data,
-        idempotency_key=idempotency_key,
+        limit=limit,
+        offset=offset,
+    )
+    return Page(
+        items=[core.calculation_payload(session, item) for item in items],
+        total=total,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -343,7 +426,8 @@ def create_calculation(
     summary="Lire l'état d'un calcul",
 )
 def read_calculation(calculation_id: uuid.UUID, session: DatabaseSession):
-    return core.get_calculation(session, calculation_id)
+    calculation = core.get_calculation(session, calculation_id)
+    return core.calculation_payload(session, calculation)
 
 
 @router.post(
@@ -357,7 +441,8 @@ def cancel_calculation(
     session: DatabaseSession,
 ):
     access = request.state.access_context
-    return core.cancel_calculation(session, calculation_id, actor_id=access.user_id)
+    calculation = core.cancel_calculation(session, calculation_id, actor_id=access.user_id)
+    return core.calculation_payload(session, calculation)
 
 
 @router.post(
@@ -373,13 +458,14 @@ def rerun_calculation(
     idempotency_key: IdempotencyKey,
 ):
     access = request.state.access_context
-    return core.rerun_calculation(
+    calculation = core.rerun_calculation(
         session,
         calculation_id,
         idempotency_key=idempotency_key,
         synchronous=not request.app.state.settings.background_jobs_enabled,
         actor_id=access.user_id,
     )
+    return core.calculation_payload(session, calculation)
 
 
 @router.get(
@@ -434,6 +520,32 @@ def create_report(
 
 
 @router.get(
+    "/reports",
+    response_model=Page[ReportRead],
+    summary="Lister les rapports accessibles",
+)
+def list_reports(
+    request: Request,
+    session: DatabaseSession,
+    organization_id: uuid.UUID | None = None,
+    calculation_id: uuid.UUID | None = None,
+    limit: Limit = 50,
+    offset: Offset = 0,
+):
+    access = request.state.access_context
+    allowed_ids = None if access.local_bypass else access.organization_ids
+    items, total = core.list_reports(
+        session,
+        organization_id=organization_id,
+        calculation_id=calculation_id,
+        limit=limit,
+        offset=offset,
+        allowed_organization_ids=allowed_ids,
+    )
+    return Page(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get(
     "/reports/{report_id}",
     response_model=ReportRead,
     summary="Lire les métadonnées d'un rapport",
@@ -449,12 +561,18 @@ def read_report(report_id: uuid.UUID, session: DatabaseSession):
 )
 def download_report(
     report_id: uuid.UUID,
+    request: Request,
     session: DatabaseSession,
     storage: ObjectStorageDependency,
 ):
     report = core.get_report(session, report_id)
     stored_file = core.get_report_file(session, report)
     content = storage.get_bytes(stored_file.object_key)
+    core.audit_report_download(
+        session,
+        report,
+        actor_id=request.state.access_context.user_id,
+    )
     return Response(
         content=content,
         media_type=stored_file.media_type,

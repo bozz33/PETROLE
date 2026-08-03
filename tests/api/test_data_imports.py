@@ -153,6 +153,12 @@ def test_csv_profile_import_keeps_raw_and_normalized_lineage(import_client) -> N
     download = import_client.get(f"/api/v1/files/{stored_file['id']}/download")
     assert download.status_code == 200
     assert download.content == content
+    audit = import_client.get(
+        "/api/v1/audit-events",
+        params={"organization_id": organization["id"], "action": "file.downloaded"},
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
 
 
 def test_import_reports_invalid_number_and_non_monotonic_profile(import_client) -> None:

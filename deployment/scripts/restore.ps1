@@ -53,9 +53,9 @@ function Invoke-Compose {
 }
 
 Invoke-Compose up --detach postgres minio
-Invoke-Compose stop api worker web
-$postgresContainer = (Invoke-Compose ps -q postgres | Select-Object -First 1).Trim()
-$minioContainer = (Invoke-Compose ps -q minio | Select-Object -First 1).Trim()
+Invoke-Compose stop api worker web minio
+$postgresContainer = (Invoke-Compose ps --all -q postgres | Select-Object -First 1).Trim()
+$minioContainer = (Invoke-Compose ps --all -q minio | Select-Object -First 1).Trim()
 if (-not $postgresContainer -or -not $minioContainer) {
     throw "Les conteneurs PostgreSQL et MinIO doivent être disponibles."
 }
@@ -98,7 +98,7 @@ finally {
 }
 
 Invoke-Compose run --rm --no-deps api alembic upgrade head
-Invoke-Compose up --detach api worker
+Invoke-Compose up --detach minio api worker
 if ($StartWeb) {
     Invoke-Compose up --detach web
 }

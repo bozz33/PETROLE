@@ -8,7 +8,7 @@ export default defineConfig({
   reporter: "list",
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173",
-    channel: "chrome",
+    channel: process.env.PLAYWRIGHT_USE_BUNDLED_CHROMIUM === "true" ? undefined : "chrome",
     headless: true,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",

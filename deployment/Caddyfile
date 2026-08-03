@@ -1,0 +1,28 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$HYDRO_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	reverse_proxy web:80 {
+		health_uri /api/v1/health
+		health_interval 30s
+		health_timeout 3s
+		lb_try_duration 5s
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

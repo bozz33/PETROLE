@@ -147,6 +147,15 @@ La variable `E2E_BASE_URL` permet de viser une autre instance que `http://localh
 Le dernier procès-verbal de recette locale du backend est disponible dans
 [`docs/validation/recette_backend_mvp.md`](docs/validation/recette_backend_mvp.md).
 
+### Reprise et déploiement VPS
+
+- état de reprise entre sessions : [`MEMOIRE_PROJET.md`](MEMOIRE_PROJET.md) ;
+- prompt prêt pour une nouvelle session : [`PROMPT_REPRISE_VPS.md`](PROMPT_REPRISE_VPS.md) ;
+- installation, transfert et qualification VPS : [`deployment/VPS.md`](deployment/VPS.md).
+
+Le mode VPS de développement monte le dépôt en volume. Les modifications backend et frontend
+sont donc rechargées sans reconstruction, sauf changement des dépendances ou des Dockerfiles.
+
 ### Exécuter le dossier de validation scientifique
 
 Après installation locale du projet en mode éditable :

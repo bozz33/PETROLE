@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from hydro_api.application import create_application
-from hydro_api.config import Settings
+from hydro_api.config import Settings, get_settings
 from hydro_api.database.base import Base, utc_now
 from hydro_api.models import AuditEvent
 from hydro_shared.observability import bound_context
@@ -54,6 +54,22 @@ def test_readiness_verifie_base_et_stockage(tmp_path) -> None:
         "database": "ready",
         "object_storage": "ready",
     }
+
+
+def test_configuration_explicite_isole_instance_applicative(tmp_path) -> None:
+    """Une application construite explicitement n'hérite pas de la configuration globale."""
+
+    settings = Settings(
+        environment="test",
+        database_url="sqlite+pysqlite:///:memory:",
+        background_jobs_enabled=False,
+        object_storage_backend="filesystem",
+        object_storage_directory=tmp_path / "objects",
+    )
+    application = create_application(settings)
+
+    assert application.state.settings is settings
+    assert application.dependency_overrides[get_settings]() is settings
 
 
 def test_schema_openapi_versionne() -> None:

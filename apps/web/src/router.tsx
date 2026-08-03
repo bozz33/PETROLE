@@ -17,6 +17,7 @@ import { ProjetsPage } from "./pages/ProjetsPage";
 import { RapportsPage } from "./pages/RapportsPage";
 import { StockagePage } from "./pages/StockagePage";
 import { TableauBordPage } from "./pages/TableauBordPage";
+import { VisualisationReseauPage } from "./pages/VisualisationReseauPage";
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -45,6 +46,12 @@ const modelingRoute = createRoute({
   getParentRoute: () => applicationRoute,
   path: "modelisation",
   component: ModelisationPage,
+});
+
+const networkVisualisationRoute = createRoute({
+  getParentRoute: () => applicationRoute,
+  path: "reseau",
+  component: VisualisationReseauPage,
 });
 
 const librariesRoute = createRoute({
@@ -93,6 +100,7 @@ const applicationTree = applicationRoute.addChildren([
   dashboardRoute,
   projectsRoute,
   modelingRoute,
+  networkVisualisationRoute,
   librariesRoute,
   calculationRoute,
   storageRoute,

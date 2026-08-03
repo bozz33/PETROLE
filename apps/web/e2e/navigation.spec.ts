@@ -31,7 +31,7 @@ async function installPlatformMock(page: Page): Promise<void> {
     respond(route, { version: 8, name: "PETROLE test style", sources: {}, layers: [] }),
   );
 
-  await page.route("**/api/v1/**", async (route) => {
+  await page.route(/\/api\/v1\//, async (route) => {
     const path = new URL(route.request().url()).pathname.replace("/api/v1", "");
 
     if (path === "/auth/status") {
@@ -87,9 +87,15 @@ for (const [path, title] of ROUTES) {
   });
 }
 
-test("la navigation interne change de page sans rechargement externe", async ({ page }) => {
+test("la navigation interne change de page sans rechargement externe", async ({ page }, testInfo) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.locator('a[href="/modelisation"]').click();
+  await expect(page.getByRole("heading", { level: 1, name: "Tableau de bord" })).toBeVisible();
+
+  if (testInfo.project.name === "mobile") {
+    await page.getByRole("button", { name: "Ouvrir la navigation" }).click();
+  }
+
+  await page.getByRole("link", { name: "Modélisation" }).click();
   await expect(page).toHaveURL(/\/modelisation$/);
   await expect(page.getByRole("heading", { level: 1, name: "Modélisation" })).toBeVisible();
 });

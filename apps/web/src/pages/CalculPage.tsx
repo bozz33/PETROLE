@@ -6,6 +6,7 @@ import { EmptyState, ErrorNotice, Panel, StatusBadge, SuccessNotice } from "../c
 import { EXAMPLE_SCENARIO } from "../samples";
 import type {
   Calculation,
+  CalculationProfilePoint,
   CalculationResult,
   ModelVersion,
   Page,
@@ -119,6 +120,7 @@ export function CalculPage() {
   const profile = useMemo(() => summary?.profile ?? [], [summary]);
   const violations = summary?.violations ?? [];
   const warnings = summary?.warnings ?? [];
+  const ruleEvaluations = summary?.rule_evaluations ?? [];
   const error =
     projectsQuery.error ??
     modelsQuery.error ??
@@ -267,6 +269,36 @@ export function CalculPage() {
           </section>
 
           <Panel
+            title="Éligibilité à la décision"
+            description="Le verdict physique reste distinct de la conformité normative."
+          >
+            <div className="resource-summary">
+              <div>
+                <span>Contrôles physiques</span>
+                <StatusBadge
+                  value={summary.physical_approvable ? "approvable" : "bloqué"}
+                />
+              </div>
+              <div>
+                <span>Conformité normative</span>
+                <StatusBadge value={summary.compliance_status} />
+              </div>
+              <div>
+                <span>Décision positive</span>
+                <StatusBadge
+                  value={summary.decision_eligible ? "éligible" : "interdite"}
+                />
+              </div>
+            </div>
+            {summary.compliance_status === "not_evaluated" ? (
+              <div className="notice notice-error" role="alert">
+                Aucun jeu de règles approuvé n’a été évalué. Le rapport peut être généré,
+                mais son approbation positive reste interdite.
+              </div>
+            ) : null}
+          </Panel>
+
+          <Panel
             title="Profil pression–altitude"
             description="Pression absolue et profil altimétrique suivant le chaînage."
           >
@@ -309,6 +341,46 @@ export function CalculPage() {
               )}
             </Panel>
           </div>
+
+          <Panel
+            title="Contrôles normatifs"
+            description="Seuils figés dans l’empreinte du calcul."
+          >
+            {ruleEvaluations.length ? (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Règle</th>
+                      <th>Sévérité</th>
+                      <th>Statut</th>
+                      <th>Valeur</th>
+                      <th>Limite</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ruleEvaluations.map((evaluation) => (
+                      <tr key={evaluation.id}>
+                        <td>
+                          <strong>{evaluation.rule_code ?? evaluation.rule_id.slice(0, 8)}</strong>
+                          <small>{evaluation.message}</small>
+                        </td>
+                        <td>{evaluation.severity ?? "—"}</td>
+                        <td><StatusBadge value={evaluation.status} /></td>
+                        <td>{formatOptionalNumber(evaluation.measured_value, evaluation.unit)}</td>
+                        <td>{formatOptionalNumber(evaluation.limit_value, evaluation.unit)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState
+                title="Aucune règle évaluée"
+                detail="Sélectionnez un jeu de règles approuvé dans la fiche projet."
+              />
+            )}
+          </Panel>
         </>
       ) : (
         <Panel title="Résultat" description="Synthèse, profil et diagnostics.">
@@ -340,7 +412,7 @@ function ResultMetric({
   );
 }
 
-function ProfileChart({ points }: { points: CalculationResult["result"]["profile"] }) {
+function ProfileChart({ points }: { points: CalculationProfilePoint[] }) {
   if (!points.length) {
     return <EmptyState title="Profil vide" detail="Aucun point de profil n'a été produit." />;
   }
@@ -412,4 +484,8 @@ function ProfileChart({ points }: { points: CalculationResult["result"]["profile
       </svg>
     </div>
   );
+}
+
+function formatOptionalNumber(value: number | null, unit: string | null): string {
+  return value === null ? "—" : formatNumber(value) + (unit ? " " + unit : "");
 }

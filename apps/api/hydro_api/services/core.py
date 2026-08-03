@@ -287,6 +287,7 @@ def update_project(
     if project.status == "archived":
         raise ResourceConflictError("Un projet archivé ne peut pas être modifié.")
     changes = data.model_dump(exclude_unset=True)
+    changed_fields = set(changes)
     rule_set_ids = changes.pop("rule_set_ids", None)
     responsible_user_ids = changes.pop("responsible_user_ids", None)
     if rule_set_ids is not None or responsible_user_ids is not None:
@@ -298,12 +299,8 @@ def update_project(
         )
         if rule_set_ids is not None:
             project.rule_sets = rule_sets
-            changes["rule_set_ids"] = [str(identifier) for identifier in project.rule_set_ids]
         if responsible_user_ids is not None:
             project.responsible_users = responsible_users
-            changes["responsible_user_ids"] = [
-                str(identifier) for identifier in project.responsible_user_ids
-            ]
     if "site_id" in changes and changes["site_id"] is not None:
         site = session.get(Site, changes["site_id"])
         if site is None:
@@ -318,13 +315,16 @@ def update_project(
         if field == "country_code" and value is not None:
             value = value.upper()
         setattr(project, field, value)
+    if changed_fields:
+        # Une modification limitée aux associations doit aussi dater la fiche projet.
+        project.updated_at = utc_now()
     _audit(
         session,
         organization_id=project.organization_id,
         action="project.updated",
         object_type="project",
         object_id=project.id,
-        details={"fields": sorted(changes)},
+        details={"fields": sorted(changed_fields)},
     )
     _flush(session, "La mise à jour du projet entre en conflit avec une donnée existante.")
     return project

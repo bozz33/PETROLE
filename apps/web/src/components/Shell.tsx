@@ -1,7 +1,7 @@
 import type { PropsWithChildren, ReactNode } from "react";
-import { NavLink, useLocation } from "react-router-dom";
 
 import { useAuth } from "../auth";
+import { InternalLink, useNavigation } from "../routing";
 
 const NAVIGATION = [
   { to: "/", label: "Vue d'ensemble", mark: "01" },
@@ -11,6 +11,7 @@ const NAVIGATION = [
   { to: "/decision", label: "Comparaison et décision", mark: "05" },
   { to: "/donnees", label: "Données et imports", mark: "06" },
   { to: "/rapports", label: "Rapports", mark: "07" },
+  { to: "/administration", label: "Administration", mark: "08" },
 ];
 
 const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
@@ -41,17 +42,21 @@ const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
     title: "Rapports",
     subtitle: "Générer et approuver les notes de calcul traçables.",
   },
+  "/administration": {
+    title: "Administration",
+    subtitle: "Gérer les membres, les références normatives, les règles et l'audit.",
+  },
 };
 
 export function Shell({ children }: PropsWithChildren) {
-  const location = useLocation();
-  const metadata = PAGE_TITLES[location.pathname] ?? PAGE_TITLES["/"];
+  const { path } = useNavigation();
+  const metadata = PAGE_TITLES[path] ?? PAGE_TITLES["/"];
   const { user, localBypass, logout } = useAuth();
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <NavLink to="/" className="brand" aria-label="Accueil">
+        <InternalLink to="/" className="brand" label="Accueil">
           <span className="brand-symbol" aria-hidden="true">
             HP
           </span>
@@ -59,19 +64,18 @@ export function Shell({ children }: PropsWithChildren) {
             <strong>HydroPlatform</strong>
             <small>Ingénierie liquide</small>
           </span>
-        </NavLink>
+        </InternalLink>
 
         <nav className="main-nav" aria-label="Navigation principale">
           {NAVIGATION.map((item) => (
-            <NavLink
+            <InternalLink
               key={item.to}
               to={item.to}
-              end={item.to === "/"}
-              className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
+              className={(isActive) => (isActive ? "nav-link active" : "nav-link")}
             >
               <span className="nav-mark">{item.mark}</span>
               <span>{item.label}</span>
-            </NavLink>
+            </InternalLink>
           ))}
         </nav>
 

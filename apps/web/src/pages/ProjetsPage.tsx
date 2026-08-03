@@ -4,7 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, jsonBody } from "../api";
 import { EmptyState, ErrorNotice, Panel, StatusBadge, SuccessNotice } from "../components/Shell";
 import { EXAMPLE_MODEL } from "../samples";
-import type { ModelVersion, Organization, Page, Project, Site } from "../types";
+import type {
+  ModelVersion,
+  Organization,
+  OrganizationMember,
+  Page,
+  Project,
+  RuleSet,
+  Site,
+} from "../types";
 import { formatDate } from "../types";
 
 export function ProjetsPage() {
@@ -19,6 +27,14 @@ export function ProjetsPage() {
   const [projectSiteId, setProjectSiteId] = useState("");
   const [siteName, setSiteName] = useState("");
   const [siteCode, setSiteCode] = useState("");
+  const [configuredName, setConfiguredName] = useState("");
+  const [configuredDescription, setConfiguredDescription] = useState("");
+  const [configuredCountryCode, setConfiguredCountryCode] = useState("");
+  const [configuredSiteId, setConfiguredSiteId] = useState("");
+  const [configuredProjectType, setConfiguredProjectType] =
+    useState<Project["project_type"]>("liquid_pipeline");
+  const [selectedRuleSetIds, setSelectedRuleSetIds] = useState<string[]>([]);
+  const [selectedResponsibleIds, setSelectedResponsibleIds] = useState<string[]>([]);
   const [modelName, setModelName] = useState("Baseline hydraulique");
   const [modelPayload, setModelPayload] = useState(
     JSON.stringify(EXAMPLE_MODEL, null, 2),
@@ -35,7 +51,8 @@ export function ProjetsPage() {
         "/sites?limit=200&offset=0&organization_id=" + organizationId,
       ),
     enabled: Boolean(organizationId),
-  });  const projectsQuery = useQuery({
+  });
+  const projectsQuery = useQuery({
     queryKey: ["projects", organizationId],
     queryFn: () =>
       apiRequest<Page<Project>>(
@@ -51,11 +68,30 @@ export function ProjetsPage() {
       ),
     enabled: Boolean(projectId),
   });
+  const ruleSetsQuery = useQuery({
+    queryKey: ["rule-sets", organizationId, "approved"],
+    queryFn: () =>
+      apiRequest<Page<RuleSet>>(
+        "/rule-sets?status=approved&limit=200&offset=0&organization_id=" +
+          organizationId,
+      ),
+    enabled: Boolean(organizationId),
+  });
+  const membersQuery = useQuery({
+    queryKey: ["members", organizationId],
+    queryFn: () =>
+      apiRequest<OrganizationMember[]>(
+        "/organizations/" + organizationId + "/members",
+      ),
+    enabled: Boolean(organizationId),
+  });
 
   const organizations = organizationsQuery.data?.items ?? [];
   const sites = sitesQuery.data?.items ?? [];
   const projects = projectsQuery.data?.items ?? [];
   const models = modelsQuery.data?.items ?? [];
+  const approvedRuleSets = ruleSetsQuery.data?.items ?? [];
+  const members = membersQuery.data ?? [];
 
   useEffect(() => {
     if (!organizationId && organizations.length) {
@@ -73,6 +109,26 @@ export function ProjetsPage() {
     () => projects.find((project) => project.id === projectId),
     [projectId, projects],
   );
+
+  useEffect(() => {
+    if (!selectedProject) {
+      setConfiguredName("");
+      setConfiguredDescription("");
+      setConfiguredCountryCode("");
+      setConfiguredSiteId("");
+      setConfiguredProjectType("liquid_pipeline");
+      setSelectedRuleSetIds([]);
+      setSelectedResponsibleIds([]);
+      return;
+    }
+    setConfiguredName(selectedProject.name);
+    setConfiguredDescription(selectedProject.description ?? "");
+    setConfiguredCountryCode(selectedProject.country_code ?? "");
+    setConfiguredSiteId(selectedProject.site_id ?? "");
+    setConfiguredProjectType(selectedProject.project_type);
+    setSelectedRuleSetIds(selectedProject.rule_set_ids);
+    setSelectedResponsibleIds(selectedProject.responsible_user_ids);
+  }, [selectedProject]);
 
   const organizationMutation = useMutation({
     mutationFn: () =>
@@ -155,16 +211,63 @@ export function ProjetsPage() {
     },
   });
 
+  const projectConfigurationMutation = useMutation({
+    mutationFn: () =>
+      apiRequest<Project>("/projects/" + projectId, {
+        method: "PATCH",
+        body: jsonBody({
+          name: configuredName,
+          description: configuredDescription || null,
+          project_type: configuredProjectType,
+          country_code: configuredCountryCode || null,
+          site_id: configuredSiteId || null,
+          rule_set_ids: selectedRuleSetIds,
+          responsible_user_ids: selectedResponsibleIds,
+        }),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["projects", organizationId] });
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+
+  const projectStatusMutation = useMutation({
+    mutationFn: (action: "activate" | "archive" | "restore") =>
+      apiRequest<Project>("/projects/" + projectId + "/" + action, {
+        method: "POST",
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["projects", organizationId] });
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+
+  const toggleIdentifier = (
+    identifier: string,
+    selected: string[],
+    setSelected: (value: string[]) => void,
+  ) => {
+    setSelected(
+      selected.includes(identifier)
+        ? selected.filter((value) => value !== identifier)
+        : [...selected, identifier],
+    );
+  };
+
   const error =
     organizationsQuery.error ??
     sitesQuery.error ??
     projectsQuery.error ??
     modelsQuery.error ??
+    ruleSetsQuery.error ??
+    membersQuery.error ??
     organizationMutation.error ??
     siteMutation.error ??
     projectMutation.error ??
     modelMutation.error ??
-    approveMutation.error;
+    approveMutation.error ??
+    projectConfigurationMutation.error ??
+    projectStatusMutation.error;
 
   return (
     <div className="stack">
@@ -173,7 +276,9 @@ export function ProjetsPage() {
         siteMutation.isSuccess ||
         projectMutation.isSuccess ||
         modelMutation.isSuccess ||
-        approveMutation.isSuccess) && (
+        approveMutation.isSuccess ||
+        projectConfigurationMutation.isSuccess ||
+        projectStatusMutation.isSuccess) && (
         <SuccessNotice>La modification a été enregistrée et auditée.</SuccessNotice>
       )}
 
@@ -296,7 +401,8 @@ export function ProjetsPage() {
                 Créer le site
               </button>
             </form>
-          </details>          <details open={Boolean(organizations.length && !projects.length)}>
+          </details>
+          <details open={Boolean(organizations.length && !projects.length)}>
             <summary>Nouveau projet</summary>
             <form
               className="compact-form"
@@ -313,7 +419,8 @@ export function ProjetsPage() {
                     <option key={site.id} value={site.id}>{site.code} — {site.name}</option>
                   ))}
                 </select>
-              </label>              <label>
+              </label>
+              <label>
                 Nom
                 <input
                   value={projectName}
@@ -350,6 +457,182 @@ export function ProjetsPage() {
           </details>
         </Panel>
       </div>
+
+      <Panel
+        title="Fiche projet"
+        description="Référentiel, responsables et état du projet utilisés par les calculs."
+      >
+        {selectedProject ? (
+          <form
+            className="editor-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              projectConfigurationMutation.mutate();
+            }}
+          >
+            <div className="form-grid three">
+              <label>
+                Nom
+                <input
+                  value={configuredName}
+                  onChange={(event) => setConfiguredName(event.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Type de projet
+                <select
+                  value={configuredProjectType}
+                  onChange={(event) =>
+                    setConfiguredProjectType(event.target.value as Project["project_type"])
+                  }
+                >
+                  <option value="liquid_pipeline">Pipeline liquide</option>
+                  <option value="terminal">Terminal</option>
+                  <option value="combined">Installation combinée</option>
+                  <option value="gas_pipeline">Gazoduc — hors calcul MVP</option>
+                </select>
+              </label>
+              <label>
+                Pays
+                <input
+                  value={configuredCountryCode}
+                  onChange={(event) =>
+                    setConfiguredCountryCode(event.target.value.toUpperCase().slice(0, 2))
+                  }
+                  maxLength={2}
+                  placeholder="DZ"
+                />
+              </label>
+            </div>
+            <div className="form-grid">
+              <label>
+                Site industriel
+                <select
+                  value={configuredSiteId}
+                  onChange={(event) => setConfiguredSiteId(event.target.value)}
+                >
+                  <option value="">Aucun site</option>
+                  {sites.map((site) => (
+                    <option key={site.id} value={site.id}>
+                      {site.code} — {site.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Système d'unités
+                <input value="SI" disabled />
+              </label>
+            </div>
+            <label>
+              Description et hypothèses générales
+              <textarea
+                value={configuredDescription}
+                onChange={(event) => setConfiguredDescription(event.target.value)}
+                rows={4}
+              />
+            </label>
+
+            <div className="selection-grid">
+              <fieldset className="selection-fieldset">
+                <legend>Jeux de règles approuvés</legend>
+                {approvedRuleSets.length ? (
+                  approvedRuleSets.map((ruleSet) => (
+                    <label className="selection-option" key={ruleSet.id}>
+                      <input
+                        type="checkbox"
+                        checked={selectedRuleSetIds.includes(ruleSet.id)}
+                        onChange={() =>
+                          toggleIdentifier(
+                            ruleSet.id,
+                            selectedRuleSetIds,
+                            setSelectedRuleSetIds,
+                          )
+                        }
+                      />
+                      <span>
+                        <strong>{ruleSet.code}</strong>
+                        <small>
+                          {ruleSet.title} · version {ruleSet.version_number}
+                        </small>
+                      </span>
+                    </label>
+                  ))
+                ) : (
+                  <p className="field-help">
+                    Aucun jeu approuvé. Créez-le dans la page Administration.
+                  </p>
+                )}
+              </fieldset>
+
+              <fieldset className="selection-fieldset">
+                <legend>Responsables</legend>
+                {members.length ? (
+                  members.map((member) => (
+                    <label className="selection-option" key={member.id}>
+                      <input
+                        type="checkbox"
+                        checked={selectedResponsibleIds.includes(member.id)}
+                        onChange={() =>
+                          toggleIdentifier(
+                            member.id,
+                            selectedResponsibleIds,
+                            setSelectedResponsibleIds,
+                          )
+                        }
+                      />
+                      <span>
+                        <strong>{member.full_name}</strong>
+                        <small>
+                          {member.role} · {member.email}
+                        </small>
+                      </span>
+                    </label>
+                  ))
+                ) : (
+                  <p className="field-help">
+                    Aucun membre déclaré pour cette organisation.
+                  </p>
+                )}
+              </fieldset>
+            </div>
+
+            <div className="button-row">
+              <button
+                className="button button-primary"
+                disabled={projectConfigurationMutation.isPending}
+              >
+                Enregistrer la fiche
+              </button>
+              {selectedProject.status !== "active" ? (
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => projectStatusMutation.mutate("activate")}
+                  disabled={projectStatusMutation.isPending}
+                >
+                  Activer le projet
+                </button>
+              ) : (
+                <button
+                  className="button button-ghost"
+                  type="button"
+                  onClick={() => projectStatusMutation.mutate("archive")}
+                  disabled={projectStatusMutation.isPending}
+                >
+                  Archiver le projet
+                </button>
+              )}
+            </div>
+          </form>
+        ) : (
+          <EmptyState
+            title="Aucun projet sélectionné"
+            detail="Sélectionnez ou créez un projet pour renseigner sa gouvernance."
+          />
+        )}
+      </Panel>
 
       <Panel
         title="Versions du modèle"

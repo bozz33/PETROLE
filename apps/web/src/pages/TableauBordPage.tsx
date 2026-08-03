@@ -1,15 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
 
 import { apiRequest } from "../api";
 import { EmptyState, ErrorNotice, Panel, StatusBadge } from "../components/Shell";
-import type { Health, Organization, Page, Project } from "../types";
+import { InternalLink } from "../routing";
+import type { Health, Organization, Page, Project, Readiness } from "../types";
 import { formatDate } from "../types";
 
 export function TableauBordPage() {
   const healthQuery = useQuery({
     queryKey: ["health"],
     queryFn: () => apiRequest<Health>("/health"),
+    refetchInterval: 30_000,
+  });
+  const readinessQuery = useQuery({
+    queryKey: ["readiness"],
+    queryFn: () => apiRequest<Readiness>("/health/ready"),
     refetchInterval: 30_000,
   });
   const organizationsQuery = useQuery({
@@ -26,8 +31,15 @@ export function TableauBordPage() {
   const activeProjects = projects.filter((project) => project.status === "active").length;
   const draftProjects = projects.filter((project) => project.status === "draft").length;
   const loading =
-    healthQuery.isLoading || organizationsQuery.isLoading || projectsQuery.isLoading;
-  const error = healthQuery.error ?? organizationsQuery.error ?? projectsQuery.error;
+    healthQuery.isLoading ||
+    readinessQuery.isLoading ||
+    organizationsQuery.isLoading ||
+    projectsQuery.isLoading;
+  const error =
+    healthQuery.error ??
+    readinessQuery.error ??
+    organizationsQuery.error ??
+    projectsQuery.error;
 
   if (error) {
     return <ErrorNotice error={error} />;
@@ -44,12 +56,12 @@ export function TableauBordPage() {
             note de calcul reproductible.
           </p>
           <div className="button-row">
-            <Link className="button button-primary" to="/calcul">
+            <InternalLink className="button button-primary" to="/calcul">
               Lancer un calcul
-            </Link>
-            <Link className="button button-ghost" to="/donnees">
+            </InternalLink>
+            <InternalLink className="button button-ghost" to="/donnees">
               Importer des données
-            </Link>
+            </InternalLink>
           </div>
         </div>
         <div className="hero-orbit" aria-hidden="true">
@@ -64,8 +76,14 @@ export function TableauBordPage() {
       <section className="metrics-grid" aria-label="Indicateurs">
         <Metric
           label="État de l'API"
-          value={loading ? "…" : healthQuery.data?.status ?? "inconnu"}
-          detail={healthQuery.data?.version ? "Version " + healthQuery.data.version : "Vérification en cours"}
+          value={loading ? "…" : readinessQuery.data?.status ?? "indisponible"}
+          detail={
+            readinessQuery.data
+              ? "Base et stockage objet disponibles"
+              : healthQuery.data?.version
+                ? "Version " + healthQuery.data.version
+                : "Vérification en cours"
+          }
           tone="green"
         />
         <Metric
@@ -93,9 +111,9 @@ export function TableauBordPage() {
           title="Projets récents"
           description="Derniers référentiels modifiés."
           action={
-            <Link className="text-link" to="/projets">
+            <InternalLink className="text-link" to="/projets">
               Voir tous
-            </Link>
+            </InternalLink>
           }
         >
           {projects.length ? (

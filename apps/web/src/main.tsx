@@ -1,10 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
 
 import { App } from "./App";
 import { AuthProvider } from "./auth";
+import { NavigationProvider } from "./routing";
 import "./styles.css";
 
 const queryClient = new QueryClient({
@@ -25,11 +25,11 @@ if (!container) {
 createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <NavigationProvider>
         <AuthProvider>
           <App />
         </AuthProvider>
-      </BrowserRouter>
+      </NavigationProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

@@ -3,12 +3,13 @@ import { useMutation } from "@tanstack/react-query";
 
 import { apiRequest, downloadApiFile, jsonBody } from "../api";
 import { EmptyState, ErrorNotice, Panel, StatusBadge, SuccessNotice } from "../components/Shell";
-import type { Calculation, Report } from "../types";
+import type { Calculation, CalculationResult, Report } from "../types";
 import { formatDate } from "../types";
 
 export function RapportsPage() {
   const [calculationId, setCalculationId] = useState("");
   const [calculation, setCalculation] = useState<Calculation | null>(null);
+  const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
   const [hydraulicReport, setHydraulicReport] = useState<Report | null>(null);
   const [operationalReport, setOperationalReport] = useState<Report | null>(null);
   const [comment, setComment] = useState("");
@@ -16,9 +17,18 @@ export function RapportsPage() {
   const [sourceId, setSourceId] = useState("");
 
   const lookupMutation = useMutation({
-    mutationFn: () => apiRequest<Calculation>("/calculations/" + calculationId.trim()),
+    mutationFn: async () => {
+      const selectedCalculation = await apiRequest<Calculation>(
+        "/calculations/" + calculationId.trim(),
+      );
+      const selectedResult = await apiRequest<CalculationResult>(
+        "/calculations/" + selectedCalculation.id + "/results",
+      );
+      return { calculation: selectedCalculation, result: selectedResult };
+    },
     onSuccess: (value) => {
-      setCalculation(value);
+      setCalculation(value.calculation);
+      setCalculationResult(value.result);
       setHydraulicReport(null);
     },
   });
@@ -51,7 +61,7 @@ export function RapportsPage() {
     mutationFn: (target: Report) =>
       downloadApiFile(
         "/reports/" + target.id + "/download",
-        target.filename,
+        "rapport-" + target.report_type + "-" + target.id.slice(0, 8) + ".pdf",
       ),
   });
   const approvalMutation = useMutation({
@@ -69,6 +79,9 @@ export function RapportsPage() {
     operationalMutation.error ??
     approvalMutation.error ??
     downloadMutation.error;
+  const decisionEligible = calculationResult?.result?.decision_eligible === true;
+  const complianceStatus =
+    calculationResult?.result?.compliance_status ?? "not_evaluated";
 
   return (
     <div className="stack">
@@ -116,6 +129,14 @@ export function RapportsPage() {
             <div>
               <span>Empreinte d'entrée</span>
               <strong className="mono hash">{calculation.input_hash}</strong>
+            </div>
+            <div>
+              <span>Conformité</span>
+              <StatusBadge value={complianceStatus} />
+            </div>
+            <div>
+              <span>Décision positive</span>
+              <StatusBadge value={decisionEligible ? "éligible" : "interdite"} />
             </div>
           </div>
         ) : null}
@@ -179,6 +200,12 @@ export function RapportsPage() {
 
                 {hydraulicReport.status === "generated" ? (
                   <div className="approval-box">
+                    {!decisionEligible ? (
+                      <div className="notice notice-error" role="alert">
+                        Approbation positive interdite : conformité {complianceStatus}.
+                        Le rejet reste disponible et traçable.
+                      </div>
+                    ) : null}
                     <label>
                       Commentaire de décision
                       <textarea
@@ -191,7 +218,7 @@ export function RapportsPage() {
                     <div className="button-row">
                       <button
                         className="button button-primary"
-                        disabled={approvalMutation.isPending}
+                        disabled={approvalMutation.isPending || !decisionEligible}
                         onClick={() => approvalMutation.mutate("approved")}
                       >
                         Approuver

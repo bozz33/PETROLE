@@ -175,6 +175,19 @@ def test_cycle_normatif_et_evaluation_d_un_calcul(governance_api) -> None:
         },
     ).json()
     assert project["rule_set_ids"] == [rule_set["id"]]
+    detached_rules = client.patch(
+        f"/api/v1/projects/{project['id']}",
+        json={"rule_set_ids": []},
+    )
+    assert detached_rules.status_code == 200, detached_rules.text
+    assert detached_rules.json()["rule_set_ids"] == []
+    assert detached_rules.json()["updated_at"] != project["updated_at"]
+    restored_rules = client.patch(
+        f"/api/v1/projects/{project['id']}",
+        json={"rule_set_ids": [rule_set["id"]]},
+    )
+    assert restored_rules.status_code == 200, restored_rules.text
+    assert restored_rules.json()["rule_set_ids"] == [rule_set["id"]]
     model = client.post(
         f"/api/v1/projects/{project['id']}/models",
         json={

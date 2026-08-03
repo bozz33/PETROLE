@@ -294,6 +294,13 @@ def test_roles_cloisonnement_et_protection_du_dernier_administrateur(
     assert engineer_project.status_code == 201, engineer_project.text
     assert engineer_project.json()["responsible_user_ids"] == [member.json()["id"]]
     project_id = engineer_project.json()["id"]
+    updated_responsibles = client.patch(
+        f"/api/v1/projects/{project_id}",
+        headers=engineer_headers,
+        json={"responsible_user_ids": [member.json()["id"]]},
+    )
+    assert updated_responsibles.status_code == 200, updated_responsibles.text
+    assert updated_responsibles.json()["responsible_user_ids"] == [member.json()["id"]]
     assert (
         client.post(
             f"/api/v1/projects/{project_id}/activate",

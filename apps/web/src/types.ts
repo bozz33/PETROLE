@@ -22,6 +22,23 @@ export interface UserAccount {
   memberships: Membership[];
 }
 
+export type OrganizationRole =
+  | "admin"
+  | "engineer"
+  | "operator"
+  | "approver"
+  | "viewer";
+
+export interface OrganizationMember {
+  id: string;
+  email: string;
+  full_name: string;
+  is_active: boolean;
+  role: OrganizationRole;
+  membership_id: string;
+  created_at: string;
+}
+
 export interface TokenPair {
   access_token: string;
   refresh_token: string;
@@ -192,10 +209,86 @@ export interface Project {
   name: string;
   code: string;
   description: string | null;
+  project_type: "liquid_pipeline" | "terminal" | "gas_pipeline" | "combined";
   country_code: string | null;
+  unit_system: "SI";
+  rule_set_ids: string[];
+  responsible_user_ids: string[];
   status: "draft" | "active" | "archived";
   created_at: string;
   updated_at: string;
+}
+
+export interface StandardReference {
+  id: string;
+  organization_id: string;
+  parent_id: string | null;
+  code: string;
+  title: string;
+  issuing_body: string;
+  edition: string;
+  publication_date: string | null;
+  effective_date: string | null;
+  status: "draft" | "active" | "withdrawn" | "archived";
+  licensed_copy_ref: string | null;
+  source_url: string | null;
+  content_hash: string;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RuleSet {
+  id: string;
+  organization_id: string;
+  parent_id: string | null;
+  code: string;
+  title: string;
+  country_code: string | null;
+  domain: string;
+  version_number: number;
+  description: string | null;
+  status: "draft" | "approved" | "archived";
+  standard_ids: string[];
+  content_hash: string;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RuleDefinition {
+  id: string;
+  rule_set_id: string;
+  standard_id: string | null;
+  code: string;
+  title: string;
+  severity: "information" | "warning" | "error" | "blocking";
+  domain: string;
+  metric_path: string;
+  operator: "le" | "lt" | "ge" | "gt" | "eq" | "between";
+  limit_value: number;
+  upper_limit_value: number | null;
+  unit: string | null;
+  applicability: { type: "always" };
+  parameters: Record<string, unknown>;
+  message: string;
+  source_clause_ref: string | null;
+  status: "draft" | "approved" | "archived";
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  organization_id: string | null;
+  actor_id: string | null;
+  action: string;
+  object_type: string;
+  object_id: string;
+  correlation_id: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface ModelVersion {
@@ -225,10 +318,13 @@ export interface Scenario {
 
 export interface Calculation {
   id: string;
+  job_id: string | null;
   scenario_id: string;
   engine: string;
   engine_version: string;
   status: string;
+  phase: "queued" | "running" | "completed" | "failed" | "cancelled";
+  progress_percent: number;
   input_hash: string;
   created_at: string;
   started_at: string | null;
@@ -262,7 +358,43 @@ export interface CalculationPayload {
   total_power_w: number;
   residual: number;
   feasible: boolean;
+  physical_approvable: boolean;
+  compliance_status:
+    | "not_evaluated"
+    | "compliant"
+    | "compliant_with_reservations"
+    | "non_compliant"
+    | "indeterminate";
+  decision_eligible: boolean;
   approvable: boolean;
+  compliance: {
+    status: string;
+    counts: {
+      total: number;
+      compliant: number;
+      non_compliant: number;
+      not_applicable: number;
+      errors: number;
+    };
+    blocking_failure_count: number;
+    reservation_count: number;
+    blocking_rule_ids: string[];
+  };
+  rule_evaluations: Array<{
+    id: string;
+    rule_set_id: string;
+    rule_id: string;
+    rule_code: string | null;
+    rule_set_hash: string | null;
+    status: "compliant" | "non_compliant" | "not_applicable" | "error";
+    severity: "information" | "warning" | "error" | "blocking" | null;
+    measured_value: number | null;
+    limit_value: number | null;
+    margin: number | null;
+    unit: string | null;
+    message: string;
+    source_clause_ref: string | null;
+  }>;
   violations: CalculationIssue[];
   warnings: CalculationIssue[];
   profile: CalculationProfilePoint[];
@@ -272,7 +404,7 @@ export interface CalculationPayload {
 export interface CalculationResult {
   calculation_id: string;
   status: string;
-  result: CalculationPayload;
+  result: CalculationPayload | null;
   diagnostics: Record<string, unknown> | null;
 }
 
@@ -359,9 +491,6 @@ export interface Report {
   locale: string;
   status: string;
   content_hash: string;
-  filename: string;
-  media_type: string;
-  size_bytes: number;
   created_at: string;
   approved_at: string | null;
   approval_comment: string | null;
@@ -372,6 +501,12 @@ export interface Health {
   service: string;
   version: string;
   environment: string;
+}
+
+export interface Readiness {
+  status: "ready";
+  database: "ready";
+  object_storage: "ready";
 }
 
 export function formatDate(value: string | null): string {

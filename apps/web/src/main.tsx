@@ -10,6 +10,7 @@ import "./styles.css";
 import "./petrole-theme.css";
 import "./shadcn-shell.css";
 import "./auth-theme.css";
+import "./auth-fallback.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

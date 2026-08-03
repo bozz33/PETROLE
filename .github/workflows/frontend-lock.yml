@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: frontend-lock-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   lockfile:
@@ -49,6 +49,10 @@ jobs:
             echo "Le verrou est déjà à jour."
             exit 0
           fi
+          cp apps/web/package-lock.json /tmp/package-lock.json
+          git fetch origin feature/frontend-shadcn-admin
+          git reset --hard origin/feature/frontend-shadcn-admin
+          cp /tmp/package-lock.json apps/web/package-lock.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add apps/web/package-lock.json

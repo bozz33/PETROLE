@@ -5,6 +5,9 @@ import { EmptyState, ErrorNotice, Panel, StatusBadge } from "../components/Shell
 import { InternalLink } from "../routing";
 import type { Health, Organization, Page, Project, Readiness } from "../types";
 import { formatDate } from "../types";
+import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export function TableauBordPage() {
   const healthQuery = useQuery({
@@ -126,7 +129,7 @@ export function TableauBordPage() {
         title="Projets récents"
         description="Derniers référentiels modifiés et état de validation."
         action={
-          <InternalLink className="text-link" to="/projets">
+          <InternalLink className={buttonVariants({ variant: "link", size: "sm" })} to="/projets">
             Voir tous les projets
           </InternalLink>
         }
@@ -171,14 +174,14 @@ export function TableauBordPage() {
 
       <div className="dashboard-actions">
         <div>
-          <InternalLink className="button button-primary" to="/projets">
+          <InternalLink className={buttonVariants()} to="/projets">
             + Nouveau projet
           </InternalLink>
-          <InternalLink className="button button-secondary" to="/donnees">
+          <InternalLink className={buttonVariants({ variant: "outline" })} to="/donnees">
             Importer des données
           </InternalLink>
         </div>
-        <InternalLink className="button button-warning" to="/calcul">
+        <InternalLink className={buttonVariants({ variant: "amber" })} to="/calcul">
           Lancer un calcul hydraulique →
         </InternalLink>
       </div>
@@ -202,7 +205,7 @@ function Metric({
   icon: "availability" | "organizations" | "projects" | "validation";
 }) {
   return (
-    <article className={`metric-card ${tone}`}>
+    <Card className={cn("metric-card gap-0 py-0", tone)}>
       <span className="metric-icon" aria-hidden="true">
         <MetricIcon name={icon} />
       </span>
@@ -212,7 +215,7 @@ function Metric({
       <span className={`metric-trend ${tone === "amber" ? "warning" : "positive"}`}>
         {trend}
       </span>
-    </article>
+    </Card>
   );
 }
 

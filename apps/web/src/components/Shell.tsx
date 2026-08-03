@@ -1,4 +1,11 @@
-import type { FormEvent, PropsWithChildren, ReactNode } from "react";
+import {
+  type FormEvent,
+  type PropsWithChildren,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { useAuth } from "../auth";
 import { InternalLink, useNavigation } from "../routing";
@@ -19,19 +26,79 @@ type IconName =
   | "bell"
   | "sun"
   | "moon"
-  | "droplet";
+  | "droplet"
+  | "menu"
+  | "chevronLeft"
+  | "logout";
 
-const NAVIGATION: Array<{ to: string; label: string; icon: IconName }> = [
-  { to: "/", label: "Tableau de bord", icon: "dashboard" },
-  { to: "/projets", label: "Projets", icon: "folder" },
-  { to: "/modelisation", label: "Modélisation", icon: "network" },
-  { to: "/bibliotheques", label: "Bibliothèques", icon: "library" },
-  { to: "/calcul", label: "Calcul hydraulique", icon: "calculator" },
-  { to: "/stockage", label: "Stockage et transferts", icon: "tank" },
-  { to: "/decision", label: "Comparaison et décision", icon: "decision" },
-  { to: "/donnees", label: "Données et imports", icon: "database" },
-  { to: "/rapports", label: "Rapports", icon: "report" },
-  { to: "/administration", label: "Administration", icon: "settings" },
+interface NavigationItem {
+  to: string;
+  label: string;
+  icon: IconName;
+  description: string;
+}
+
+const NAVIGATION: NavigationItem[] = [
+  {
+    to: "/",
+    label: "Tableau de bord",
+    icon: "dashboard",
+    description: "Vue générale des projets et services",
+  },
+  {
+    to: "/projets",
+    label: "Projets",
+    icon: "folder",
+    description: "Projets, versions et scénarios",
+  },
+  {
+    to: "/modelisation",
+    label: "Modélisation",
+    icon: "network",
+    description: "Réseaux, tronçons et équipements",
+  },
+  {
+    to: "/bibliotheques",
+    label: "Bibliothèques",
+    icon: "library",
+    description: "Produits, pompes, vannes et matériaux",
+  },
+  {
+    to: "/calcul",
+    label: "Calcul hydraulique",
+    icon: "calculator",
+    description: "Lancer et analyser les simulations",
+  },
+  {
+    to: "/stockage",
+    label: "Stockage et transferts",
+    icon: "tank",
+    description: "Bacs, mouvements et bilans matière",
+  },
+  {
+    to: "/decision",
+    label: "Comparaison et décision",
+    icon: "decision",
+    description: "Comparer et optimiser les scénarios",
+  },
+  {
+    to: "/donnees",
+    label: "Données et imports",
+    icon: "database",
+    description: "Importer, contrôler et normaliser",
+  },
+  {
+    to: "/rapports",
+    label: "Rapports",
+    icon: "report",
+    description: "Notes de calcul et approbations",
+  },
+  {
+    to: "/administration",
+    label: "Administration",
+    icon: "settings",
+    description: "Membres, normes, règles et audit",
+  },
 ];
 
 const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
@@ -77,25 +144,100 @@ const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   },
 };
 
+const SIDEBAR_STORAGE_KEY = "petrole-sidebar-collapsed";
+
 export function Shell({ children }: PropsWithChildren) {
-  const { path } = useNavigation();
+  const { path, navigate } = useNavigation();
   const metadata = PAGE_TITLES[path] ?? PAGE_TITLES["/"];
   const { user, localBypass, logout } = useAuth();
   const { resolvedTheme, toggleTheme } = useTheme();
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true",
+  );
   const initials = initialsOf(user?.full_name ?? "Alain Kouassi");
+
+  const filteredNavigation = useMemo(() => {
+    const query = commandQuery.trim().toLocaleLowerCase("fr");
+    if (!query) {
+      return NAVIGATION;
+    }
+    return NAVIGATION.filter((item) =>
+      `${item.label} ${item.description}`.toLocaleLowerCase("fr").includes(query),
+    );
+  }, [commandQuery]);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase("fr") === "k") {
+        event.preventDefault();
+        setCommandOpen((current) => !current);
+      }
+      if (event.key === "Escape") {
+        setCommandOpen(false);
+        setMobileSidebarOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, []);
+
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [path]);
+
+  useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   function search(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
+    setCommandOpen(true);
+  }
+
+  function choose(item: NavigationItem): void {
+    navigate(item.to);
+    setCommandOpen(false);
+    setCommandQuery("");
   }
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={`app-shell${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
+      <a className="skip-link" href="#main-content">
+        Aller au contenu principal
+      </a>
+
+      {mobileSidebarOpen ? (
+        <button
+          className="sidebar-backdrop"
+          type="button"
+          aria-label="Fermer la navigation"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        className={`sidebar${sidebarCollapsed ? " is-collapsed" : ""}${
+          mobileSidebarOpen ? " is-mobile-open" : ""
+        }`}
+      >
+        <button
+          className="sidebar-toggle"
+          type="button"
+          onClick={() => setSidebarCollapsed((current) => !current)}
+          aria-label={sidebarCollapsed ? "Déployer la barre latérale" : "Réduire la barre latérale"}
+          title={sidebarCollapsed ? "Déployer" : "Réduire"}
+        >
+          <Icon name="chevronLeft" />
+        </button>
+
         <InternalLink to="/" className="brand" label="Accueil PETROLE">
           <span className="brand-symbol" aria-hidden="true">
             <Icon name="droplet" />
           </span>
-          <span>
+          <span className="brand-copy">
             <strong>PETROLE</strong>
             <small>Hydraulique & stockage</small>
           </span>
@@ -108,11 +250,12 @@ export function Shell({ children }: PropsWithChildren) {
               key={item.to}
               to={item.to}
               className={(isActive) => (isActive ? "nav-link active" : "nav-link")}
+              label={sidebarCollapsed ? item.label : undefined}
             >
               <span className="nav-mark" aria-hidden="true">
                 <Icon name={item.icon} />
               </span>
-              <span>{item.label}</span>
+              <span className="nav-label">{item.label}</span>
             </InternalLink>
           ))}
         </nav>
@@ -126,9 +269,18 @@ export function Shell({ children }: PropsWithChildren) {
         </div>
       </aside>
 
-      <main className="main-content">
+      <main id="main-content" className="main-content" tabIndex={-1}>
         <header className="topbar">
           <div className="topbar-context">
+            <button
+              className="mobile-menu-button"
+              type="button"
+              onClick={() => setMobileSidebarOpen(true)}
+              aria-label="Ouvrir la navigation"
+              aria-expanded={mobileSidebarOpen}
+            >
+              <Icon name="menu" />
+            </button>
             <span>Plateforme</span>
             <span aria-hidden="true">/</span>
             <strong>{metadata.title}</strong>
@@ -137,7 +289,12 @@ export function Shell({ children }: PropsWithChildren) {
           <div className="topbar-actions">
             <form className="global-search" role="search" onSubmit={search}>
               <Icon name="search" />
-              <input aria-label="Rechercher" placeholder="Rechercher…" type="search" />
+              <input
+                aria-label="Rechercher"
+                placeholder="Rechercher…"
+                type="search"
+                onFocus={() => setCommandOpen(true)}
+              />
               <kbd>⌘ K</kbd>
             </form>
             <button
@@ -153,13 +310,35 @@ export function Shell({ children }: PropsWithChildren) {
               <Icon name="bell" />
               <span className="notification-dot" aria-hidden="true" />
             </button>
-            <div className="profile-chip" title={user?.email ?? "Profil local"}>
-              <span className="profile-avatar">{initials}</span>
-              <span className="profile-copy">
-                <strong>{localBypass ? "Administrateur" : user?.full_name}</strong>
-                <small>{localBypass ? "Mode local" : "Compte actif"}</small>
-              </span>
-            </div>
+            <details className="profile-menu">
+              <summary className="profile-chip" title={user?.email ?? "Profil local"}>
+                <span className="profile-avatar">{initials}</span>
+                <span className="profile-copy">
+                  <strong>{localBypass ? "Administrateur" : user?.full_name}</strong>
+                  <small>{localBypass ? "Mode local" : "Compte actif"}</small>
+                </span>
+              </summary>
+              <div className="profile-menu-card">
+                <div className="profile-menu-header">
+                  <strong>{localBypass ? "Administrateur local" : user?.full_name}</strong>
+                  <small>{localBypass ? "Authentification désactivée en développement" : user?.email}</small>
+                </div>
+                <button className="profile-menu-action" type="button" onClick={toggleTheme}>
+                  <Icon name={resolvedTheme === "dark" ? "sun" : "moon"} />
+                  {resolvedTheme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
+                </button>
+                {!localBypass ? (
+                  <button
+                    className="profile-menu-action danger"
+                    type="button"
+                    onClick={() => void logout()}
+                  >
+                    <Icon name="logout" />
+                    Se déconnecter
+                  </button>
+                ) : null}
+              </div>
+            </details>
           </div>
         </header>
 
@@ -181,6 +360,59 @@ export function Shell({ children }: PropsWithChildren) {
         </header>
         <div className="page-body">{children}</div>
       </main>
+
+      {commandOpen ? (
+        <div
+          className="command-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) {
+              setCommandOpen(false);
+            }
+          }}
+        >
+          <section className="command-dialog" role="dialog" aria-modal="true" aria-label="Recherche globale">
+            <div className="command-search">
+              <Icon name="search" />
+              <input
+                autoFocus
+                type="search"
+                placeholder="Rechercher une page ou une fonction…"
+                value={commandQuery}
+                onChange={(event) => setCommandQuery(event.target.value)}
+              />
+              <kbd>Échap</kbd>
+            </div>
+            <div className="command-results">
+              <p className="command-group-label">Navigation PETROLE</p>
+              {filteredNavigation.length ? (
+                filteredNavigation.map((item) => (
+                  <button
+                    key={item.to}
+                    className="command-item"
+                    type="button"
+                    onClick={() => choose(item)}
+                  >
+                    <span className="command-item-icon" aria-hidden="true">
+                      <Icon name={item.icon} />
+                    </span>
+                    <span className="command-item-copy">
+                      <strong>{item.label}</strong>
+                      <small>{item.description}</small>
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div className="command-empty">Aucun résultat pour « {commandQuery} ».</div>
+              )}
+            </div>
+            <footer className="command-footer">
+              <span>Entrée pour ouvrir</span>
+              <span>Ctrl/⌘ + K pour rechercher</span>
+            </footer>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -291,6 +523,9 @@ function Icon({ name }: { name: IconName }) {
     sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
     moon: <path d="M21 12.8A8.5 8.5 0 1 1 11.2 3 6.5 6.5 0 0 0 21 12.8z"/>,
     droplet: <path d="M12 2.5S5.5 10 5.5 15a6.5 6.5 0 0 0 13 0C18.5 10 12 2.5 12 2.5z"/>,
+    menu: <><path d="M4 6h16M4 12h16M4 18h16"/></>,
+    chevronLeft: <path d="m15 18-6-6 6-6"/>,
+    logout: <><path d="M10 17l5-5-5-5M15 12H3"/><path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></>,
   };
 
   return <svg {...common}>{paths[name]}</svg>;

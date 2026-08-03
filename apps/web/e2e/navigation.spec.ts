@@ -60,7 +60,10 @@ async function installPlatformMock(page: Page): Promise<void> {
   });
 }
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
+  if (testInfo.project.name === "mobile") {
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
   await installPlatformMock(page);
 });
 

@@ -17,6 +17,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from hydro_domain.fluid import Fluid
+from hydro_domain.pipeline import Pipeline
+from hydro_domain.scenario import Scenario
+from hydro_shared.errors import InvalidInputError
 from hydro_shared.hashing import sha256_of
 from hydro_shared.units import SI_UNITS
 from hydro_shared.versioning import (
@@ -24,10 +28,6 @@ from hydro_shared.versioning import (
     INPUT_SCHEMA_VERSION,
     engine_fingerprint,
 )
-
-from hydro_domain.fluid import Fluid
-from hydro_domain.pipeline import Pipeline
-from hydro_domain.scenario import Scenario
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,6 +94,29 @@ class CanonicalInput:
         """Unités internes du paquet : SI, sans exception."""
         return {dimension.value: unit for dimension, unit in SI_UNITS.items()}
 
+    def equipment(self) -> dict[str, Any]:
+        """Catalogue figé des équipements nécessaires au rejeu du calcul.
+
+        Les stations ne portent que les identifiants des modèles de pompe. Les courbes
+        constructeur doivent donc être enregistrées séparément dans le paquet canonique :
+        elles influencent directement la hauteur, le rendement, la puissance et le NPSH.
+
+        Un même identifiant ne peut pas désigner deux modèles différents dans un pipeline.
+        Cette ambiguïté rendrait le rejeu dépendant de l'ordre de parcours des stations.
+        """
+        pump_models: dict[str, dict[str, Any]] = {}
+        for station in self.pipeline.stations:
+            for pump in station.pumps:
+                serialized = pump.model.as_dict()
+                previous = pump_models.get(pump.model.id)
+                if previous is not None and previous != serialized:
+                    raise InvalidInputError(
+                        "Un identifiant de modèle de pompe désigne plusieurs courbes différentes.",
+                        pump_model_id=pump.model.id,
+                    )
+                pump_models[pump.model.id] = serialized
+        return {"pump_models": [pump_models[identifier] for identifier in sorted(pump_models)]}
+
     def payload(self) -> dict[str, Any]:
         """Contenu haché du paquet : tout ce qui influence le résultat numérique."""
         return {
@@ -101,6 +124,7 @@ class CanonicalInput:
             "units": self.units(),
             "fluid": self.fluid.as_dict(),
             "network": self.pipeline.as_dict(),
+            "equipment": self.equipment(),
             "boundary_conditions": [
                 condition.as_dict() for condition in self.scenario.boundary_conditions
             ],

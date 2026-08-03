@@ -188,7 +188,9 @@ def is_compatible(unit: str, dimension: Dimension) -> bool:
     return True
 
 
-def format_si(value_si: float, dimension: Dimension, unit: str | None = None, digits: int = 4) -> str:
+def format_si(
+    value_si: float, dimension: Dimension, unit: str | None = None, digits: int = 4
+) -> str:
     """Formate une valeur SI pour l'affichage, unité toujours visible (NFR-UX-002)."""
     target = unit or SI_UNITS[dimension]
     displayed = from_si(value_si, target, dimension) if target != SI_UNITS[dimension] else value_si

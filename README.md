@@ -94,14 +94,29 @@ pip install -e ".[dev]"
 pytest -m "not integration"
 ```
 
-### Pile complète
+### Pile locale de développement
+
+Premier démarrage, ou après modification des dépendances :
 
 ```bash
-docker compose -f deployment/docker-compose.yml up --build
+docker compose -f deployment/docker-compose.yml -f deployment/docker-compose.dev.yml up --build
 ```
 
+Démarrages suivants :
+
+```bash
+docker compose -f deployment/docker-compose.yml -f deployment/docker-compose.dev.yml up
+```
+
+Le dépôt est monté sous `/workspace` dans les conteneurs API et calcul. Les modifications de `apps/api` et `packages` rechargent automatiquement ces deux processus. Le dossier `apps/web` est monté dans le conteneur Vite et ses modifications sont également prises en compte. Aucune reconstruction d'image n'est nécessaire pour un changement de code ; elle reste requise après une modification des dépendances ou des fichiers Docker.
+
 - API et documentation interactive : <http://localhost:8000/docs>
+- Santé de l'API : <http://localhost:8000/api/v1/health>
+- Console MinIO : <http://localhost:9001>
 - Interface web : <http://localhost:5173>
+- Stockage objet : <http://localhost:9000>
+
+La pile de développement active une file de calcul persistante. L'API enregistre la demande, le processus de calcul la traite hors requête HTTP, puis l'interface suit automatiquement son état.
 
 ### Exécuter le dossier de validation scientifique
 

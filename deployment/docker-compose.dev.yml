@@ -1,0 +1,71 @@
+services:
+  api:
+    build:
+      target: development
+    command:
+      - uvicorn
+      - hydro_api.application:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - /workspace/apps/api
+      - --reload-dir
+      - /workspace/packages
+    environment:
+      HYDRO_ENVIRONMENT: development
+      HYDRO_RELOAD: "true"
+      HYDRO_AUTHENTICATION_REQUIRED: "false"
+      HYDRO_BACKGROUND_JOBS_ENABLED: "true"
+      WATCHFILES_FORCE_POLLING: "true"
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+
+  worker:
+    build:
+      target: development
+    command:
+      - watchfiles
+      - --filter
+      - python
+      - hydro-worker
+      - /workspace/apps/api
+      - /workspace/packages
+    environment:
+      HYDRO_ENVIRONMENT: development
+      HYDRO_AUTHENTICATION_REQUIRED: "false"
+      HYDRO_BACKGROUND_JOBS_ENABLED: "true"
+      WATCHFILES_FORCE_POLLING: "true"
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+
+  web:
+    build:
+      target: development
+    command:
+      - npm
+      - run
+      - dev
+      - --
+      - --host
+      - 0.0.0.0
+      - --port
+      - "80"
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - type: bind
+        source: ../apps/web
+        target: /workspace/apps/web
+      - type: volume
+        source: web_node_modules
+        target: /workspace/apps/web/node_modules
+
+volumes:
+  web_node_modules:

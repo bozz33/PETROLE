@@ -6,7 +6,7 @@
 
 
 
-Équipe de réalisation : 2 développeurs assistés par des assistants IA
+Équipe de réalisation : 2 développeurs, avec validation métier et scientifique
 
 Déploiement cible : local, serveur privé et cloud
 
@@ -24,7 +24,7 @@ Déploiement cible : local, serveur privé et cloud
 
 | Périmètre | MVP liquide en régime permanent : pipelines, pompes, stations, réservoirs, transferts, scénarios et optimisation initiale |
 
-| Équipe | 2 développeurs + assistants IA + validation humaine métier/scientifique |
+| Équipe | 2 développeurs + experts ponctuels + validation métier/scientifique |
 
 | Backend final | Python, FastAPI, Pydantic, SQLAlchemy, Alembic, PostgreSQL et PostGIS |
 
@@ -1190,7 +1190,7 @@ Shadcn Admin est retenu comme base visuelle et structurelle. Le dépôt officiel
 
 - Les jeux de données de référence sont versionnés dans le dépôt.
 
-- Les assistants IA peuvent générer des tests, mais un humain valide les résultats attendus.
+- Les tests automatisés sont revus ; les résultats attendus sont validés par un référent compétent.
 
 # 14. Plan de développement pour deux développeurs
 
@@ -1226,7 +1226,7 @@ Shadcn Admin est retenu comme base visuelle et structurelle. Le dépôt officiel
 
 - Une fonctionnalité scientifique n’est terminée qu’avec tests, tolérances, source et rapport de validation.
 
-- Les assistants IA ne fusionnent pas directement du code critique sans revue humaine.
+- Aucun code critique n’est fusionné sans revue croisée et validation des tests.
 
 - Le frontend ne doit pas contenir de logique scientifique de référence.
 
@@ -1306,7 +1306,7 @@ Shadcn Admin est retenu comme base visuelle et structurelle. Le dépôt officiel
 
 | R-05 | Licence incompatible | Élevé | Inventaire licences; DWSIM reste externe; audit avant intégration. |
 
-| R-06 | Équipe de deux développeurs | Élevé | Monolithe modulaire, périmètre strict, assistants IA et jalons. |
+| R-06 | Équipe de deux développeurs | Élevé | Monolithe modulaire, périmètre strict, automatisation renforcée et jalons. |
 
 | R-07 | Résultats non expliqués | Élevé | Traçabilité, contraintes localisées, rapport des méthodes. |
 

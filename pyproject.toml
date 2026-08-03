@@ -13,7 +13,10 @@ authors = [{ name = "Équipe Plateforme Hydrocarbures" }]
 
 dependencies = [
     # Noyau scientifique (DEC-ENGINE-001)
-    "numpy>=1.26",
+    # NumPy 2.4+ publie des stubs réservés à Python 3.12+, tandis que le
+    # projet garantit encore Python 3.11. Cette borne maintient le typage
+    # statique compatible sur toute la plage d'exécution annoncée.
+    "numpy>=1.26,<2.4",
     "scipy>=1.11",
     "pint>=0.23",
     "fluids>=1.0",
@@ -36,6 +39,7 @@ dependencies = [
     "email-validator>=2.2",
     "structlog>=24.1",
     "orjson>=3.10",
+    "boto3>=1.35",
     # Données et rapports
     "pandas>=2.2",
     "openpyxl>=3.1",
@@ -48,7 +52,8 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "pytest-asyncio>=0.24",
-    "httpx>=0.27",
+    "httpx2>=2.7,<3",
+    "pypdf>=5",
     "ruff>=0.6",
     "mypy>=1.11",
     "types-python-dateutil",
@@ -59,6 +64,7 @@ pandapipes = ["pandapipes>=0.11"]
 [project.scripts]
 hydro-validate = "hydro_validation.cli:main"
 hydro-api = "hydro_api.__main__:main"
+hydro-worker = "hydro_api.worker:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [
@@ -122,7 +128,7 @@ no_implicit_optional = true
 mypy_path = "packages/shared:packages/domain:packages/hydroliquid:packages/tank_transfer:packages/optimization:packages/reporting:packages/validation:apps/api"
 
 [[tool.mypy.overrides]]
-module = ["fluids.*", "CoolProp.*", "pyomo.*", "pandapipes.*", "geoalchemy2.*", "reportlab.*", "matplotlib.*"]
+module = ["boto3.*", "botocore.*", "fluids.*", "CoolProp.*", "scipy.*", "pyomo.*", "pandapipes.*", "geoalchemy2.*", "reportlab.*", "matplotlib.*", "pandas.*"]
 ignore_missing_imports = true
 
 [tool.coverage.run]

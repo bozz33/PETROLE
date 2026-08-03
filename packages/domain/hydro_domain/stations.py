@@ -19,10 +19,9 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
-from hydro_shared.errors import InvalidInputError
-
 from hydro_domain.enums import EquipmentStatus, PumpArrangement
-from hydro_domain.pumps import G, CurveEvaluation, PumpInstance
+from hydro_domain.pumps import CurveEvaluation, G, PumpInstance
+from hydro_shared.errors import InvalidInputError
 
 #: Tolérance de la dichotomie de partage de débit en parallèle, en m³/s.
 PARALLEL_SHARING_TOLERANCE_M3_S = 1e-10
@@ -289,9 +288,7 @@ class PumpStation:
                 absorbed_power_w=0.0,
                 efficiency=None,
                 active_pump_count=0,
-                detail=(
-                    "Station bypassée." if self.is_bypassed else "Aucune pompe active."
-                ),
+                detail=("Station bypassée." if self.is_bypassed else "Aucune pompe active."),
             )
 
         head = self.combined_head(flow_m3_s)

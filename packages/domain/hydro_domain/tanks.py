@@ -11,15 +11,15 @@ inversible, et le produit ne doit pas prétendre convertir un volume en niveau.
 
 from __future__ import annotations
 
+import itertools
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from hydro_shared.errors import StrappingTableError
-
 from hydro_domain.enums import EquipmentStatus, TankType
 from hydro_domain.interpolation import ExtrapolationPolicy, MonotoneTable
+from hydro_shared.errors import StrappingTableError
 
 
 class StrappingTable:
@@ -152,7 +152,7 @@ class TankLevels:
             for value in (self.minimum_m, self.low_m, self.normal_m, self.high_m, self.high_high_m)
             if value is not None
         ]
-        for previous, current in zip(ordered, ordered[1:], strict=False):
+        for previous, current in itertools.pairwise(ordered):
             if current < previous:
                 raise StrappingTableError(
                     "Les seuils de niveau doivent être ordonnés : minimum ≤ bas ≤ normal ≤ haut "
@@ -271,9 +271,7 @@ class Tank:
 
     def mass_kg(self, density_kg_m3: float, level_m: float | None = None) -> float:
         """Masse stockée pour une masse volumique donnée."""
-        volume = (
-            self.current_volume_m3 if level_m is None else self.strapping.volume_at(level_m)
-        )
+        volume = self.current_volume_m3 if level_m is None else self.strapping.volume_at(level_m)
         return volume * density_kg_m3
 
     def accepts_fluid(self, fluid_id: str) -> bool:

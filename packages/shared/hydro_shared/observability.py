@@ -20,7 +20,7 @@ from typing import Any
 
 import structlog
 
-#: Identifiant de corrélation propagé de la requête HTTP au worker puis au moteur (D13 § 3).
+#: Identifiant de corrélation propagé de la requête HTTP au processus différé puis au moteur (D13 § 3).
 correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
 #: Identifiant du calcul en cours, présent dans tout le journal scientifique.
 calculation_id_var: ContextVar[str | None] = ContextVar("calculation_id", default=None)

@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import pytest
 
-from hydro_shared.errors import PumpCurveError
-
 from hydro_domain.enums import EquipmentStatus, PumpArrangement, PumpRole
 from hydro_domain.pumps import (
     G,
@@ -29,6 +27,7 @@ from hydro_domain.stations import (
     head_to_pressure_pa,
     pressure_to_head_m,
 )
+from hydro_shared.errors import PumpCurveError
 
 #: Courbe de référence : pompe de gros débit type oléoduc, points constructeur en m³/h.
 _POINTS_M3H = [1000.0, 2000.0, 3000.0, 4000.0, 5000.0, 6000.0, 7000.0]

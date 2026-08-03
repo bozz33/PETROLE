@@ -30,6 +30,7 @@ apps/web/.vite/
 var/
 storage/
 outputs/
+tmp/
 *.sqlite3
 *.db
 

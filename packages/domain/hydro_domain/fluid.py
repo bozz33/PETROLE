@@ -11,13 +11,13 @@ Toute évaluation hors du domaine tabulé produit un avertissement `WARN_EXTRAPO
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from itertools import pairwise
 from typing import Any
-
-from hydro_shared.errors import FluidPropertyError
-from hydro_shared.units import Dimension, Measure
 
 from hydro_domain.enums import FluidCategory, PropertyQuality, PropertySource
 from hydro_domain.interpolation import MonotoneTable
+from hydro_shared.errors import FluidPropertyError
+from hydro_shared.units import Dimension, Measure
 
 #: Température de référence usuelle des fiches produit (15 °C).
 REFERENCE_TEMPERATURE_K = 288.15
@@ -88,7 +88,7 @@ class PropertyTable:
                 point_count=len(self.points),
             )
         temperatures = [p.temperature_k for p in self.points]
-        if any(b <= a for a, b in zip(temperatures, temperatures[1:], strict=False)):
+        if any(b <= a for a, b in pairwise(temperatures)):
             raise FluidPropertyError(
                 "Les températures d'une table de propriété doivent être strictement croissantes.",
                 temperatures=temperatures,
@@ -311,9 +311,7 @@ class Fluid:
             "coolprop_name": self.coolprop_name,
             "density_table": self.density_table.as_dict() if self.density_table else None,
             "kinematic_viscosity_table": (
-                self.kinematic_viscosity_table.as_dict()
-                if self.kinematic_viscosity_table
-                else None
+                self.kinematic_viscosity_table.as_dict() if self.kinematic_viscosity_table else None
             ),
             "vapor_pressure_table": (
                 self.vapor_pressure_table.as_dict() if self.vapor_pressure_table else None

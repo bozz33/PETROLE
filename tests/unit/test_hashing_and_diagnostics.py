@@ -115,7 +115,9 @@ class TestViolations:
         assert v.relative_deviation is None
 
     def test_localisation_lisible(self):
-        loc = Location(object_type="edge", object_id="e1", object_label="Tronçon 3", chainage_m=125_000.0)
+        loc = Location(
+            object_type="edge", object_id="e1", object_label="Tronçon 3", chainage_m=125_000.0
+        )
         described = loc.describe()
         assert "Tronçon 3" in described
         assert "125.000 km" in described

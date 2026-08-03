@@ -1,0 +1,49 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependances
+      - python
+
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:20"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependances
+      - interface
+
+  - package-ecosystem: docker
+    directory: /deployment
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:40"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependances
+      - conteneurs
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependances
+      - integration-continue

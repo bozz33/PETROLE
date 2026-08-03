@@ -1,0 +1,42 @@
+name: Analyse de sécurité du code
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+  schedule:
+    - cron: "27 3 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyse:
+    name: CodeQL — ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        language:
+          - python
+          - javascript-typescript
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Initialiser CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+
+      - name: Construire automatiquement
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyser
+        uses: github/codeql-action/analyze@v3

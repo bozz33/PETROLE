@@ -12,7 +12,7 @@ Roadmap complète jusqu’au produit final
 
 | Statut | Référence de conception - à valider par l’équipe |
 
-| Équipe | 2 développeurs, avec assistants IA |
+| Équipe | 2 développeurs, avec validation métier et scientifique |
 
 | Référentiel | ASME, API, ISO, IEC, ISA et exigences locales applicables |
 
@@ -30,7 +30,7 @@ Note : ce document structure la conception du logiciel. Il ne remplace ni les te
 
 | Date | 2 août 2026 |
 
-| Auteur | Équipe projet - 2 développeurs assistés par IA |
+| Auteur | Équipe projet - 2 développeurs |
 
 | Validation attendue | Relecture technique, métier et réglementaire |
 
@@ -158,7 +158,7 @@ La plateforme doit évoluer par niveaux de confiance. Chaque nouvelle capacité 
 
 | Fuite | Non | Recherche | Pilote | Programme opérationnel |
 
-| IA | Assistance docs | Analytics | Copilote | Explication avancée |
+| Aide à la décision | Indicateurs explicables | Analyses avancées | Recommandations contrôlées | Explications détaillées |
 
 
 

@@ -12,7 +12,7 @@ Composants retenus, usages, limites, licences et plan d’audit
 
 | Statut | Référence de conception - à valider par l’équipe |
 
-| Équipe | 2 développeurs, avec assistants IA |
+| Équipe | 2 développeurs, avec validation métier et scientifique |
 
 | Référentiel | ASME, API, ISO, IEC, ISA et exigences locales applicables |
 
@@ -30,7 +30,7 @@ Note : ce document structure la conception du logiciel. Il ne remplace ni les te
 
 | Date | 2 août 2026 |
 
-| Auteur | Équipe projet - 2 développeurs assistés par IA |
+| Auteur | Équipe projet - 2 développeurs |
 
 | Validation attendue | Relecture technique, métier et réglementaire |
 

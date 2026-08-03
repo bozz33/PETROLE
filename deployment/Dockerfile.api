@@ -1,0 +1,49 @@
+# syntax=docker/dockerfile:1.7
+
+FROM python:3.11-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /workspace
+
+RUN python -m venv /opt/venv \
+    && groupadd --gid 10001 hydro \
+    && useradd --uid 10001 --gid hydro --create-home --shell /usr/sbin/nologin hydro
+
+FROM base AS development
+
+COPY pyproject.toml README.md LICENSE ./
+COPY apps/api ./apps/api
+COPY packages ./packages
+
+RUN pip install --editable ".[dev]"
+
+USER hydro
+
+EXPOSE 8000
+
+CMD ["uvicorn", "hydro_api.application:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/workspace/apps/api", "--reload-dir", "/workspace/packages"]
+
+FROM base AS build
+
+COPY pyproject.toml README.md LICENSE ./
+COPY apps/api ./apps/api
+COPY packages ./packages
+
+RUN pip wheel --wheel-dir /tmp/wheels .
+
+FROM base AS runtime
+
+COPY --from=build /tmp/wheels /tmp/wheels
+RUN pip install /tmp/wheels/* \
+    && rm -rf /tmp/wheels
+
+USER hydro
+
+EXPOSE 8000
+
+CMD ["uvicorn", "hydro_api.application:app", "--host", "0.0.0.0", "--port", "8000"]

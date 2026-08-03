@@ -12,7 +12,7 @@ Organisation de deux développeurs, backlog, sprints, charges et jalons
 
 | Statut | Référence de conception - à valider par l’équipe |
 
-| Équipe | 2 développeurs, avec assistants IA |
+| Équipe | 2 développeurs, avec validation métier et scientifique |
 
 | Référentiel | ASME, API, ISO, IEC, ISA et exigences locales applicables |
 
@@ -30,7 +30,7 @@ Note : ce document structure la conception du logiciel. Il ne remplace ni les te
 
 | Date | 2 août 2026 |
 
-| Auteur | Équipe projet - 2 développeurs assistés par IA |
+| Auteur | Équipe projet - 2 développeurs |
 
 | Validation attendue | Relecture technique, métier et réglementaire |
 
@@ -60,7 +60,7 @@ Note : ce document structure la conception du logiciel. Il ne remplace ni les te
 
 - Rituels
 
-- Outils IA
+- Outils d’automatisation
 
 - Critères de fin
 
@@ -74,7 +74,7 @@ La pagination peut évoluer après validation et mise en forme finale dans Micro
 
 | Hypothèse | Valeur de travail |
 
-| Équipe | 2 développeurs à temps plein, assistés par des outils IA |
+| Équipe | 2 développeurs à temps plein, avec revues métier et scientifiques planifiées |
 
 | Cadence | Sprints de 2 semaines |
 
@@ -104,7 +104,7 @@ La pagination peut évoluer après validation et mise en forme finale dans Micro
 
 | Développeur B - Produit/Frontend/Data | Frontend, éditeur, imports, données, déploiement | API métier, tests E2E, observabilité |
 
-| Assistants IA | Génération de tests, documentation, revue, prototypes, recherche | Migration, analyse d’erreurs, exemples |
+| Automatisation qualité | Exécution des tests, analyse statique, documentation, contrôles reproductibles | Migrations vérifiées, diagnostics, mesures de couverture |
 
 | Référent métier | Validation des cas, données, terminologie et scénarios | Priorisation et recette |
 
@@ -268,7 +268,7 @@ La pagination peut évoluer après validation et mise en forme finale dans Micro
 
 # 9. Estimation de charge et marge
 
-La charge fonctionnelle estimée représente environ 90 à 100 semaines-personnes. La capacité brute de deux personnes pendant 48 semaines est de 96 semaines-personnes ; le plan est donc tendu. Il nécessite l’usage efficace des assistants IA, une forte automatisation et une marge obtenue par réduction de périmètre ou prolongation de quelques semaines.
+La charge fonctionnelle estimée représente environ 90 à 100 semaines-personnes. La capacité brute de deux personnes pendant 48 semaines est de 96 semaines-personnes ; le plan est donc tendu. Il nécessite une forte automatisation des contrôles, des revues ciblées et une marge obtenue par réduction de périmètre ou prolongation de quelques semaines.
 
 | Scénario | Durée calendaire | Hypothèses |
 
@@ -298,7 +298,7 @@ La charge fonctionnelle estimée représente environ 90 à 100 semaines-personne
 
 - Release notes et migration testée à chaque version candidate.
 
-# 11. Utilisation encadrée des assistants IA
+# 11. Automatisation et contrôles de production
 
 | Usage autorisé | Contrôle humain |
 
@@ -318,7 +318,7 @@ La charge fonctionnelle estimée représente environ 90 à 100 semaines-personne
 
 
 
-| Interdictions Les assistants IA ne valident pas seuls une équation, une règle normative, une migration destructive, une sécurité OT ou un résultat industriel. |
+| Interdictions Aucun contrôle automatisé ne valide seul une équation, une règle normative, une migration destructive, une mesure de sécurité OT ou un résultat industriel. |
 
 
 

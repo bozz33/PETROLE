@@ -22,6 +22,7 @@ pompe, où la dérivée continue améliore la convergence du solveur.
 from __future__ import annotations
 
 import bisect
+import itertools
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -129,8 +130,8 @@ class MonotoneTable:
     @staticmethod
     def _detect_monotonicity(ys: Sequence[float]) -> bool | None:
         """Retourne ``True`` si croissante, ``False`` si décroissante, ``None`` sinon."""
-        increasing = all(b >= a for a, b in zip(ys, ys[1:], strict=False))
-        decreasing = all(b <= a for a, b in zip(ys, ys[1:], strict=False))
+        increasing = all(b >= a for a, b in itertools.pairwise(ys))
+        decreasing = all(b <= a for a, b in itertools.pairwise(ys))
         if increasing and not decreasing:
             return True
         if decreasing and not increasing:
@@ -190,8 +191,7 @@ class MonotoneTable:
             return TableEvaluation(value=self._interpolate_inside(value), extrapolated=False)
 
         detail = (
-            f"{self.label} : abscisse {value:.6g} hors du domaine tabulé "
-            f"[{lo:.6g} ; {hi:.6g}]."
+            f"{self.label} : abscisse {value:.6g} hors du domaine tabulé [{lo:.6g} ; {hi:.6g}]."
         )
         if self._policy is ExtrapolationPolicy.FORBID:
             raise self._error_type(detail, value=value, domain=(lo, hi))

@@ -45,8 +45,8 @@ from hydro_domain.interpolation import (
 )
 from hydro_domain.pipeline import InjectionPoint, Pipeline
 from hydro_domain.pumps import (
-    G,
     CurveEvaluation,
+    G,
     PumpCurve,
     PumpInstance,
     PumpModel,
@@ -72,6 +72,15 @@ from hydro_domain.scenario import (
     SolverOptions,
     StationOverride,
 )
+from hydro_domain.serialization import (
+    canonical_input_from_dict,
+    fluid_from_dict,
+    pipeline_from_dict,
+    pump_model_from_dict,
+    pump_models_from_dict,
+    scenario_from_dict,
+    solver_options_from_dict,
+)
 from hydro_domain.stations import (
     PumpGroup,
     PumpStation,
@@ -85,7 +94,6 @@ from hydro_domain.stations import (
 from hydro_domain.tanks import StrappingTable, Tank, TankLevels
 
 __all__ = [
-    "G",
     "REFERENCE_TEMPERATURE_K",
     "STANDARD_PRESSURE_PA",
     "TYPICAL_ROUGHNESS_M",
@@ -102,6 +110,7 @@ __all__ = [
     "Fluid",
     "FluidCategory",
     "FrictionModel",
+    "G",
     "GravityZone",
     "InjectionPoint",
     "InterpolationKind",
@@ -145,10 +154,17 @@ __all__ = [
     "absorbed_power_w",
     "build_parallel_station",
     "build_series_station",
+    "canonical_input_from_dict",
     "fit_quadratic_head",
+    "fluid_from_dict",
     "head_to_pressure_pa",
     "hydraulic_power_w",
+    "pipeline_from_dict",
     "pressure_to_head_m",
+    "pump_model_from_dict",
+    "pump_models_from_dict",
+    "scenario_from_dict",
+    "solver_options_from_dict",
     "validate_segment_chain",
     "velocity_head_m",
 ]

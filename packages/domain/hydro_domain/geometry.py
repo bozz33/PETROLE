@@ -14,14 +14,14 @@ profil peut être plus finement échantillonné que le découpage en tronçons, 
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from itertools import pairwise
 from typing import Any
-
-from hydro_shared.errors import ProfileError
-from hydro_shared.units import Dimension, Measure
 
 from hydro_domain.enums import EquipmentStatus
 from hydro_domain.interpolation import ExtrapolationPolicy, MonotoneTable
+from hydro_shared.errors import ProfileError
+from hydro_shared.units import Dimension, Measure
 
 #: Rugosité absolue indicative de quelques matériaux, en mètres. Ces valeurs sont des ordres
 #: de grandeur de littérature : elles servent d'aide à la saisie, jamais de valeur par défaut
@@ -318,7 +318,9 @@ class ElevationProfile:
         d'un ré-échantillonnage, sous peine de masquer un point critique de pression.
         """
         if step_m <= 0:
-            raise ProfileError("Le pas d'échantillonnage doit être strictement positif.", step_m=step_m)
+            raise ProfileError(
+                "Le pas d'échantillonnage doit être strictement positif.", step_m=step_m
+            )
         start, end = self.domain
         chainages: set[float] = {p.chainage_m for p in self._points}
         current = start
@@ -327,8 +329,7 @@ class ElevationProfile:
             current += step_m
         chainages.add(end)
         return [
-            ProfilePoint(chainage_m=c, elevation_m=self.elevation_at(c))
-            for c in sorted(chainages)
+            ProfilePoint(chainage_m=c, elevation_m=self.elevation_at(c)) for c in sorted(chainages)
         ]
 
     def summit_chainages(self) -> list[float]:
@@ -341,7 +342,10 @@ class ElevationProfile:
         summits: list[float] = []
         pts = self._points
         for i in range(1, len(pts) - 1):
-            if pts[i].elevation_m >= pts[i - 1].elevation_m and pts[i].elevation_m >= pts[i + 1].elevation_m:
+            if (
+                pts[i].elevation_m >= pts[i - 1].elevation_m
+                and pts[i].elevation_m >= pts[i + 1].elevation_m
+            ):
                 summits.append(pts[i].chainage_m)
         return summits
 
@@ -373,7 +377,7 @@ def validate_segment_chain(segments: Sequence[PipeSegment]) -> list[str]:
         problems.append(f"Identifiants de tronçon dupliqués : {sorted(duplicates)}.")
 
     ordered = sorted(segments, key=lambda s: s.sequence)
-    for previous, current in zip(ordered, ordered[1:], strict=False):
+    for previous, current in pairwise(ordered):
         if current.sequence == previous.sequence:
             problems.append(
                 f"Deux tronçons portent le numéro de séquence {current.sequence} "

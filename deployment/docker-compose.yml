@@ -1,0 +1,129 @@
+name: hydro-platform
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.api
+      target: runtime
+    environment:
+      HYDRO_ENVIRONMENT: ${HYDRO_ENVIRONMENT:-production}
+      HYDRO_HOST: 0.0.0.0
+      HYDRO_PORT: 8000
+      HYDRO_LOG_LEVEL: ${HYDRO_LOG_LEVEL:-info}
+      HYDRO_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-hydro}:${POSTGRES_PASSWORD:-hydro_dev}@postgres:5432/${POSTGRES_DB:-hydro}
+      HYDRO_AUTHENTICATION_REQUIRED: ${HYDRO_AUTHENTICATION_REQUIRED:-true}
+      HYDRO_JWT_SECRET: ${HYDRO_JWT_SECRET:-development-secret-change-before-production}
+      HYDRO_BACKGROUND_JOBS_ENABLED: "true"
+      HYDRO_OBJECT_STORAGE_BACKEND: s3
+      HYDRO_OBJECT_STORAGE_BUCKET: ${HYDRO_OBJECT_STORAGE_BUCKET:-hydro-reports}
+      HYDRO_S3_ENDPOINT_URL: http://minio:9000
+      HYDRO_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-hydro}
+      HYDRO_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-hydro_dev_storage}
+      HYDRO_S3_REGION: ${HYDRO_S3_REGION:-us-east-1}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/api/v1/health", timeout=2)
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - application
+
+
+  worker:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.api
+      target: runtime
+    command:
+      - hydro-worker
+    environment:
+      HYDRO_ENVIRONMENT: ${HYDRO_ENVIRONMENT:-production}
+      HYDRO_LOG_LEVEL: ${HYDRO_LOG_LEVEL:-info}
+      HYDRO_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-hydro}:${POSTGRES_PASSWORD:-hydro_dev}@postgres:5432/${POSTGRES_DB:-hydro}
+      HYDRO_AUTHENTICATION_REQUIRED: ${HYDRO_AUTHENTICATION_REQUIRED:-true}
+      HYDRO_JWT_SECRET: ${HYDRO_JWT_SECRET:-development-secret-change-before-production}
+      HYDRO_BACKGROUND_JOBS_ENABLED: "true"
+      HYDRO_WORKER_POLL_SECONDS: ${HYDRO_WORKER_POLL_SECONDS:-1}
+      HYDRO_OBJECT_STORAGE_BACKEND: s3
+      HYDRO_OBJECT_STORAGE_BUCKET: ${HYDRO_OBJECT_STORAGE_BUCKET:-hydro-reports}
+      HYDRO_S3_ENDPOINT_URL: http://minio:9000
+      HYDRO_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-hydro}
+      HYDRO_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-hydro_dev_storage}
+      HYDRO_S3_REGION: ${HYDRO_S3_REGION:-us-east-1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - application
+
+  web:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.web
+      target: production
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - application
+
+  postgres:
+    image: postgis/postgis:17-3.5-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hydro}
+      POSTGRES_USER: ${POSTGRES_USER:-hydro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hydro_dev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hydro} -d ${POSTGRES_DB:-hydro}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - application
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-hydro}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-hydro_dev_storage}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - object_storage_data:/data
+    restart: unless-stopped
+    networks:
+      - application
+
+volumes:
+  postgres_data:
+  object_storage_data:
+
+networks:
+  application:
+    driver: bridge

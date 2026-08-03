@@ -1,0 +1,143 @@
+name: Qualité et validation
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qualite-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Python, tests et preuve scientifique
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Installer le projet
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Vérifier le formatage
+        run: ruff format --check packages apps tests database
+
+      - name: Vérifier les règles de code
+        run: ruff check packages apps tests database
+
+      - name: Vérifier le typage
+        run: mypy packages apps/api
+
+      - name: Exécuter les tests avec couverture
+        run: |
+          pytest -p no:cacheprovider \
+            --cov=packages \
+            --cov=apps/api \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=xml \
+            --cov-fail-under=80 \
+            -q
+
+      - name: Générer le dossier de validation
+        run: |
+          hydro-validate \
+            --report var/validation/rapport.md \
+            --json var/validation/preuve.json
+
+      - name: Archiver la couverture et la preuve
+        uses: actions/upload-artifact@v4
+        with:
+          name: preuves-scientifiques
+          path: |
+            coverage.xml
+            var/validation/rapport.md
+            var/validation/preuve.json
+          if-no-files-found: error
+          retention-days: 30
+
+  frontend:
+    name: TypeScript et interface web
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Installer les dépendances verrouillées
+        run: npm ci
+
+      - name: Vérifier le typage strict
+        run: npm run typecheck
+
+      - name: Construire le bundle de production
+        run: npm run build
+
+      - name: Refuser les vulnérabilités hautes ou critiques
+        run: npm audit --audit-level=high
+
+  conteneurs:
+    name: Images et migrations PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs:
+      - backend
+      - frontend
+    env:
+      HYDRO_ENVIRONMENT: staging
+      HYDRO_AUTHENTICATION_REQUIRED: "true"
+      HYDRO_JWT_SECRET: ci-temporary-secret-0123456789-not-production
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Valider la composition
+        run: docker compose -f deployment/docker-compose.yml config --quiet
+
+      - name: Construire les images de production
+        run: docker compose -f deployment/docker-compose.yml build api worker web
+
+      - name: Démarrer les dépendances
+        run: docker compose -f deployment/docker-compose.yml up -d postgres minio
+
+      - name: Appliquer toutes les migrations
+        run: docker compose -f deployment/docker-compose.yml run --rm api alembic upgrade head
+
+      - name: Vérifier l'absence de dérive du schéma
+        run: docker compose -f deployment/docker-compose.yml run --rm api alembic check
+
+      - name: Afficher les journaux en cas d'échec
+        if: failure()
+        run: docker compose -f deployment/docker-compose.yml logs --no-color
+
+      - name: Arrêter la pile temporaire
+        if: always()
+        run: docker compose -f deployment/docker-compose.yml down --volumes

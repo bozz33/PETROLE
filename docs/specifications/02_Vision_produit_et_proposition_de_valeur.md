@@ -12,7 +12,7 @@ Positionnement, objectifs et différenciation de la plateforme
 
 | Statut | Référence de conception - à valider par l’équipe |
 
-| Équipe | 2 développeurs, avec assistants IA |
+| Équipe | 2 développeurs, avec validation métier et scientifique |
 
 | Référentiel | ASME, API, ISO, IEC, ISA et exigences locales applicables |
 
@@ -30,7 +30,7 @@ Note : ce document structure la conception du logiciel. Il ne remplace ni les te
 
 | Date | 2 août 2026 |
 
-| Auteur | Équipe projet - 2 développeurs assistés par IA |
+| Auteur | Équipe projet - 2 développeurs |
 
 | Validation attendue | Relecture technique, métier et réglementaire |
 
@@ -66,7 +66,7 @@ La pagination peut évoluer après validation et mise en forme finale dans Micro
 
 
 
-La plateforme vise les pipelines de liquides, les stations de pompage, les réseaux technologiques de dépôts, les réservoirs et, dans les versions ultérieures, les gazoducs et stations de compression. Elle associe un moteur physique déterministe, des outils d’analyse de données et des fonctions d’optimisation. L’intelligence artificielle assiste l’utilisateur mais ne remplace pas les équations, les règles normatives ni la validation humaine.
+La plateforme vise les pipelines de liquides, les stations de pompage, les réseaux technologiques de dépôts, les réservoirs et, dans les versions ultérieures, les gazoducs et stations de compression. Elle associe un moteur physique déterministe, des outils d’analyse de données et des fonctions d’optimisation. Les fonctions d’aide à la décision assistent l’utilisateur mais ne remplacent pas les équations, les règles normatives ni la validation humaine.
 
 # 2. Problèmes à résoudre
 
@@ -202,7 +202,7 @@ La plateforme vise les pipelines de liquides, les stations de pompage, les rése
 
 - Les résultats industriels nécessitent une validation par un ingénieur compétent et un site pilote.
 
-- Les fonctions IA doivent citer les données et ne peuvent modifier les résultats physiques validés.
+- Les fonctions d’aide à la décision doivent citer les données utilisées et ne peuvent modifier les résultats physiques validés.
 
 # Sources et références
 

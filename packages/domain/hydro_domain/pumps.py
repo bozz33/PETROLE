@@ -22,14 +22,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from hydro_shared.errors import PumpCurveError
-
 from hydro_domain.enums import EquipmentStatus, PumpRole
 from hydro_domain.interpolation import (
     ExtrapolationPolicy,
     InterpolationKind,
     MonotoneTable,
 )
+from hydro_shared.errors import PumpCurveError
 
 #: Accélération de la pesanteur normale (CGPM 1901), en m/s².
 G = 9.80665
@@ -78,9 +77,7 @@ class QuadraticFit:
         }
 
 
-def fit_quadratic_head(
-    flows_m3_s: Sequence[float], heads_m: Sequence[float]
-) -> QuadraticFit:
+def fit_quadratic_head(flows_m3_s: Sequence[float], heads_m: Sequence[float]) -> QuadraticFit:
     """Ajuste ``H = a − b·Q²`` par moindres carrés sur les points fournis.
 
     Résolution analytique de la régression linéaire ``H = a + k·X`` avec ``X = Q²`` et
@@ -218,9 +215,7 @@ class PumpCurve:
         # d'exploitation. L'exiger strictement garantit qu'un point de fonctionnement
         # pompe-réseau existe et qu'il est unique, et rend la courbe inversible pour la
         # résolution du partage de débit en parallèle.
-        strictly_decreasing = all(
-            b < a for a, b in zip(self._heads, self._heads[1:], strict=False)
-        )
+        strictly_decreasing = all(b < a for a, b in zip(self._heads, self._heads[1:], strict=False))
         if not strictly_decreasing:
             raise PumpCurveError(
                 "La courbe H(Q) doit être strictement décroissante pour qu'un point de "
@@ -240,9 +235,7 @@ class PumpCurve:
 
         self._fit: QuadraticFit | None = None
 
-    def _optional_table(
-        self, values: Sequence[float] | None, label: str
-    ) -> MonotoneTable | None:
+    def _optional_table(self, values: Sequence[float] | None, label: str) -> MonotoneTable | None:
         if values is None:
             return None
         if len(values) != len(self._flows):
@@ -378,6 +371,7 @@ class PumpCurve:
             "powers_w": self._power.y if self._power else None,
             "npshr_m": self._npshr.y if self._npshr else None,
             "reference_speed_rpm": self.reference_speed_rpm,
+            "interpolation": self._head.as_dict()["kind"],
         }
 
 

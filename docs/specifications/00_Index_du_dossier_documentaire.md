@@ -12,7 +12,7 @@ Guide de lecture et registre des livrables D01 à D20
 
 | Statut | Référence de conception - à valider par l’équipe |
 
-| Équipe | 2 développeurs, avec assistants IA |
+| Équipe | 2 développeurs, avec validation métier et scientifique |
 
 | Référentiel | ASME, API, ISO, IEC, ISA et exigences locales applicables |
 
@@ -30,7 +30,7 @@ Note : ce document structure la conception du logiciel. Il ne remplace ni les te
 
 | Date | 2 août 2026 |
 
-| Auteur | Équipe projet - 2 développeurs assistés par IA |
+| Auteur | Équipe projet - 2 développeurs |
 
 | Validation attendue | Relecture technique, métier et réglementaire |
 
@@ -132,7 +132,7 @@ Ce dossier rassemble les documents nécessaires pour cadrer, spécifier, concevo
 
 # 4. Décisions consolidées
 
-- Équipe : deux développeurs appuyés par des assistants IA et des experts ponctuels.
+- Équipe : deux développeurs appuyés par des experts ponctuels et une automatisation renforcée.
 
 - Socle : Python, FastAPI, PostgreSQL/PostGIS, React/TypeScript, NumPy/SciPy, fluids, CoolProp et Pyomo.
 

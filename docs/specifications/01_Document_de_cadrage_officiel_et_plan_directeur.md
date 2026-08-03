@@ -18,7 +18,7 @@ Modélisation  •  Calcul  •  Simulation  •  Analyse de données  •  Opti
 
 | Date | 2 août 2026 |
 
-| Équipe | 2 développeurs, appuyés par des assistants IA |
+| Équipe | 2 développeurs, appuyés par des experts ponctuels |
 
 | Statut | Base officielle pour la conception et le cahier des charges |
 
@@ -36,7 +36,7 @@ Document de travail structurant - diffusion contrôlée
 
 | Version | 0.1 |
 
-| Responsables | Équipe projet : 2 développeurs avec assistants IA |
+| Responsables | Équipe projet : 2 développeurs |
 
 | Objet | Fixer la vision, le périmètre, les principes, les modules, les phases et les décisions structurantes. |
 
@@ -96,7 +96,7 @@ La plateforme ne sera pas limitée à un cas académique fixe. L’utilisateur p
 
 
 
-Le développement sera réalisé par une équipe de deux développeurs assistés par des outils d’intelligence artificielle. Cette taille d’équipe impose une stratégie de livraison progressive, un monolithe modulaire au départ, une forte automatisation des tests et une sélection prudente des composants open source.
+Le développement sera réalisé par une équipe de deux développeurs, avec des revues métier et scientifiques aux jalons critiques. Cette taille d’équipe impose une stratégie de livraison progressive, un monolithe modulaire au départ, une forte automatisation des tests et une sélection prudente des composants open source.
 
 # 2. Contexte et justification
 
@@ -526,7 +526,7 @@ Le MVP doit être suffisamment utile pour un ingénieur, tout en restant réalis
 
 # 16. Organisation de l’équipe et méthode de réalisation
 
-L’équipe comprend deux développeurs et des assistants IA. Les assistants IA accélèrent la recherche, le prototypage, la documentation et les tests, mais ne remplacent ni la validation métier ni la revue de code.
+L’équipe comprend deux développeurs, un référent métier et des experts ponctuels. L’automatisation accélère les tests, les contrôles qualité et la production documentaire, sans remplacer la validation métier ni la revue de code.
 
 | Rôle | Responsabilités recommandées |
 
@@ -536,7 +536,7 @@ L’équipe comprend deux développeurs et des assistants IA. Les assistants IA 
 
 | Responsabilité partagée | Architecture, modèle métier, revue croisée, CI/CD, performances et documentation. |
 
-| Assistants IA | Recherche guidée, génération de tests, revue, documentation, prototypes et analyse de données. |
+| Automatisation qualité | Tests, analyse statique, contrôles documentaires, mesures de couverture et vérifications reproductibles. |
 
 | Référent métier | Validation des hypothèses, cas d’usage, données, unités, résultats et critères d’acceptation. |
 
@@ -560,15 +560,15 @@ L’équipe comprend deux développeurs et des assistants IA. Les assistants IA 
 
 8. Livrer un incrément démontrable à fréquence régulière.
 
-## 16.2 Règles d’usage de l’IA
+## 16.2 Règles de production et de validation
 
-- Aucun calcul critique généré par IA ne sera accepté sans test et revue humaine.
+- Aucun calcul critique nouveau ne sera accepté sans cas de référence, test automatisé et revue scientifique.
 
 - Les sources, hypothèses et formules utilisées devront être identifiables.
 
-- Le code généré devra respecter les conventions, types, tests et analyses statiques du projet.
+- Tout code livré devra respecter les conventions, le typage, les tests et les analyses statiques du projet.
 
-- Les données industrielles confidentielles ne seront pas envoyées à un service non autorisé.
+- Les données industrielles confidentielles resteront dans les systèmes et services explicitement autorisés.
 
 - Les décisions normatives et HSE resteront sous responsabilité humaine.
 
@@ -616,7 +616,7 @@ L’équipe comprend deux développeurs et des assistants IA. Les assistants IA 
 
 | R7 | Complexité du gaz et des transitoires | Élevé | Report après validation du cœur liquide et services spécialisés. |
 
-| R8 | Utilisation non maîtrisée de l’IA | Élevé | Revue humaine, tests, confidentialité et journal des décisions. |
+| R8 | Automatisation insuffisamment contrôlée | Élevé | Revue croisée, tests, confidentialité et journal des décisions. |
 
 | R9 | Cybersécurité des connexions SCADA | Critique | Passerelle en DMZ, lecture seule et conformité IEC 62443. |
 
@@ -698,11 +698,11 @@ L’équipe comprend deux développeurs et des assistants IA. Les assistants IA 
 
 - Le MVP ciblera les liquides, pompes, réservoirs, transferts et scénarios.
 
-- Le projet sera réalisable par incréments avec deux développeurs et des assistants IA.
+- Le projet sera réalisable par incréments avec deux développeurs, une automatisation renforcée et des revues spécialisées.
 
 - Les premières connexions industrielles resteront en lecture seule.
 
-- Les moteurs déterministes seront séparés de l’IA conversationnelle.
+- Les moteurs déterministes seront séparés des interfaces d’assistance et de présentation.
 
 ## 21.2 Points à confirmer pendant les documents suivants
 

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+import itertools
 import math
 
 import pytest
-
-from hydro_shared.errors import ProfileError, StrappingTableError
 
 from hydro_domain.enums import EquipmentStatus
 from hydro_domain.geometry import (
@@ -22,6 +21,7 @@ from hydro_domain.interpolation import (
     MonotoneTable,
 )
 from hydro_domain.tanks import StrappingTable, Tank, TankLevels
+from hydro_shared.errors import ProfileError, StrappingTableError
 
 
 class TestMonotoneTable:
@@ -41,17 +41,13 @@ class TestMonotoneTable:
         assert evaluation.detail is not None
 
     def test_extrapolation_clamp(self):
-        table = MonotoneTable(
-            [0.0, 10.0], [0.0, 100.0], extrapolation=ExtrapolationPolicy.CLAMP
-        )
+        table = MonotoneTable([0.0, 10.0], [0.0, 100.0], extrapolation=ExtrapolationPolicy.CLAMP)
         evaluation = table.evaluate(15.0)
         assert evaluation.extrapolated
         assert evaluation.value == pytest.approx(100.0)
 
     def test_extrapolation_interdite(self):
-        table = MonotoneTable(
-            [0.0, 10.0], [0.0, 100.0], extrapolation=ExtrapolationPolicy.FORBID
-        )
+        table = MonotoneTable([0.0, 10.0], [0.0, 100.0], extrapolation=ExtrapolationPolicy.FORBID)
         with pytest.raises(Exception, match="hors du domaine"):
             table.evaluate(15.0)
 
@@ -76,7 +72,7 @@ class TestMonotoneTable:
             [0.0, 1.0, 2.0, 3.0], [10.0, 8.0, 5.0, 1.0], kind=InterpolationKind.PCHIP
         )
         values = [table(x / 10.0) for x in range(0, 31)]
-        assert all(b <= a + 1e-12 for a, b in zip(values, values[1:], strict=False))
+        assert all(b <= a + 1e-12 for a, b in itertools.pairwise(values))
 
     def test_derivee_lineaire(self):
         table = MonotoneTable([0.0, 10.0], [0.0, 100.0])
@@ -148,7 +144,10 @@ class TestPipeSegment:
         assert demi.effective_k() == pytest.approx(4.0 * ouverte.effective_k())
 
     def test_vanne_fermee_bloque(self):
-        assert Fitting(id="V", kind="vanne", k_coefficient=0.5, opening_ratio=0.0).effective_k() == math.inf
+        assert (
+            Fitting(id="V", kind="vanne", k_coefficient=0.5, opening_ratio=0.0).effective_k()
+            == math.inf
+        )
 
 
 class TestChaineDeTroncons:
@@ -286,7 +285,9 @@ class TestTank:
             "id": "B1",
             "name": "Bac 1",
             "strapping": StrappingTable.from_vertical_cylinder(20.0, 12.0),
-            "levels": TankLevels(minimum_m=0.5, low_m=1.0, normal_m=6.0, high_m=10.0, high_high_m=11.0),
+            "levels": TankLevels(
+                minimum_m=0.5, low_m=1.0, normal_m=6.0, high_m=10.0, high_high_m=11.0
+            ),
             "current_level_m": 6.0,
         }
         return Tank(**{**defaults, **kwargs})

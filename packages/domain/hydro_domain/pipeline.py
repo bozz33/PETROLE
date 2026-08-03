@@ -15,12 +15,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from hydro_shared.errors import TopologyError
-
 from hydro_domain.enums import EquipmentStatus
 from hydro_domain.geometry import ElevationProfile, PipeSegment, validate_segment_chain
 from hydro_domain.stations import PumpStation
 from hydro_domain.tanks import Tank
+from hydro_shared.errors import TopologyError
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,9 +76,7 @@ class Pipeline:
     def __post_init__(self) -> None:
         if not self.segments:
             raise TopologyError("Un pipeline doit comporter au moins un tronçon.", pipeline=self.id)
-        object.__setattr__(
-            self, "segments", tuple(sorted(self.segments, key=lambda s: s.sequence))
-        )
+        object.__setattr__(self, "segments", tuple(sorted(self.segments, key=lambda s: s.sequence)))
         object.__setattr__(
             self, "stations", tuple(sorted(self.stations, key=lambda s: s.chainage_m))
         )
@@ -210,7 +207,9 @@ class Pipeline:
                 )
 
         if all(not s.is_in_service for s in self.segments):
-            problems.append("Tous les tronçons sont hors service : aucun écoulement n'est possible.")
+            problems.append(
+                "Tous les tronçons sont hors service : aucun écoulement n'est possible."
+            )
 
         return problems
 

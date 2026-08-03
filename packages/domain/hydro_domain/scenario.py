@@ -15,14 +15,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from hydro_shared.errors import BoundaryConditionError
-
 from hydro_domain.enums import (
     BoundaryKind,
     EquipmentStatus,
     FrictionModel,
     ObjectiveKind,
 )
+from hydro_shared.errors import BoundaryConditionError
 
 #: Tolérance par défaut sur le résidu de pression, en pascals. Sur des pressions de plusieurs
 #: mégapascals, 1 Pa correspond à un résidu relatif de l'ordre de 10⁻⁷ : très en deçà de la
@@ -72,6 +71,16 @@ class SolverOptions:
     max_flow_m3_s: float | None = None
     #: Détecte et signale les zones susceptibles d'être gravitaires (modèle PHY-GRV-01).
     detect_gravity_zones: bool = True
+    #: Applique le modèle de zone gravitaire au calcul lui-même, en bornant la charge à
+    #: ``z + p_v/(ρg)`` dans les portions dépressurisées.
+    #:
+    #: **Désactivé par défaut.** Le modèle par défaut est celui d'une conduite pleine ; une
+    #: pression calculée sous la pression de vapeur y est traitée comme une violation
+    #: critique (contrôle C-002), ce qui est la posture prudente. L'activation de cette
+    #: option sélectionne explicitement le modèle académique à surface libre décrit au
+    #: D07 § 8, dont les hypothèses (interface gaz-liquide, régime stable, capacité de
+    #: transport) doivent être vérifiées avant tout usage industriel.
+    apply_gravity_model: bool = False
     #: Vitesses admissibles pour le contrôle C-005, en m/s.
     min_velocity_m_s: float | None = None
     max_velocity_m_s: float | None = 3.0
@@ -119,6 +128,7 @@ class SolverOptions:
             "use_quadratic_pump_fit": self.use_quadratic_pump_fit,
             "max_flow_m3_s": self.max_flow_m3_s,
             "detect_gravity_zones": self.detect_gravity_zones,
+            "apply_gravity_model": self.apply_gravity_model,
             "min_velocity_m_s": self.min_velocity_m_s,
             "max_velocity_m_s": self.max_velocity_m_s,
         }
@@ -225,9 +235,7 @@ class Scenario:
                 BoundaryCondition(BoundaryKind.PRESSURE, self.outlet_pressure_pa, "outlet")
             )
         if self.imposed_flow_m3_s is not None:
-            conditions.append(
-                BoundaryCondition(BoundaryKind.FLOW, self.imposed_flow_m3_s, "inlet")
-            )
+            conditions.append(BoundaryCondition(BoundaryKind.FLOW, self.imposed_flow_m3_s, "inlet"))
         if self.inlet_tank_level_m is not None:
             conditions.append(
                 BoundaryCondition(BoundaryKind.TANK_LEVEL, self.inlet_tank_level_m, "inlet")

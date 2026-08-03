@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import socket
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
 from tempfile import NamedTemporaryFile
 from typing import Annotated, Any, Protocol
+from urllib.parse import urlparse
 
 from fastapi import Depends, Request
 
@@ -102,15 +104,29 @@ class S3ObjectStorage:
         bucket: str,
     ) -> None:
         import boto3
+        from botocore.config import Config
 
         self.bucket = bucket
         self.region = region
+        endpoint = urlparse(endpoint_url)
+        if not endpoint.hostname:
+            raise ValueError("Le point d'accès S3 ne contient aucun nom d'hôte valide.")
+        self.endpoint_ip = socket.gethostbyname(endpoint.hostname)
+        self.endpoint_port = endpoint.port or (443 if endpoint.scheme == "https" else 80)
         self.client: Any = boto3.client(
             "s3",
             endpoint_url=endpoint_url,
             aws_access_key_id=access_key,
             aws_secret_access_key=secret_key,
             region_name=region,
+            # Une dépendance indisponible doit produire un diagnostic rapide. Les délais par
+            # défaut de botocore peuvent bloquer la disponibilité HTTP pendant plusieurs
+            # dizaines de secondes, ce qui masque la cause et sature les workers web.
+            config=Config(
+                connect_timeout=0.25,
+                read_timeout=0.5,
+                retries={"total_max_attempts": 1, "mode": "standard"},
+            ),
         )
         self._ensure_bucket()
 
@@ -150,6 +166,13 @@ class S3ObjectStorage:
         self.client.delete_object(Bucket=self.bucket, Key=normalized)
 
     def check(self) -> None:
+        # La pile HTTP peut attendre le délai TCP du système lorsque le conteneur cible
+        # disparaît. Cette sonde bornée maintient le point de disponibilité réactif.
+        with socket.create_connection(
+            (self.endpoint_ip, self.endpoint_port),
+            timeout=0.5,
+        ):
+            pass
         self.client.head_bucket(Bucket=self.bucket)
 
 

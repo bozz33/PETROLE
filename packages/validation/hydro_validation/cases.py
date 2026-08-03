@@ -31,6 +31,7 @@ from hydro_tanks import (
     constant_operating_point,
 )
 from hydro_validation.models import ValidationCase, ValidationObservation
+from hydro_validation.mvp_cases import MVP_CASES
 from hydroliquid import (
     G,
     LongDistanceLiquidEngine,
@@ -454,7 +455,7 @@ def _tank_008() -> tuple[ValidationObservation, ...]:
     )
 
 
-CASES: tuple[ValidationCase, ...] = (
+DETAILED_CASES: tuple[ValidationCase, ...] = (
     ValidationCase(
         "VAL-LIQ-001",
         "Conduite horizontale laminaire",
@@ -555,6 +556,8 @@ CASES: tuple[ValidationCase, ...] = (
     ),
 )
 
+CASES: tuple[ValidationCase, ...] = (*MVP_CASES, *DETAILED_CASES)
+
 
 def validation_cases() -> tuple[ValidationCase, ...]:
     """Retourne le registre ordonné et immuable des cas rapides."""
@@ -562,4 +565,4 @@ def validation_cases() -> tuple[ValidationCase, ...]:
     return CASES
 
 
-__all__ = ["CASES", "validation_cases"]
+__all__ = ["CASES", "DETAILED_CASES", "validation_cases"]

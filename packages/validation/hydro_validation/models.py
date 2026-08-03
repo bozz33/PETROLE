@@ -66,7 +66,7 @@ ValidationExecutor = Callable[[], tuple[ValidationObservation, ...]]
 
 @dataclass(frozen=True, slots=True)
 class ValidationCase:
-    """Définition stable d'un cas du plan D10."""
+    """Définition stable d'un cas du plan scientifique D10 ou de la réception MVP."""
 
     id: str
     title: str

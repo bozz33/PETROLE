@@ -14,9 +14,9 @@ from hydro_validation.runner import render_markdown, run_validation_suite, selec
 def test_all_registered_validation_cases_pass() -> None:
     result = run_validation_suite()
 
-    assert len(result.cases) == 14
+    assert len(result.cases) == 34
     assert result.passed
-    assert result.passed_count == 14
+    assert result.passed_count == 34
     assert result.failed_count == 0
     assert len(result.sha256) == 64
 
@@ -26,6 +26,15 @@ def test_case_selection_accepts_shell_patterns() -> None:
 
     assert len(selected) == 5
     assert all(case.id.startswith("VAL-PMP-") for case in selected)
+
+
+def test_porte_scientifique_mvp_couvre_v001_a_v020() -> None:
+    selected = select_cases(["V-*"])
+
+    assert [case.id for case in selected] == [f"V-{index:03d}" for index in range(1, 21)]
+    result = run_validation_suite(["V-*"])
+    assert result.passed
+    assert result.passed_count == 20
 
 
 def test_markdown_report_contains_traceability() -> None:

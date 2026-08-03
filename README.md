@@ -146,9 +146,22 @@ La variable `E2E_BASE_URL` permet de viser une autre instance que `http://localh
 
 ### Exécuter le dossier de validation scientifique
 
+Après installation locale du projet en mode éditable :
+
 ```bash
 hydro-validate --report var/validation/rapport.md
 ```
+
+Dans la pile Docker de développement, sans installation supplémentaire sur l'hôte :
+
+```bash
+docker compose -f deployment/docker-compose.yml -f deployment/docker-compose.dev.yml \
+  exec -T api hydro-validate --report /workspace/var/validation/rapport.md \
+  --json /workspace/var/validation/preuve.json
+```
+
+La campagne contient 34 cas : les 20 portes de réception `V-001` à `V-020` et 14 cas
+analytiques détaillés des familles `VAL-LIQ-*`, `VAL-PMP-*` et `VAL-TNK-*`.
 
 ---
 

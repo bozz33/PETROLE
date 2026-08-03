@@ -11,6 +11,7 @@ import "./petrole-theme.css";
 import "./shadcn-shell.css";
 import "./auth-theme.css";
 import "./auth-fallback.css";
+import "./responsive-shell.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

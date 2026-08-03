@@ -5,7 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./App";
 import { AuthProvider } from "./auth";
 import { NavigationProvider } from "./routing";
+import { ThemeProvider } from "./theme";
 import "./styles.css";
+import "./petrole-theme.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,11 +27,13 @@ if (!container) {
 createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <NavigationProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </NavigationProvider>
+      <ThemeProvider>
+        <NavigationProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </NavigationProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

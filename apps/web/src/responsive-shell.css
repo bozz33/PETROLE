@@ -1,0 +1,19 @@
+/* Le bouton mobile est visible par défaut, puis explicitement masqué sur bureau.
+   Cette stratégie évite le viewport desktop implicite de certains navigateurs mobiles. */
+.mobile-menu-button {
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  color: var(--foreground-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+@media (min-width: 901px) {
+  .mobile-menu-button {
+    display: none;
+  }
+}

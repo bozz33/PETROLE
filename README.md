@@ -118,6 +118,32 @@ Le dépôt est monté sous `/workspace` dans les conteneurs API et calcul. Les m
 
 La pile de développement active une file de calcul persistante. L'API enregistre la demande, le processus de calcul la traite hors requête HTTP, puis l'interface suit automatiquement son état.
 
+### Validation locale sans CI distante
+
+La validation reproductible du backend s'exécute depuis la racine :
+
+```bash
+.venv/Scripts/python -m ruff format --check apps packages tests
+.venv/Scripts/python -m ruff check apps packages tests
+.venv/Scripts/python -m mypy packages apps/api
+.venv/Scripts/python -m pytest --cov=packages --cov=apps/api
+```
+
+La validation du frontend s'exécute après démarrage de la pile Docker. Les essais E2E utilisent
+Chrome local et couvrent chaque écran en formats bureau et mobile :
+
+```bash
+cd apps/web
+npm ci
+npm run typecheck
+npm test
+npm run test:e2e
+npm run build
+npm audit --audit-level=moderate
+```
+
+La variable `E2E_BASE_URL` permet de viser une autre instance que `http://localhost:5173`.
+
 ### Exécuter le dossier de validation scientifique
 
 ```bash

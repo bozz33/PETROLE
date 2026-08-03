@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { apiRequest } from "@/api";
+import { PipelineMap } from "@/components/maps/PipelineMap";
 import { EmptyState, ErrorNotice, Panel, StatusBadge } from "@/components/Shell";
 import { NetworkCanvas } from "@/features/network-editor/NetworkCanvas";
 import type {
@@ -13,10 +14,13 @@ import type {
   Project,
 } from "@/types";
 
+type ViewMode = "schema" | "map";
+
 export function VisualisationReseauPage() {
   const [organizationId, setOrganizationId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [modelId, setModelId] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("schema");
 
   const organizationsQuery = useQuery({
     queryKey: ["organizations"],
@@ -55,6 +59,14 @@ export function VisualisationReseauPage() {
   const nodes = nodesQuery.data?.items ?? [];
   const edges = edgesQuery.data?.items ?? [];
   const selectedModel = models.find((model) => model.id === modelId);
+  const mapPoints = nodes
+    .filter(
+      (node): node is NetworkNode & { latitude: number; longitude: number } =>
+        node.latitude !== null && node.longitude !== null,
+    )
+    .map((node) => ({ latitude: node.latitude, longitude: node.longitude }));
+  const mapStyleUrl =
+    import.meta.env.VITE_MAP_STYLE_URL ?? "https://demotiles.maplibre.org/style.json";
 
   useEffect(() => {
     if (!organizationId && organizations.length) {
@@ -91,7 +103,7 @@ export function VisualisationReseauPage() {
     <div className="stack">
       <Panel
         title="Sélection du modèle"
-        description="Choisissez la version à afficher dans le canevas technologique React Flow."
+        description="Choisissez la version à afficher dans le schéma technologique ou sur la carte."
       >
         <div className="form-grid three">
           <label>
@@ -134,16 +146,49 @@ export function VisualisationReseauPage() {
       </Panel>
 
       <Panel
-        title="Schéma technologique du réseau"
-        description="Les couleurs distinguent les sources, bacs, stations, jonctions, injections et terminaux."
-        action={selectedModel ? <StatusBadge value={selectedModel.status} /> : undefined}
+        title={viewMode === "schema" ? "Schéma technologique du réseau" : "Carte du réseau"}
+        description={
+          viewMode === "schema"
+            ? "Les couleurs distinguent les sources, bacs, stations, jonctions, injections et terminaux."
+            : "La carte utilise les coordonnées géographiques renseignées sur les nœuds du modèle."
+        }
+        action={
+          <div className="inline-actions">
+            {selectedModel ? <StatusBadge value={selectedModel.status} /> : null}
+            <button
+              className={viewMode === "schema" ? "button button-primary" : "button button-secondary"}
+              type="button"
+              aria-pressed={viewMode === "schema"}
+              onClick={() => setViewMode("schema")}
+            >
+              Schéma
+            </button>
+            <button
+              className={viewMode === "map" ? "button button-primary" : "button button-secondary"}
+              type="button"
+              aria-pressed={viewMode === "map"}
+              onClick={() => setViewMode("map")}
+            >
+              Carte
+            </button>
+          </div>
+        }
       >
-        {nodes.length ? (
-          <NetworkCanvas nodes={nodes} edges={edges} />
+        {viewMode === "schema" ? (
+          nodes.length ? (
+            <NetworkCanvas nodes={nodes} edges={edges} />
+          ) : (
+            <EmptyState
+              title="Réseau non disponible"
+              detail="Sélectionnez un modèle contenant des nœuds et des tronçons structurés."
+            />
+          )
+        ) : mapPoints.length >= 2 ? (
+          <PipelineMap points={mapPoints} styleUrl={mapStyleUrl} />
         ) : (
           <EmptyState
-            title="Réseau non disponible"
-            detail="Sélectionnez un modèle contenant des nœuds et des tronçons structurés."
+            title="Coordonnées insuffisantes"
+            detail="Renseignez la latitude et la longitude d'au moins deux nœuds pour tracer le pipeline."
           />
         )}
       </Panel>
@@ -156,6 +201,10 @@ export function VisualisationReseauPage() {
         <div>
           <span>Tronçons</span>
           <strong>{edges.length}</strong>
+        </div>
+        <div>
+          <span>Nœuds géolocalisés</span>
+          <strong>{mapPoints.length}</strong>
         </div>
         <div>
           <span>Longueur cumulée</span>

@@ -75,9 +75,7 @@ def create_model(client: TestClient) -> tuple[dict, dict]:
         },
     )
     assert fluid_response.status_code == 201, fluid_response.text
-    fluid_approval = client.post(
-        f"/api/v1/catalog/items/{fluid_response.json()['id']}/approve"
-    )
+    fluid_approval = client.post(f"/api/v1/catalog/items/{fluid_response.json()['id']}/approve")
     assert fluid_approval.status_code == 200, fluid_approval.text
     response = client.post(
         f"/api/v1/projects/{project['id']}/models",
@@ -100,6 +98,7 @@ def create_node(
     code: str,
     kind: str,
     elevation_m: float,
+    payload: dict | None = None,
 ) -> dict:
     response = client.post(
         f"/api/v1/models/{model_id}/nodes",
@@ -108,6 +107,7 @@ def create_node(
             "name": f"Nœud {code}",
             "kind": kind,
             "elevation_m": elevation_m,
+            "payload": payload or {},
         },
     )
     assert response.status_code == 201, response.text
@@ -122,12 +122,14 @@ def create_edge(
     sequence: int,
     start: dict,
     end: dict,
+    material_catalog_item_id: str | None = None,
 ) -> dict:
     response = client.post(
         f"/api/v1/models/{model_id}/edges",
         json={
             "from_node_id": start["id"],
             "to_node_id": end["id"],
+            "material_catalog_item_id": material_catalog_item_id,
             "code": code,
             "name": f"Tronçon {code}",
             "sequence": sequence,
@@ -362,6 +364,102 @@ def test_calcul_assemble_automatiquement_le_reseau_normalise(network_api) -> Non
     result = client.get(f"/api/v1/calculations/{calculation.json()['id']}/results")
     assert result.json()["result"]["segment_count"] == 1
     assert result.json()["result"]["flow_m3_s"] > 0
+
+
+def test_compilation_conserve_injections_et_soutirages_normalises(network_api) -> None:
+    client = network_api
+    _, model = create_model(client)
+    source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
+    injection = create_node(
+        client,
+        model["id"],
+        code="INJ-01",
+        kind="injection",
+        elevation_m=105.0,
+        payload={"flow_m3_s": 0.03},
+    )
+    offtake = create_node(
+        client,
+        model["id"],
+        code="SOU-01",
+        kind="offtake",
+        elevation_m=95.0,
+        payload={"flow_m3_s": 0.01},
+    )
+    terminal = create_node(client, model["id"], code="DST", kind="terminal", elevation_m=90.0)
+    create_edge(client, model["id"], code="T-01", sequence=1, start=source, end=injection)
+    create_edge(client, model["id"], code="T-02", sequence=2, start=injection, end=offtake)
+    create_edge(client, model["id"], code="T-03", sequence=3, start=offtake, end=terminal)
+
+    preview = client.get(f"/api/v1/models/{model['id']}/canonical-sections")
+
+    assert preview.status_code == 200, preview.text
+    compiled = preview.json()["network"]["injections"]
+    assert [item["id"] for item in compiled] == ["INJ-01", "SOU-01"]
+    assert compiled[0]["chainage_m"] == 1000.0
+    assert compiled[0]["flow_m3_s"] == 0.03
+    assert compiled[1]["chainage_m"] == 2000.0
+    assert compiled[1]["flow_m3_s"] == -0.01
+
+
+def test_validation_refuse_noeud_ignore_et_debit_intermediaire_invalide(network_api) -> None:
+    client = network_api
+    _, model = create_model(client)
+    source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
+    tank = create_node(client, model["id"], code="TK-01", kind="tank", elevation_m=95.0)
+    invalid_injection = create_node(
+        client,
+        model["id"],
+        code="INJ-01",
+        kind="injection",
+        elevation_m=92.0,
+    )
+    terminal = create_node(client, model["id"], code="DST", kind="terminal", elevation_m=90.0)
+    create_edge(client, model["id"], code="T-01", sequence=1, start=source, end=tank)
+    create_edge(client, model["id"], code="T-02", sequence=2, start=tank, end=invalid_injection)
+    create_edge(client, model["id"], code="T-03", sequence=3, start=invalid_injection, end=terminal)
+
+    validation = client.post(f"/api/v1/models/{model['id']}/validate")
+
+    assert validation.status_code == 200
+    assert validation.json()["valid"] is False
+    codes = {item["code"] for item in validation.json()["errors"]}
+    assert {"NET_NODE_UNSUPPORTED", "NET_NODE_FLOW"} <= codes
+
+
+def test_validation_exige_un_materiau_approuve(network_api) -> None:
+    client = network_api
+    organization, model = create_model(client)
+    source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
+    terminal = create_node(client, model["id"], code="DST", kind="terminal", elevation_m=90.0)
+    material = client.post(
+        "/api/v1/catalog/materials",
+        json={
+            "organization_id": organization["id"],
+            "code": "ACIER-L450",
+            "name": "Acier de conduite L450",
+            "payload": {"roughness_m": 0.000045, "mawp_pa": 8_000_000.0},
+            "source": "Fiche matériau approuvable",
+        },
+    )
+    assert material.status_code == 201, material.text
+    create_edge(
+        client,
+        model["id"],
+        code="T-01",
+        sequence=1,
+        start=source,
+        end=terminal,
+        material_catalog_item_id=material.json()["id"],
+    )
+
+    invalid = client.post(f"/api/v1/models/{model['id']}/validate")
+    assert "NET_MATERIAL_UNAPPROVED" in {item["code"] for item in invalid.json()["errors"]}
+
+    approval = client.post(f"/api/v1/catalog/items/{material.json()['id']}/approve")
+    assert approval.status_code == 200, approval.text
+    valid = client.post(f"/api/v1/models/{model['id']}/validate")
+    assert valid.json()["valid"] is True
 
 
 def test_suppressions_reseau_refusent_les_cascades_implicites(network_api) -> None:

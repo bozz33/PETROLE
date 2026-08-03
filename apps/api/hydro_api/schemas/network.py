@@ -47,7 +47,9 @@ class NetworkNodeUpdate(BaseModel):
     """Champs modifiables d'un nœud appartenant à un brouillon."""
 
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    kind: Literal["source", "tank", "station", "junction", "terminal", "injection", "offtake"] | None = None
+    kind: (
+        Literal["source", "tank", "station", "junction", "terminal", "injection", "offtake"] | None
+    ) = None
     elevation_m: float | None = None
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
@@ -108,7 +110,9 @@ class NetworkEdgeCreate(BaseModel):
         if abs(chainages[0]) > tolerance:
             raise ValueError("Le profil du tronçon doit commencer au chainage 0 m.")
         if abs(chainages[-1] - self.length_m) > tolerance:
-            raise ValueError("Le dernier point du profil doit coïncider avec la longueur du tronçon.")
+            raise ValueError(
+                "Le dernier point du profil doit coïncider avec la longueur du tronçon."
+            )
         if self.from_node_id == self.to_node_id:
             raise ValueError("Un tronçon doit relier deux nœuds différents.")
         return self
@@ -185,7 +189,9 @@ class AssetInstanceUpdate(BaseModel):
     """État et paramètres modifiables d'une instance placée."""
 
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    role: Literal["main", "standby", "auxiliary", "isolation", "control", "measurement"] | None = None
+    role: Literal["main", "standby", "auxiliary", "isolation", "control", "measurement"] | None = (
+        None
+    )
     status: Literal["available", "maintenance", "unavailable", "bypassed"] | None = None
     payload: dict[str, Any] | None = None
 

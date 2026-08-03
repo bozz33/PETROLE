@@ -82,6 +82,7 @@ def _invariant_canvas(*args: Any, **kwargs: Any) -> Canvas:
     kwargs["invariant"] = 1
     return Canvas(*args, **kwargs)
 
+
 def build_operational_report_pdf(data: OperationalReportData) -> bytes:
     """Produit un PDF A4 déterministe, paginé et directement archivable."""
 

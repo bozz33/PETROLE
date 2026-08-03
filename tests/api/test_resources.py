@@ -148,13 +148,16 @@ def test_workflow_projet_version_scenario(client):
     cloned_scenario = clone_response.json()
     assert cloned_scenario["parent_id"] == scenario["id"]
     assert cloned_scenario["payload"] == scenario["payload"]
-    assert client.patch(
-        f"/api/v1/scenarios/{cloned_scenario['id']}",
-        json={"payload": {"flow_m3_s": 0.3}},
-    ).status_code == 200
-    assert client.get(f"/api/v1/scenarios/{scenario['id']}").json()["payload"] == scenario[
-        "payload"
-    ]
+    assert (
+        client.patch(
+            f"/api/v1/scenarios/{cloned_scenario['id']}",
+            json={"payload": {"flow_m3_s": 0.3}},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.get(f"/api/v1/scenarios/{scenario['id']}").json()["payload"] == scenario["payload"]
+    )
 
 
 def test_cycle_de_vie_projet_et_restauration_du_statut(client, database_engine):
@@ -209,9 +212,7 @@ def test_cycle_de_vie_projet_et_restauration_du_statut(client, database_engine):
     with Session(database_engine) as session:
         actions = set(
             session.scalars(
-                select(AuditEvent.action).where(
-                    AuditEvent.object_id == uuid.UUID(project["id"])
-                )
+                select(AuditEvent.action).where(AuditEvent.object_id == uuid.UUID(project["id"]))
             )
         )
     assert {"project.activated", "project.archived", "project.restored"} <= actions
@@ -412,6 +413,9 @@ def test_calcul_persistant_et_lecture_des_resultats(client):
     assert "profile" not in summary.json()["summary"]
     assert results.json()["result"]["profile"]
     assert results.json()["result"]["explanation"]["summary"]
+    assert isinstance(results.json()["result"]["physical_approvable"], bool)
+    assert results.json()["result"]["compliance_status"] == "not_evaluated"
+    assert results.json()["result"]["decision_eligible"] is False
     assert results.json()["diagnostics"]["method"]
 
 
@@ -429,6 +433,26 @@ def test_cle_d_idempotence_rejoue_le_meme_calcul(client, database_engine):
     with Session(database_engine) as session:
         count = session.scalar(select(func.count()).select_from(CalculationRun))
     assert count == 1
+
+
+def test_cle_d_idempotence_refuse_des_entrees_modifiees(client):
+    scenario = create_calculable_scenario(client)
+    path = f"/api/v1/scenarios/{scenario['id']}/calculations"
+    headers = {"Idempotency-Key": "rejeu-entrees-figees"}
+    first = client.post(path, headers=headers, json={})
+    assert first.status_code == 202
+
+    changed_payload = {**scenario["payload"], "imposed_flow_m3_s": 0.31}
+    changed = client.patch(
+        f"/api/v1/scenarios/{scenario['id']}",
+        json={"payload": changed_payload},
+    )
+    assert changed.status_code == 200, changed.text
+
+    conflict = client.post(path, headers=headers, json={})
+
+    assert conflict.status_code == 409
+    assert "entrées canoniques différents" in conflict.json()["detail"]
 
 
 def test_calcul_exige_une_cle_d_idempotence(client):
@@ -513,17 +537,24 @@ def test_generation_telechargement_et_approbation_du_rapport(
     assert download.content.startswith(b"%PDF-")
     assert len(download.content) > 50_000
 
-    approval = client.post(
+    forbidden_approval = client.post(
         f"/api/v1/reports/{report['id']}/approve",
         json={"decision": "approved", "comment": "Revue technique terminée."},
     )
-    assert approval.status_code == 200
-    assert approval.json()["status"] == "approved"
-    assert approval.json()["approved_at"]
+    assert forbidden_approval.status_code == 409
+    assert "not_evaluated" in forbidden_approval.text
+
+    rejection = client.post(
+        f"/api/v1/reports/{report['id']}/approve",
+        json={"decision": "rejected", "comment": "Conformité normative non établie."},
+    )
+    assert rejection.status_code == 200
+    assert rejection.json()["status"] == "rejected"
+    assert rejection.json()["approved_at"]
 
     contradictory = client.post(
         f"/api/v1/reports/{report['id']}/approve",
-        json={"decision": "rejected", "comment": "Décision différente."},
+        json={"decision": "approved", "comment": "Décision différente."},
     )
     assert contradictory.status_code == 409
 

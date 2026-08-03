@@ -23,6 +23,7 @@ class SimulationStatus(StrEnum):
     NO_PHYSICAL_SOLUTION = "SIM_NO_PHYSICAL_SOLUTION"
     NOT_CONVERGED = "SIM_NOT_CONVERGED"
     CANCELLED = "SIM_CANCELLED"
+    TECHNICAL_ERROR = "SIM_TECHNICAL_ERROR"
 
     @property
     def is_terminal(self) -> bool:

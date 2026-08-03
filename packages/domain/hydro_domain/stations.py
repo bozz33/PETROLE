@@ -117,6 +117,8 @@ class PumpStation:
     discharge_pressure_max_pa: float | None = None
     #: Coefficient de perte du collecteur d'aspiration, appliqué au calcul du NPSH disponible.
     suction_line_k: float = 0.0
+    #: Diamètre hydraulique du collecteur d'aspiration. Sans valeur, C-003 reste non évalué.
+    suction_line_diameter_m: float | None = None
     #: Coefficient de perte du chemin de bypass.
     bypass_k: float = 0.0
     #: Rendement du moteur et de la transmission, appliqué à la puissance absorbée.
@@ -139,6 +141,18 @@ class PumpStation:
                 f"à la pression minimale d'aspiration.",
                 suction_min=self.suction_pressure_min_pa,
                 discharge_max=self.discharge_pressure_max_pa,
+            )
+        if self.suction_line_k < 0.0:
+            raise InvalidInputError(
+                f"Station {self.name} : le coefficient du collecteur d'aspiration doit être "
+                "positif ou nul.",
+                suction_line_k=self.suction_line_k,
+            )
+        if self.suction_line_diameter_m is not None and self.suction_line_diameter_m <= 0.0:
+            raise InvalidInputError(
+                f"Station {self.name} : le diamètre du collecteur d'aspiration doit être "
+                "strictement positif.",
+                suction_line_diameter_m=self.suction_line_diameter_m,
             )
         identifiers = [p.id for group in self.groups for p in group.pumps]
         duplicates = {i for i in identifiers if identifiers.count(i) > 1}
@@ -372,6 +386,7 @@ class PumpStation:
             suction_pressure_min_pa=self.suction_pressure_min_pa,
             discharge_pressure_max_pa=self.discharge_pressure_max_pa,
             suction_line_k=self.suction_line_k,
+            suction_line_diameter_m=self.suction_line_diameter_m,
             bypass_k=self.bypass_k,
             drive_efficiency=self.drive_efficiency,
             label=self.label,
@@ -398,6 +413,7 @@ class PumpStation:
             suction_pressure_min_pa=self.suction_pressure_min_pa,
             discharge_pressure_max_pa=self.discharge_pressure_max_pa,
             suction_line_k=self.suction_line_k,
+            suction_line_diameter_m=self.suction_line_diameter_m,
             bypass_k=self.bypass_k,
             drive_efficiency=self.drive_efficiency,
             label=self.label,
@@ -415,6 +431,7 @@ class PumpStation:
             "suction_pressure_min_pa": self.suction_pressure_min_pa,
             "discharge_pressure_max_pa": self.discharge_pressure_max_pa,
             "suction_line_k": self.suction_line_k,
+            "suction_line_diameter_m": self.suction_line_diameter_m,
             "bypass_k": self.bypass_k,
             "drive_efficiency": self.drive_efficiency,
             "groups": [g.as_dict() for g in self.groups],

@@ -514,6 +514,11 @@ def _station(
             path,
         ),
         suction_line_k=_number(data.get("suction_line_k", 0.0), f"{path}.suction_line_k"),
+        suction_line_diameter_m=_optional_number(
+            data,
+            "suction_line_diameter_m",
+            path,
+        ),
         bypass_k=_number(data.get("bypass_k", 0.0), f"{path}.bypass_k"),
         drive_efficiency=_number(
             data.get("drive_efficiency", 1.0),
@@ -601,6 +606,10 @@ def solver_options_from_dict(value: Any, path: str = "scenario.solver") -> Solve
         pressure_tolerance_pa=_number(
             data.get("pressure_tolerance_pa", 1.0),
             f"{path}.pressure_tolerance_pa",
+        ),
+        flow_tolerance_m3_s=_number(
+            data.get("flow_tolerance_m3_s", 1.0e-9),
+            f"{path}.flow_tolerance_m3_s",
         ),
         mass_balance_tolerance=_number(
             data.get("mass_balance_tolerance", 1.0e-6),
@@ -759,12 +768,17 @@ def canonical_input_from_dict(value: Any) -> CanonicalInput:
     rule_set_ids = tuple(
         str(item) for item in _items(rules.get("rule_set_ids", ()), "rules.rule_set_ids")
     )
+    rule_manifest = tuple(
+        dict(_mapping(item, f"rules.manifest[{index}]"))
+        for index, item in enumerate(_items(rules.get("manifest", ()), "rules.manifest"))
+    )
     return CanonicalInput(
         pipeline=pipeline,
         fluid=fluid,
         scenario=scenario,
         engine=_required_str(manifest, "engine", "manifest"),
         rule_set_ids=rule_set_ids,
+        rule_manifest=rule_manifest,
         provenance=_provenance(data.get("provenance")),
         schema_version=_required_str(manifest, "schema_version", "manifest"),
         engine_version=_required_str(manifest, "engine_version", "manifest"),

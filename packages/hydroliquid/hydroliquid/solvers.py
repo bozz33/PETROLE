@@ -45,6 +45,7 @@ def bracket_root(
     *,
     expansion: float = 2.0,
     max_expansions: int = MAX_BRACKET_EXPANSIONS,
+    hard_upper: float | None = None,
 ) -> tuple[float, float]:
     """Cherche un intervalle ``[a, b]`` sur lequel ``f`` change de signe.
 
@@ -60,14 +61,25 @@ def bracket_root(
     if f_lower == 0.0:
         return (lower, lower)
 
-    current_upper = upper
-    for _ in range(max_expansions):
+    if hard_upper is not None and hard_upper < lower:
+        raise NoPhysicalSolutionError(
+            "La borne supérieure physique est inférieure à la borne minimale.",
+            lower=lower,
+            hard_upper=hard_upper,
+        )
+    current_upper = min(upper, hard_upper) if hard_upper is not None else upper
+    for _ in range(max_expansions + 1):
         f_upper = f(current_upper)
         if f_upper == 0.0:
             return (current_upper, current_upper)
         if f_lower * f_upper < 0.0:
             return (lower, current_upper)
-        current_upper *= expansion
+        if hard_upper is not None and current_upper >= hard_upper:
+            break
+        expanded_upper = current_upper * expansion
+        current_upper = (
+            min(expanded_upper, hard_upper) if hard_upper is not None else expanded_upper
+        )
 
     raise NoPhysicalSolutionError(
         "Aucune solution physique n'a été trouvée dans le domaine exploré : la fonction "
@@ -75,6 +87,7 @@ def bracket_root(
         "pompage et les pertes de charge.",
         lower=lower,
         upper=current_upper,
+        hard_upper=hard_upper,
         residual_at_lower=f_lower,
     )
 
@@ -85,6 +98,7 @@ def brent(
     upper: float,
     *,
     tolerance: float,
+    variable_tolerance: float | None = None,
     max_iterations: int = 100,
     diagnostics: SolverDiagnostics | None = None,
     log_iterations: bool = False,
@@ -96,9 +110,13 @@ def brent(
     superlinéaire. C'est la méthode de référence du produit pour les problèmes à une inconnue
     (D-v2 § 5.6).
 
-    ``tolerance`` porte sur le **résidu**, pas sur l'abscisse : c'est le résidu de pression ou
-    de charge qui a un sens physique et qui est comparé à la tolérance du scénario.
+    ``tolerance`` porte sur le **résidu**. ``variable_tolerance`` porte sur l'abscisse et sert
+    uniquement à sécuriser les pas de Brent. Séparer ces unités évite notamment d'utiliser
+    une tolérance en pascals sur une inconnue exprimée en m³/s.
     """
+    x_tolerance = tolerance if variable_tolerance is None else variable_tolerance
+    if x_tolerance < 0.0:
+        raise ValueError("La tolérance sur l'inconnue doit être positive ou nulle.")
     a, b = lower, upper
     fa, fb = f(a), f(b)
 
@@ -144,7 +162,7 @@ def brent(
             s = b - fb * (b - a) / (fb - fa)
 
         # Conditions de Brent : on retombe sur la dichotomie si le pas proposé est douteux.
-        delta = abs(2e-15 * abs(b)) + 0.5 * tolerance
+        delta = abs(2e-15 * abs(b)) + 0.5 * x_tolerance
         conditions = (
             not ((3 * a + b) / 4 < s < b or b < s < (3 * a + b) / 4),
             mflag and abs(s - b) >= abs(b - c) / 2,
@@ -274,6 +292,8 @@ def solve_monotonic(
     lower: float,
     upper: float,
     tolerance: float,
+    variable_tolerance: float | None = None,
+    hard_upper: float | None = None,
     max_iterations: int = 100,
     diagnostics: SolverDiagnostics | None = None,
     log_iterations: bool = False,
@@ -285,7 +305,7 @@ def solve_monotonic(
     automatiquement ; s'il ne peut pas être trouvé, l'absence de solution physique est
     signalée explicitement plutôt que masquée par une valeur arbitraire.
     """
-    bracket = bracket_root(f, lower, upper)
+    bracket = bracket_root(f, lower, upper, hard_upper=hard_upper)
     if bracket[0] == bracket[1]:
         if diagnostics is not None:
             diagnostics.method = "bracket-exact"
@@ -301,6 +321,7 @@ def solve_monotonic(
         bracket[0],
         bracket[1],
         tolerance=tolerance,
+        variable_tolerance=variable_tolerance,
         max_iterations=max_iterations,
         diagnostics=diagnostics,
         log_iterations=log_iterations,

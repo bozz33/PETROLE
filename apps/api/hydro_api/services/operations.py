@@ -352,8 +352,7 @@ def list_transfers(
     conditions = [TransferRun.organization_id == organization_id]
     if tank_id is not None:
         conditions.append(
-            (TransferRun.source_tank_id == tank_id)
-            | (TransferRun.destination_tank_id == tank_id)
+            (TransferRun.source_tank_id == tank_id) | (TransferRun.destination_tank_id == tank_id)
         )
     total = session.scalar(select(func.count()).select_from(TransferRun).where(*conditions)) or 0
     items = list(
@@ -556,9 +555,9 @@ def list_comparisons(
     if session.get(Project, project_id) is None:
         raise ResourceNotFoundError("Projet", project_id)
     condition = ScenarioComparison.project_id == project_id
-    total = session.scalar(
-        select(func.count()).select_from(ScenarioComparison).where(condition)
-    ) or 0
+    total = (
+        session.scalar(select(func.count()).select_from(ScenarioComparison).where(condition)) or 0
+    )
     items = list(
         session.scalars(
             select(ScenarioComparison)
@@ -812,9 +811,7 @@ def list_optimizations(
     if session.get(ScenarioRecord, scenario_id) is None:
         raise ResourceNotFoundError("Scénario", scenario_id)
     condition = OptimizationRun.scenario_id == scenario_id
-    total = session.scalar(
-        select(func.count()).select_from(OptimizationRun).where(condition)
-    ) or 0
+    total = session.scalar(select(func.count()).select_from(OptimizationRun).where(condition)) or 0
     items = list(
         session.scalars(
             select(OptimizationRun)

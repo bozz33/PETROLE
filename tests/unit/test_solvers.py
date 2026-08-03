@@ -39,6 +39,17 @@ class TestEncadrement:
         assert excinfo.value.code == "SIM_NO_PHYSICAL_SOLUTION"
         assert "ne change pas de signe" in excinfo.value.message
 
+    def test_borne_physique_superieure_jamais_depassee(self):
+        visited: list[float] = []
+
+        def residual(value: float) -> float:
+            visited.append(value)
+            return value - 5.0
+
+        with pytest.raises(NoPhysicalSolutionError):
+            bracket_root(residual, 0.0, 1.0, hard_upper=2.0)
+        assert max(visited) == 2.0
+
 
 class TestBrent:
     def test_racine_polynomiale(self):
@@ -129,6 +140,17 @@ class TestSolveMonotonic:
     def test_encadre_puis_resout(self):
         resultat = solve_monotonic(lambda x: 100.0 - x**2, lower=0.0, upper=1.0, tolerance=1e-9)
         assert resultat.root == pytest.approx(10.0, rel=1e-9)
+
+    def test_tolérances_du_résidu_et_de_l_inconnue_sont_distinctes(self):
+        resultat = solve_monotonic(
+            lambda flow: 1_000_000.0 * (flow - 0.123456789),
+            lower=0.0,
+            upper=0.2,
+            tolerance=0.1,
+            variable_tolerance=1.0e-10,
+        )
+        assert resultat.root == pytest.approx(0.123456789, abs=1.0e-7)
+        assert abs(resultat.residual) <= 0.1
 
     def test_absence_de_solution_remontee(self):
         with pytest.raises(NoPhysicalSolutionError):

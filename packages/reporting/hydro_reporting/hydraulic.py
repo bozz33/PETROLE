@@ -117,6 +117,7 @@ def _status_label(status: str) -> str:
         "SIM_NO_PHYSICAL_SOLUTION": "Aucune solution physique",
         "SIM_NOT_CONVERGED": "Non convergé",
         "SIM_CANCELLED": "Annulé",
+        "SIM_TECHNICAL_ERROR": "Erreur technique",
     }
     return labels.get(status, status)
 
@@ -349,12 +350,15 @@ def _build_story(data: HydraulicReportData, styles: dict[str, ParagraphStyle]) -
     result = data.result_payload
     input_payload = data.input_payload
     manifest = input_payload.get("manifest", {})
+    rule_manifest = input_payload.get("rules", {}).get("manifest", [])
     network = input_payload.get("network", {})
     fluid = input_payload.get("fluid", {})
     scenario = input_payload.get("scenario", {})
     diagnostics = result.get("diagnostics", {})
     violations = result.get("violations", [])
     warnings = result.get("warnings", [])
+    rule_evaluations = result.get("rule_evaluations", [])
+    compliance = result.get("compliance", {})
     profile = result.get("profile", [])
     stations = result.get("stations", [])
     segments = result.get("segments", [])
@@ -590,6 +594,28 @@ def _build_story(data: HydraulicReportData, styles: dict[str, ParagraphStyle]) -
                 "Examen requis avant approbation.",
             ]
         )
+    for evaluation in rule_evaluations:
+        status = evaluation.get("status")
+        if status not in {"compliant", "not_applicable"}:
+            severity = evaluation.get("severity") or "inconnue"
+            severity_label = {
+                "information": "informative",
+                "warning": "d'avertissement",
+                "error": "en erreur",
+                "blocking": "bloquante",
+            }.get(str(severity), str(severity))
+            control_rows.append(
+                [
+                    f"Règle {severity_label}",
+                    str(evaluation.get("rule_id", "-"))[:8],
+                    evaluation.get("message"),
+                    (
+                        f"Référence : {evaluation.get('source_clause_ref')}"
+                        if evaluation.get("source_clause_ref")
+                        else "Revue de la règle et de la donnée requise."
+                    ),
+                ]
+            )
     if control_rows:
         story.append(
             _generic_table(
@@ -598,6 +624,29 @@ def _build_story(data: HydraulicReportData, styles: dict[str, ParagraphStyle]) -
                 [28 * mm, 30 * mm, 62 * mm, 54 * mm],
                 styles,
             )
+        )
+
+    standard_rows = [
+        [
+            standard.get("code"),
+            standard.get("edition"),
+            rule_set.get("code"),
+            standard.get("content_hash"),
+        ]
+        for rule_set in rule_manifest
+        for standard in rule_set.get("standards", [])
+    ]
+    if standard_rows:
+        story.extend(
+            [
+                Paragraph("9.1 Références normatives figées", styles["h2"]),
+                _generic_table(
+                    ["Référence", "Édition", "Jeu de règles", "Empreinte"],
+                    standard_rows,
+                    [32 * mm, 24 * mm, 38 * mm, 80 * mm],
+                    styles,
+                ),
+            ]
         )
     else:
         story.append(
@@ -608,18 +657,42 @@ def _build_story(data: HydraulicReportData, styles: dict[str, ParagraphStyle]) -
         )
 
     feasible = bool(result.get("feasible"))
-    approvable = bool(result.get("approvable"))
-    conclusion_color = PALE_GREEN if approvable else PALE_RED
-    conclusion = (
-        "Le résultat est convergé, physiquement réalisable et approuvable après revue humaine."
-        if approvable
-        else (
-            "Le résultat est physiquement réalisable, mais son approbation exige la levée "
-            "des avertissements ou réserves."
-            if feasible
-            else "Le scénario n'est pas déclaré réalisable dans les hypothèses du modèle."
+    physical_approvable = bool(result.get("physical_approvable", result.get("approvable")))
+    decision_eligible = bool(result.get("decision_eligible", result.get("approvable")))
+    compliance_status = str(result.get("compliance_status", "not_evaluated"))
+    conclusion_color = PALE_GREEN if decision_eligible else PALE_RED
+    if not feasible:
+        conclusion = "Le scénario n'est pas déclaré réalisable dans les hypothèses du modèle."
+    elif not physical_approvable:
+        conclusion = (
+            "Le résultat est physiquement réalisable, mais les contrôles hydrauliques "
+            "interdisent son approbation."
         )
-    )
+    elif compliance_status == "not_evaluated":
+        conclusion = (
+            "Le résultat physique est approuvable, mais aucune conformité normative n'a été "
+            "établie. Une décision positive est interdite."
+        )
+    elif compliance_status == "indeterminate":
+        conclusion = (
+            "Le résultat physique est approuvable, mais une erreur d'évaluation normative "
+            "interdit toute décision positive."
+        )
+    elif compliance_status == "non_compliant":
+        conclusion = (
+            "Le résultat physique est approuvable, mais au moins une règle bloquante est non "
+            "conforme. Une décision positive est interdite."
+        )
+    elif compliance_status == "compliant_with_reservations":
+        conclusion = (
+            "Le résultat est physiquement approuvable et conforme avec réserves. La décision "
+            "humaine doit traiter les écarts non bloquants."
+        )
+    else:
+        conclusion = (
+            "Le résultat est physiquement approuvable et conforme aux règles évaluées. "
+            "Une revue humaine reste obligatoire."
+        )
     story.extend(
         [
             Paragraph("10. Conclusion et recommandations", styles["h1"]),
@@ -629,7 +702,13 @@ def _build_story(data: HydraulicReportData, styles: dict[str, ParagraphStyle]) -
                 style=TableStyle(
                     [
                         ("BACKGROUND", (0, 0), (-1, -1), conclusion_color),
-                        ("BOX", (0, 0), (-1, -1), 0.7, TEAL if approvable else colors.red),
+                        (
+                            "BOX",
+                            (0, 0),
+                            (-1, -1),
+                            0.7,
+                            TEAL if decision_eligible else colors.red,
+                        ),
                         ("LEFTPADDING", (0, 0), (-1, -1), 8),
                         ("RIGHTPADDING", (0, 0), (-1, -1), 8),
                         ("TOPPADDING", (0, 0), (-1, -1), 8),
@@ -658,6 +737,19 @@ def _build_story(data: HydraulicReportData, styles: dict[str, ParagraphStyle]) -
                         ),
                     ),
                     ("Modèle de frottement", assumptions.get("friction_model")),
+                    ("Conformité normative", compliance_status),
+                    (
+                        "Règles évaluées",
+                        compliance.get("counts", {}).get("total", len(rule_evaluations)),
+                    ),
+                    (
+                        "Règles bloquantes en échec",
+                        compliance.get("blocking_failure_count", 0),
+                    ),
+                    (
+                        "Éligible à une décision positive",
+                        "Oui" if decision_eligible else "Non",
+                    ),
                     (
                         "Modèle gravitaire appliqué",
                         "Oui" if assumptions.get("gravity_model_applied") else "Non",

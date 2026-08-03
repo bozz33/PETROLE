@@ -315,9 +315,7 @@ def test_comparaison_persistante_de_calculs(operations_client) -> None:
     assert comparison["result_payload"]["reference_calculation_id"] == first["id"]
     assert len(comparison["result_payload"]["ranked"]) == 2
     assert comparison["content_hash"].startswith("sha256:")
-    comparisons = operations_client.get(
-        f"/api/v1/projects/{project['id']}/comparisons"
-    )
+    comparisons = operations_client.get(f"/api/v1/projects/{project['id']}/comparisons")
     assert comparisons.status_code == 200
     assert comparisons.json()["total"] == 1
     assert comparisons.json()["items"][0]["id"] == comparison["id"]

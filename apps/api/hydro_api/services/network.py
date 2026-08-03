@@ -360,11 +360,7 @@ def list_network_nodes(
     condition = NetworkNode.model_version_id == model_id
     total = session.scalar(select(func.count()).select_from(NetworkNode).where(condition))
     items = session.scalars(
-        select(NetworkNode)
-        .where(condition)
-        .order_by(NetworkNode.code)
-        .limit(limit)
-        .offset(offset)
+        select(NetworkNode).where(condition).order_by(NetworkNode.code).limit(limit).offset(offset)
     ).all()
     return list(items), int(total or 0)
 
@@ -410,7 +406,9 @@ def delete_network_node(
             (NetworkEdge.from_node_id == node.id) | (NetworkEdge.to_node_id == node.id)
         )
     )
-    asset_reference = session.scalar(select(AssetInstance.id).where(AssetInstance.node_id == node.id))
+    asset_reference = session.scalar(
+        select(AssetInstance.id).where(AssetInstance.node_id == node.id)
+    )
     if edge_reference is not None or asset_reference is not None:
         raise ResourceConflictError(
             "Supprimez d'abord les tronçons et équipements qui référencent ce nœud."
@@ -583,11 +581,11 @@ def delete_network_edge(
 
     edge = get_network_edge(session, edge_id)
     model = _get_model(session, edge.model_version_id, mutable=True)
-    asset_reference = session.scalar(select(AssetInstance.id).where(AssetInstance.edge_id == edge.id))
+    asset_reference = session.scalar(
+        select(AssetInstance.id).where(AssetInstance.edge_id == edge.id)
+    )
     if asset_reference is not None:
-        raise ResourceConflictError(
-            "Supprimez d'abord les équipements placés sur ce tronçon."
-        )
+        raise ResourceConflictError("Supprimez d'abord les équipements placés sur ce tronçon.")
     code = edge.code
     session.delete(edge)
     session.flush()
@@ -613,7 +611,9 @@ def _validate_asset_location(
     """Contrôle tenant, type de ressource et emplacement de l'instance."""
 
     if catalog_item.organization_id != _organization_id(model):
-        raise ResourceConflictError("L'équipement de catalogue appartient à une autre organisation.")
+        raise ResourceConflictError(
+            "L'équipement de catalogue appartient à une autre organisation."
+        )
     if catalog_item.kind in {"fluid", "material"}:
         raise ResourceConflictError(
             "Un produit ou matériau ne peut pas être placé comme équipement du réseau."
@@ -633,7 +633,9 @@ def _validate_asset_location(
         if edge.model_version_id != model.id:
             raise ResourceConflictError("Le tronçon appartient à une autre version de modèle.")
         if catalog_item.kind == "pump":
-            raise ResourceConflictError("Une pompe doit être placée sur une station, pas un tronçon.")
+            raise ResourceConflictError(
+                "Une pompe doit être placée sur une station, pas un tronçon."
+            )
 
 
 def create_asset_instance(
@@ -649,9 +651,7 @@ def create_asset_instance(
         raise ResourceNotFoundError("Équipement de catalogue", data.catalog_item_id)
     _validate_asset_location(session, model, catalog_item, data.node_id, data.edge_id)
     if catalog_item.kind == "pump" and data.role not in {"main", "standby", "auxiliary"}:
-        raise ResourceConflictError(
-            "Une pompe doit utiliser le rôle main, standby ou auxiliary."
-        )
+        raise ResourceConflictError("Une pompe doit utiliser le rôle main, standby ou auxiliary.")
     asset = AssetInstance(model_version_id=model.id, **data.model_dump())
     session.add(asset)
     _flush(session, f"Le code équipement « {data.code} » existe déjà dans cette version.")
@@ -704,9 +704,7 @@ def update_asset_instance(
         and catalog_item.kind == "pump"
         and changes.get("role", asset.role) not in {"main", "standby", "auxiliary"}
     ):
-        raise ResourceConflictError(
-            "Une pompe doit utiliser le rôle main, standby ou auxiliary."
-        )
+        raise ResourceConflictError("Une pompe doit utiliser le rôle main, standby ou auxiliary.")
     for field, value in changes.items():
         setattr(asset, field, value)
     _flush(session, "La modification de l'équipement crée un conflit.")
@@ -756,7 +754,9 @@ def validate_network(session: Session, model_id: uuid.UUID) -> NetworkValidation
     errors: list[NetworkValidationIssue] = []
     warnings: list[NetworkValidationIssue] = []
 
-    def error(code: str, message: str, object_type: str, object_id: uuid.UUID | None = None) -> None:
+    def error(
+        code: str, message: str, object_type: str, object_id: uuid.UUID | None = None
+    ) -> None:
         errors.append(
             NetworkValidationIssue(
                 code=code,
@@ -837,7 +837,9 @@ def validate_network(session: Session, model_id: uuid.UUID) -> NetworkValidation
             visited.add(current)
             pending.extend(adjacency.get(current, set()) - visited)
         if len(visited) != len(nodes):
-            error("NET_DISCONNECTED", "Le réseau contient plusieurs composantes.", "model", model_id)
+            error(
+                "NET_DISCONNECTED", "Le réseau contient plusieurs composantes.", "model", model_id
+            )
 
     sequences = [edge.sequence for edge in edges]
     if sequences and sorted(sequences) != list(range(1, len(sequences) + 1)):
@@ -890,14 +892,19 @@ def validate_network(session: Session, model_id: uuid.UUID) -> NetworkValidation
             model_id,
         )
 
-    catalog_items = {
-        item.id: item
-        for item in session.scalars(
-            select(CatalogItem).where(
-                CatalogItem.id.in_([asset.catalog_item_id for asset in assets])
+    referenced_catalog_ids = {asset.catalog_item_id for asset in assets} | {
+        edge.material_catalog_item_id for edge in edges if edge.material_catalog_item_id is not None
+    }
+    catalog_items = (
+        {
+            item.id: item
+            for item in session.scalars(
+                select(CatalogItem).where(CatalogItem.id.in_(referenced_catalog_ids))
             )
-        )
-    } if assets else {}
+        }
+        if referenced_catalog_ids
+        else {}
+    )
     pump_count_by_node = Counter(
         asset.node_id
         for asset in assets
@@ -907,7 +914,12 @@ def validate_network(session: Session, model_id: uuid.UUID) -> NetworkValidation
     for asset in assets:
         item = catalog_items.get(asset.catalog_item_id)
         if item is None:
-            error("NET_ASSET_CATALOG", "L'équipement référence un catalogue absent.", "asset", asset.id)
+            error(
+                "NET_ASSET_CATALOG",
+                "L'équipement référence un catalogue absent.",
+                "asset",
+                asset.id,
+            )
         elif item.status != "approved":
             error(
                 "NET_ASSET_UNAPPROVED",
@@ -918,6 +930,50 @@ def validate_network(session: Session, model_id: uuid.UUID) -> NetworkValidation
     for node in nodes:
         if node.kind == "station" and pump_count_by_node[node.id] == 0:
             error("NET_STATION_EMPTY", "La station ne contient aucune pompe.", "node", node.id)
+        if node.kind == "tank":
+            error(
+                "NET_NODE_UNSUPPORTED",
+                "Le nœud tank n'est pas compilable par le moteur liquide du MVP ; utilisez "
+                "un nœud source ou terminal et gérez le bac par le module d'exploitation.",
+                "node",
+                node.id,
+            )
+        if node.kind in {"injection", "offtake"}:
+            flow = node.payload.get("flow_m3_s")
+            if isinstance(flow, bool) or not isinstance(flow, int | float) or flow <= 0:
+                error(
+                    "NET_NODE_FLOW",
+                    "Une injection ou un soutirage doit définir payload.flow_m3_s strictement "
+                    "positif ; le sens est porté par le type du nœud.",
+                    "node",
+                    node.id,
+                )
+
+    for edge in edges:
+        if edge.material_catalog_item_id is None:
+            continue
+        material = catalog_items.get(edge.material_catalog_item_id)
+        if material is None:
+            error(
+                "NET_MATERIAL_CATALOG",
+                "Le tronçon référence un matériau de catalogue absent.",
+                "edge",
+                edge.id,
+            )
+        elif material.organization_id != _organization_id(model) or material.kind != "material":
+            error(
+                "NET_MATERIAL_CATALOG",
+                "Le matériau doit appartenir à la même organisation et au catalogue matériaux.",
+                "edge",
+                edge.id,
+            )
+        elif material.status != "approved":
+            error(
+                "NET_MATERIAL_UNAPPROVED",
+                "Le tronçon référence une version de matériau non approuvée.",
+                "edge",
+                edge.id,
+            )
 
     raw_fluid_id = model.payload.get("fluid_catalog_item_id")
     try:
@@ -975,19 +1031,21 @@ def canonical_sections_from_normalized(
     if fluid is None:
         raise ResourceNotFoundError("Produit de catalogue", fluid_id)
 
-    referenced_catalog_ids = {
-        asset.catalog_item_id for asset in assets
-    } | {
+    referenced_catalog_ids = {asset.catalog_item_id for asset in assets} | {
         edge.material_catalog_item_id
         for edge in ordered_edges
         if edge.material_catalog_item_id is not None
     }
-    catalog_by_id = {
-        item.id: item
-        for item in session.scalars(
-            select(CatalogItem).where(CatalogItem.id.in_(referenced_catalog_ids))
-        )
-    } if referenced_catalog_ids else {}
+    catalog_by_id = (
+        {
+            item.id: item
+            for item in session.scalars(
+                select(CatalogItem).where(CatalogItem.id.in_(referenced_catalog_ids))
+            )
+        }
+        if referenced_catalog_ids
+        else {}
+    )
     assets_by_node: dict[uuid.UUID, list[AssetInstance]] = {}
     assets_by_edge: dict[uuid.UUID, list[AssetInstance]] = {}
     for asset in assets:
@@ -1120,9 +1178,25 @@ def canonical_sections_from_normalized(
                 "suction_pressure_min_pa": node.payload.get("suction_pressure_min_pa"),
                 "discharge_pressure_max_pa": node.payload.get("discharge_pressure_max_pa"),
                 "suction_line_k": node.payload.get("suction_line_k", 0.0),
+                "suction_line_diameter_m": node.payload.get("suction_line_diameter_m"),
                 "bypass_k": node.payload.get("bypass_k", 0.0),
                 "drive_efficiency": node.payload.get("drive_efficiency", 1.0),
                 "groups": groups,
+            }
+        )
+
+    injections: list[dict[str, Any]] = []
+    for node in sorted(nodes, key=lambda item: (chainage_by_node.get(item.id, 0.0), item.code)):
+        if node.kind not in {"injection", "offtake"}:
+            continue
+        entered_flow = float(node.payload["flow_m3_s"])
+        injections.append(
+            {
+                "id": node.code,
+                "label": node.name,
+                "chainage_m": chainage_by_node[node.id],
+                "flow_m3_s": entered_flow if node.kind == "injection" else -entered_flow,
+                "status": node.status,
             }
         )
 
@@ -1133,7 +1207,7 @@ def canonical_sections_from_normalized(
         "segments": segments,
         "profile": {"points": profile_points},
         "stations": stations,
-        "injections": [],
+        "injections": injections,
         "origin_tank": None,
         "destination_tank": None,
     }

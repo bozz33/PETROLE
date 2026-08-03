@@ -75,12 +75,15 @@ class ProjectUpdate(BaseModel):
     site_id: uuid.UUID | None = None
     name: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=10_000)
-    project_type: Literal[
-        "liquid_pipeline",
-        "terminal",
-        "gas_pipeline",
-        "combined",
-    ] | None = None
+    project_type: (
+        Literal[
+            "liquid_pipeline",
+            "terminal",
+            "gas_pipeline",
+            "combined",
+        ]
+        | None
+    ) = None
     country_code: str | None = Field(default=None, min_length=2, max_length=2)
     unit_system: Literal["SI"] | None = None
     rule_set_ids: list[uuid.UUID] | None = Field(default=None, max_length=100)

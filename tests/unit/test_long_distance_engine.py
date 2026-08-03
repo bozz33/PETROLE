@@ -152,6 +152,19 @@ def test_conditions_physiquement_impossibles_retournent_un_statut():
     assert result.diagnostics.messages
 
 
+def test_borne_maximale_de_debit_est_une_limite_physique_stricte():
+    cas = scenario(
+        inlet_pressure_pa=5.0e6,
+        outlet_pressure_pa=4.0e6,
+        options=SolverOptions(max_flow_m3_s=0.01),
+    )
+
+    result = LongDistanceLiquidEngine().simulate(entree_canonique(cas=cas))
+
+    assert result.status is SimulationStatus.NO_PHYSICAL_SOLUTION
+    assert not result.profile
+
+
 def test_conditions_de_bacs_resolvent_le_debit_gravitaire():
     origin = bac(
         identifiant="B-AMONT",
@@ -293,6 +306,57 @@ def test_injection_intermediaire_conserve_la_masse():
     assert result.profile[-1].flow_m3_s == pytest.approx(0.15)
     assert result.diagnostics.mass_balance_residual == pytest.approx(0.0, abs=1e-12)
     assert not any(violation.code is ViolationCode.MASS_BALANCE for violation in result.violations)
+    expected_loss = friction_head_loss_m(0.1, 1_000.0, 0.5, 4.5e-5, 9.0e-6)
+    expected_loss += friction_head_loss_m(0.15, 1_000.0, 0.5, 4.5e-5, 9.0e-6)
+    assert result.segments[0].friction_head_loss_m == pytest.approx(expected_loss, rel=1e-12)
+
+
+def test_npsh_non_evalue_sans_diametre_du_collecteur_aspiration():
+    station = station_serie(
+        identifiant="S1",
+        chainage_m=0.0,
+        suction_line_k=2.0,
+    )
+    conduit = pipeline(stations=(station,))
+    cas = scenario(imposed_flow_m3_s=0.2, inlet_pressure_pa=5.0e6)
+
+    result = LongDistanceLiquidEngine().simulate(entree_canonique(conduite=conduit, cas=cas))
+
+    assert result.stations[0].pumps[0].npsh_available_m is None
+    assert "C-003" in result.assumptions["checks"]["skipped"]
+
+
+def test_npsh_applique_vitesse_et_pertes_du_collecteur_aspiration():
+    without_loss = station_serie(
+        identifiant="S1",
+        chainage_m=0.0,
+        suction_line_k=0.0,
+        suction_line_diameter_m=0.4,
+    )
+    with_loss = station_serie(
+        identifiant="S1",
+        chainage_m=0.0,
+        suction_line_k=3.0,
+        suction_line_diameter_m=0.4,
+    )
+    cas = scenario(imposed_flow_m3_s=0.2, inlet_pressure_pa=5.0e6)
+    engine = LongDistanceLiquidEngine()
+
+    reference = engine.simulate(
+        entree_canonique(conduite=pipeline(stations=(without_loss,)), cas=cas)
+    )
+    penalized = engine.simulate(entree_canonique(conduite=pipeline(stations=(with_loss,)), cas=cas))
+
+    reference_npsha = reference.stations[0].pumps[0].npsh_available_m
+    penalized_npsha = penalized.stations[0].pumps[0].npsh_available_m
+    assert reference_npsha is not None
+    assert penalized_npsha is not None
+    velocity = 0.2 / (math.pi * 0.4**2 / 4.0)
+    assert reference_npsha - penalized_npsha == pytest.approx(
+        3.0 * velocity**2 / (2.0 * G),
+        rel=1e-12,
+    )
+    assert "C-003" in penalized.assumptions["checks"]["executed"]
 
 
 def test_depression_detectee_et_mode_gravitaire_explicite():

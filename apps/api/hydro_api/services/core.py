@@ -26,6 +26,7 @@ from hydro_api.models import (
     ScenarioRecord,
     Site,
     StoredFile,
+    UserAccount,
 )
 from hydro_api.schemas import (
     CalculationCreate,
@@ -179,7 +180,7 @@ def create_project(session: Session, data: ProjectCreate) -> Project:
             raise ResourceConflictError(
                 "Le site et le projet doivent appartenir à la même organisation."
             )
-    _validate_project_references(
+    rule_sets, responsible_users = _validate_project_references(
         session,
         data.organization_id,
         rule_set_ids=data.rule_set_ids,
@@ -187,9 +188,9 @@ def create_project(session: Session, data: ProjectCreate) -> Project:
     )
     project = Project(
         **data.model_dump(exclude={"rule_set_ids", "responsible_user_ids"}),
-        rule_set_ids=[str(identifier) for identifier in data.rule_set_ids],
-        responsible_user_ids=[str(identifier) for identifier in data.responsible_user_ids],
     )
+    project.rule_sets = rule_sets
+    project.responsible_users = responsible_users
     if project.country_code is not None:
         project.country_code = project.country_code.upper()
     session.add(project)
@@ -243,9 +244,10 @@ def _validate_project_references(
     *,
     rule_set_ids: list[uuid.UUID],
     responsible_user_ids: list[uuid.UUID],
-) -> None:
+) -> tuple[list[RuleSet], list[UserAccount]]:
     """Vérifie que les référentiels et responsables appartiennent au projet."""
 
+    rule_sets: list[RuleSet] = []
     for identifier in rule_set_ids:
         rule_set = session.get(RuleSet, identifier)
         if rule_set is None or rule_set.organization_id != organization_id:
@@ -256,6 +258,8 @@ def _validate_project_references(
             raise ResourceConflictError(
                 "Un jeu de règles doit être approuvé avant sa sélection dans un projet."
             )
+        rule_sets.append(rule_set)
+    responsible_users: list[UserAccount] = []
     for identifier in responsible_user_ids:
         membership = session.scalar(
             select(OrganizationMembership).where(
@@ -267,6 +271,11 @@ def _validate_project_references(
             raise ResourceConflictError(
                 "Un responsable doit être membre de l'organisation du projet."
             )
+        user = session.get(UserAccount, identifier)
+        if user is None:  # pragma: no cover - l'adhésion porte déjà cette clé étrangère
+            raise ResourceNotFoundError("Utilisateur responsable", identifier)
+        responsible_users.append(user)
+    return rule_sets, responsible_users
 
 
 def update_project(
@@ -281,18 +290,20 @@ def update_project(
     rule_set_ids = changes.pop("rule_set_ids", None)
     responsible_user_ids = changes.pop("responsible_user_ids", None)
     if rule_set_ids is not None or responsible_user_ids is not None:
-        _validate_project_references(
+        rule_sets, responsible_users = _validate_project_references(
             session,
             project.organization_id,
             rule_set_ids=rule_set_ids or [],
             responsible_user_ids=responsible_user_ids or [],
         )
         if rule_set_ids is not None:
-            project.rule_set_ids = [str(identifier) for identifier in rule_set_ids]
-            changes["rule_set_ids"] = project.rule_set_ids
+            project.rule_sets = rule_sets
+            changes["rule_set_ids"] = [str(identifier) for identifier in project.rule_set_ids]
         if responsible_user_ids is not None:
-            project.responsible_user_ids = [str(identifier) for identifier in responsible_user_ids]
-            changes["responsible_user_ids"] = project.responsible_user_ids
+            project.responsible_users = responsible_users
+            changes["responsible_user_ids"] = [
+                str(identifier) for identifier in project.responsible_user_ids
+            ]
     if "site_id" in changes and changes["site_id"] is not None:
         site = session.get(Site, changes["site_id"])
         if site is None:
@@ -507,10 +518,19 @@ def update_model_version(
 
 
 def approve_model_version(session: Session, model_id: uuid.UUID) -> ModelVersion:
+    model = session.get(ModelVersion, model_id)
+    if model is None:
+        raise ResourceNotFoundError("Version de modèle", model_id)
+    project = session.scalar(
+        select(Project).where(Project.id == model.project_id).with_for_update()
+    )
+    if project is None:
+        raise ResourceNotFoundError("Projet", model.project_id)
+    # Le verrou projet sérialise l'approbation de deux versions distinctes.
     model = session.scalar(
         select(ModelVersion).where(ModelVersion.id == model_id).with_for_update()
     )
-    if model is None:
+    if model is None:  # pragma: no cover - suppression concurrente interdite par la FK
         raise ResourceNotFoundError("Version de modèle", model_id)
     if model.status == "approved":
         return model
@@ -521,9 +541,14 @@ def approve_model_version(session: Session, model_id: uuid.UUID) -> ModelVersion
     from hydro_api.models import NetworkNode
     from hydro_api.services.network import validate_network
 
-    normalized_node_count = session.scalar(
-        select(func.count()).select_from(NetworkNode).where(NetworkNode.model_version_id == model.id)
-    ) or 0
+    normalized_node_count = (
+        session.scalar(
+            select(func.count())
+            .select_from(NetworkNode)
+            .where(NetworkNode.model_version_id == model.id)
+        )
+        or 0
+    )
     if normalized_node_count:
         validation = validate_network(session, model.id)
         if not validation.valid:
@@ -542,7 +567,6 @@ def approve_model_version(session: Session, model_id: uuid.UUID) -> ModelVersion
         raise ResourceConflictError(
             "Une autre version du projet est déjà approuvée. Archivez-la avant l'approbation."
         )
-    project = get_project(session, model.project_id)
     model.status = "approved"
     model.approved_at = utc_now()
     _audit(
@@ -807,9 +831,14 @@ def canonical_payload_for_calculation(
 
     from hydro_api.models import NetworkNode
 
-    normalized_node_count = session.scalar(
-        select(func.count()).select_from(NetworkNode).where(NetworkNode.model_version_id == model.id)
-    ) or 0
+    normalized_node_count = (
+        session.scalar(
+            select(func.count())
+            .select_from(NetworkNode)
+            .where(NetworkNode.model_version_id == model.id)
+        )
+        or 0
+    )
     fluid: Any
     network: Any
     equipment: Any
@@ -872,19 +901,6 @@ def queue_calculation(
 ) -> CalculationRun:
     """Valide l'entrée, crée l'exécution en attente et persiste sa tâche."""
 
-    existing = session.scalar(
-        select(CalculationRun).where(
-            CalculationRun.scenario_id == scenario_id,
-            CalculationRun.idempotency_key == idempotency_key,
-        )
-    )
-    if existing is not None:
-        if existing.engine != data.engine:
-            raise ResourceConflictError(
-                "La clé d'idempotence a déjà été utilisée avec un autre moteur."
-            )
-        return existing
-
     scenario = get_scenario(session, scenario_id)
     model = get_model_version(session, scenario.model_version_id)
     project = get_project(session, model.project_id)
@@ -907,19 +923,41 @@ def queue_calculation(
         organization_id=project.organization_id,
     )
     canonical_input = canonical_input_from_dict(canonical_payload)
-    from hydro_api.services.governance import validate_rule_sets_for_calculation
+    from hydro_api.services.governance import (
+        freeze_rule_sets,
+        validate_rule_sets_for_calculation,
+    )
 
-    validate_rule_sets_for_calculation(
+    resolved_rule_sets = validate_rule_sets_for_calculation(
         session,
         project.organization_id,
         canonical_input.rule_set_ids,
     )
+    canonical_payload["rules"] = {
+        "rule_set_ids": list(canonical_input.rule_set_ids),
+        "manifest": freeze_rule_sets(session, resolved_rule_sets),
+    }
+    canonical_input = canonical_input_from_dict(canonical_payload)
     if not engine.supports(canonical_input):
         raise InvalidInputError(
             "Le moteur choisi ne couvre pas la topologie ou les équipements de ce modèle.",
             code=ErrorCode.ENGINE_UNSUPPORTED_CASE,
             engine=engine.name,
         )
+
+    existing = session.scalar(
+        select(CalculationRun).where(
+            CalculationRun.scenario_id == scenario_id,
+            CalculationRun.idempotency_key == idempotency_key,
+        )
+    )
+    if existing is not None:
+        if existing.engine != engine.name or existing.input_hash != canonical_input.fingerprint:
+            raise ResourceConflictError(
+                "La clé d'idempotence a déjà été utilisée avec un moteur ou des entrées "
+                "canoniques différents."
+            )
+        return existing
 
     calculation = CalculationRun(
         scenario_id=scenario.id,
@@ -943,9 +981,13 @@ def queue_calculation(
             )
         )
         if duplicate is not None:
-            if duplicate.engine != data.engine:
+            if (
+                duplicate.engine != engine.name
+                or duplicate.input_hash != canonical_input.fingerprint
+            ):
                 raise ResourceConflictError(
-                    "La clé d'idempotence a déjà été utilisée avec un autre moteur."
+                    "La clé d'idempotence a déjà été utilisée avec un moteur ou des entrées "
+                    "canoniques différents."
                 ) from error
             return duplicate
         raise ResourceConflictError(
@@ -1019,7 +1061,10 @@ def execute_calculation(
         return calculation
     result_payload = result.as_dict()
     result_payload["explanation"] = engine.explain(result).as_dict()
-    from hydro_api.services.governance import evaluate_calculation_rules
+    from hydro_api.services.governance import (
+        evaluate_calculation_rules,
+        summarize_rule_evaluations,
+    )
 
     evaluations = evaluate_calculation_rules(session, calculation, result_payload)
     result_payload["rule_evaluations"] = [
@@ -1033,9 +1078,25 @@ def execute_calculation(
             "margin": item.margin,
             "unit": item.unit,
             "message": item.message,
+            "rule_code": item.details.get("rule_code"),
+            "rule_set_hash": item.details.get("rule_set_hash"),
+            "severity": item.details.get("severity"),
+            "source_clause_ref": item.details.get("source_clause_ref"),
         }
         for item in evaluations
     ]
+    compliance = summarize_rule_evaluations(evaluations)
+    physical_approvable = bool(result_payload.get("approvable"))
+    decision_eligible = physical_approvable and compliance["status"] in {
+        "compliant",
+        "compliant_with_reservations",
+    }
+    result_payload["physical_approvable"] = physical_approvable
+    result_payload["compliance"] = compliance
+    result_payload["compliance_status"] = compliance["status"]
+    result_payload["decision_eligible"] = decision_eligible
+    # Le champ historique reste conservateur pour les consommateurs existants.
+    result_payload["approvable"] = decision_eligible
     calculation.engine_version = result.engine_version
     calculation.status = result.status.value
     calculation.result_payload = result_payload
@@ -1053,6 +1114,9 @@ def execute_calculation(
             "engine": calculation.engine,
             "input_hash": calculation.input_hash,
             "status": calculation.status,
+            "physical_approvable": physical_approvable,
+            "compliance_status": compliance["status"],
+            "decision_eligible": decision_eligible,
         },
     )
     _flush(session, "Impossible d'enregistrer le résultat du calcul.")
@@ -1262,9 +1326,9 @@ def list_reports(
         if not allowed_organization_ids:
             return [], 0
         conditions.append(GeneratedReport.organization_id.in_(allowed_organization_ids))
-    total = session.scalar(
-        select(func.count()).select_from(GeneratedReport).where(*conditions)
-    ) or 0
+    total = (
+        session.scalar(select(func.count()).select_from(GeneratedReport).where(*conditions)) or 0
+    )
     items = list(
         session.scalars(
             select(GeneratedReport)
@@ -1452,6 +1516,20 @@ def approve_report(
         raise ResourceConflictError(
             "Une décision a déjà été enregistrée pour ce rapport et ne peut pas être remplacée."
         )
+
+    if data.decision == "approved" and report.calculation_id is not None:
+        calculation = report.calculation or session.get(CalculationRun, report.calculation_id)
+        result_payload = calculation.result_payload if calculation is not None else None
+        if not result_payload or not result_payload.get("decision_eligible", False):
+            compliance_status = (
+                result_payload.get("compliance_status", "not_evaluated")
+                if result_payload
+                else "not_evaluated"
+            )
+            raise ResourceConflictError(
+                "Le rapport ne peut pas être approuvé : le calcul n'est pas éligible à une "
+                f"décision positive (conformité : {compliance_status})."
+            )
 
     report.status = data.decision
     report.approved_at = utc_now()

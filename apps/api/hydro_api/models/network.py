@@ -31,7 +31,9 @@ class NetworkNode(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "kind IN ('source', 'tank', 'station', 'junction', 'terminal', 'injection', 'offtake')",
             name="kind_valid",
         ),
-        CheckConstraint("status IN ('available', 'maintenance', 'unavailable')", name="status_valid"),
+        CheckConstraint(
+            "status IN ('available', 'maintenance', 'unavailable')", name="status_valid"
+        ),
         Index("ix_network_nodes_model_kind", "model_version_id", "kind"),
     )
 
@@ -63,7 +65,9 @@ class NetworkEdge(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("inner_diameter_m > 0", name="diameter_positive"),
         CheckConstraint("roughness_m >= 0", name="roughness_nonnegative"),
         CheckConstraint("mawp_pa > 0", name="mawp_positive"),
-        CheckConstraint("status IN ('available', 'maintenance', 'unavailable')", name="status_valid"),
+        CheckConstraint(
+            "status IN ('available', 'maintenance', 'unavailable')", name="status_valid"
+        ),
         Index("ix_network_edges_model_sequence", "model_version_id", "sequence"),
     )
 

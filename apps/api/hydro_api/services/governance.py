@@ -137,9 +137,9 @@ def list_standards(
     conditions = [StandardReference.organization_id == organization_id]
     if status is not None:
         conditions.append(StandardReference.status == status)
-    total = session.scalar(
-        select(func.count()).select_from(StandardReference).where(*conditions)
-    ) or 0
+    total = (
+        session.scalar(select(func.count()).select_from(StandardReference).where(*conditions)) or 0
+    )
     items = session.scalars(
         select(StandardReference)
         .where(*conditions)
@@ -427,7 +427,9 @@ def approve_rule(
     rule = get_rule(session, rule_id)
     rule_set = get_rule_set(session, rule.rule_set_id)
     if rule_set.status != "draft" or rule.status != "draft":
-        raise ResourceConflictError("Seule une règle en brouillon d'un jeu en brouillon est approuvable.")
+        raise ResourceConflictError(
+            "Seule une règle en brouillon d'un jeu en brouillon est approuvable."
+        )
     rule.status = "approved"
     rule.approved_at = utc_now()
     session.flush()
@@ -458,7 +460,9 @@ def approve_rule_set(
         raise ResourceConflictError("Le jeu doit contenir au moins une règle approuvée.")
     if any(rule.status != "approved" for rule in rules):
         raise ResourceConflictError("Toutes les règles doivent être approuvées par un expert.")
-    standards = [get_standard(session, identifier) for identifier in _rule_set_standard_ids(session, item.id)]
+    standards = [
+        get_standard(session, identifier) for identifier in _rule_set_standard_ids(session, item.id)
+    ]
     if any(standard.status != "active" for standard in standards):
         raise ResourceConflictError("Les éditions normatives du jeu doivent rester actives.")
     item.status = "approved"
@@ -508,6 +512,82 @@ def validate_rule_sets_for_calculation(
     return resolved
 
 
+def freeze_rule_sets(
+    session: Session,
+    rule_sets: list[RuleSet],
+) -> list[dict[str, Any]]:
+    """Fige éditions et seuils applicables dans le paquet canonique du calcul."""
+
+    manifest: list[dict[str, Any]] = []
+    for rule_set in sorted(rule_sets, key=lambda item: (item.code, item.version_number)):
+        standard_ids = _rule_set_standard_ids(session, rule_set.id)
+        standards = [get_standard(session, identifier) for identifier in standard_ids]
+        rules = session.scalars(
+            select(RuleDefinition)
+            .where(
+                RuleDefinition.rule_set_id == rule_set.id,
+                RuleDefinition.status == "approved",
+            )
+            .order_by(RuleDefinition.code)
+        ).all()
+        manifest.append(
+            {
+                "rule_set_id": str(rule_set.id),
+                "code": rule_set.code,
+                "title": rule_set.title,
+                "domain": rule_set.domain,
+                "country_code": rule_set.country_code,
+                "version_number": rule_set.version_number,
+                "content_hash": rule_set.content_hash,
+                "standards": [
+                    {
+                        "standard_id": str(standard.id),
+                        "code": standard.code,
+                        "title": standard.title,
+                        "issuing_body": standard.issuing_body,
+                        "edition": standard.edition,
+                        "publication_date": (
+                            standard.publication_date.isoformat()
+                            if standard.publication_date is not None
+                            else None
+                        ),
+                        "effective_date": (
+                            standard.effective_date.isoformat()
+                            if standard.effective_date is not None
+                            else None
+                        ),
+                        "licensed_copy_ref": standard.licensed_copy_ref,
+                        "source_url": standard.source_url,
+                        "content_hash": standard.content_hash,
+                    }
+                    for standard in standards
+                ],
+                "rules": [
+                    {
+                        "rule_id": str(rule.id),
+                        "code": rule.code,
+                        "standard_id": str(rule.standard_id) if rule.standard_id else None,
+                        "title": rule.title,
+                        "severity": rule.severity,
+                        "domain": rule.domain,
+                        "metric_path": rule.metric_path,
+                        "operator": rule.operator,
+                        "limit_value": rule.limit_value,
+                        "upper_limit_value": rule.upper_limit_value,
+                        "unit": rule.unit,
+                        "applicability": rule.applicability,
+                        "parameters": rule.parameters,
+                        "message": rule.message,
+                        "source_clause_ref": rule.source_clause_ref,
+                        "status": rule.status,
+                    }
+                    for rule in rules
+                ],
+            }
+        )
+    return manifest
+
+
 def _metric_value(result: dict[str, Any], path: str) -> float:
     current: Any = result
     for part in path.split("."):
@@ -519,25 +599,31 @@ def _metric_value(result: dict[str, Any], path: str) -> float:
     return float(current)
 
 
-def _evaluate_threshold(rule: RuleDefinition, measured: float) -> tuple[bool, float]:
-    if rule.limit_value is None:
+def _evaluate_threshold(
+    *,
+    operator: str,
+    limit_value: float | None,
+    upper_limit_value: float | None,
+    measured: float,
+) -> tuple[bool, float]:
+    if limit_value is None:
         raise ValueError("La règle approuvée ne porte aucune limite.")
-    limit = rule.limit_value
-    if rule.operator == "le":
+    limit = limit_value
+    if operator == "le":
         return measured <= limit, limit - measured
-    if rule.operator == "lt":
+    if operator == "lt":
         return measured < limit, limit - measured
-    if rule.operator == "ge":
+    if operator == "ge":
         return measured >= limit, measured - limit
-    if rule.operator == "gt":
+    if operator == "gt":
         return measured > limit, measured - limit
-    if rule.operator == "eq":
+    if operator == "eq":
         difference = abs(measured - limit)
         return isclose(measured, limit, rel_tol=1.0e-9, abs_tol=1.0e-12), -difference
-    if rule.operator == "between" and rule.upper_limit_value is not None:
+    if operator == "between" and upper_limit_value is not None:
         return (
-            limit <= measured <= rule.upper_limit_value,
-            min(measured - limit, rule.upper_limit_value - measured),
+            limit <= measured <= upper_limit_value,
+            min(measured - limit, upper_limit_value - measured),
         )
     raise ValueError("L'opérateur approuvé est incomplet ou inconnu.")
 
@@ -560,66 +646,120 @@ def evaluate_calculation_rules(
         return existing
     rules_section = calculation.input_payload.get("rules", {})
     raw_ids = rules_section.get("rule_set_ids", []) if isinstance(rules_section, dict) else []
-    rule_sets: list[RuleSet] = []
-    for raw_identifier in raw_ids:
-        try:
-            identifier = uuid.UUID(str(raw_identifier))
-        except ValueError:
-            continue
-        item = session.get(RuleSet, identifier)
-        if item is not None and item.status in {"approved", "archived"}:
-            rule_sets.append(item)
-    organization_id = calculation.scenario.model_version.project.organization_id
-    evaluations: list[RuleEvaluation] = []
-    for rule_set in rule_sets:
-        rules = session.scalars(
-            select(RuleDefinition)
-            .where(
-                RuleDefinition.rule_set_id == rule_set.id,
-                RuleDefinition.status == "approved",
-            )
-            .order_by(RuleDefinition.code)
-        ).all()
-        for rule in rules:
+    frozen_manifest = rules_section.get("manifest", []) if isinstance(rules_section, dict) else []
+    frozen_rules: list[dict[str, Any]] = []
+    if isinstance(frozen_manifest, list) and frozen_manifest:
+        for rule_set_entry in frozen_manifest:
+            if not isinstance(rule_set_entry, dict):
+                continue
+            for rule_entry in rule_set_entry.get("rules", []):
+                if not isinstance(rule_entry, dict) or rule_entry.get("status") != "approved":
+                    continue
+                frozen_rules.append(
+                    {
+                        **rule_entry,
+                        "rule_set_id": rule_set_entry.get("rule_set_id"),
+                        "rule_set_hash": rule_set_entry.get("content_hash"),
+                    }
+                )
+    else:
+        # Compatibilité des tâches mises en file avant ajout du manifeste figé.
+        for raw_identifier in raw_ids:
             try:
-                measured = _metric_value(result_payload, rule.metric_path)
-                compliant, margin = _evaluate_threshold(rule, measured)
-                evaluation_status = "compliant" if compliant else "non_compliant"
-                message = "Contrôle conforme." if compliant else rule.message
-                details: dict[str, Any] = {
+                identifier = uuid.UUID(str(raw_identifier))
+            except ValueError:
+                continue
+            item = session.get(RuleSet, identifier)
+            if item is None or item.status not in {"approved", "archived"}:
+                continue
+            rules = session.scalars(
+                select(RuleDefinition)
+                .where(
+                    RuleDefinition.rule_set_id == item.id,
+                    RuleDefinition.status == "approved",
+                )
+                .order_by(RuleDefinition.code)
+            ).all()
+            frozen_rules.extend(
+                {
+                    "rule_set_id": str(item.id),
+                    "rule_set_hash": item.content_hash,
+                    "rule_id": str(rule.id),
+                    "code": rule.code,
+                    "severity": rule.severity,
                     "metric_path": rule.metric_path,
                     "operator": rule.operator,
+                    "limit_value": rule.limit_value,
                     "upper_limit_value": rule.upper_limit_value,
-                    "severity": rule.severity,
+                    "unit": rule.unit,
+                    "message": rule.message,
                     "source_clause_ref": rule.source_clause_ref,
+                    "status": rule.status,
                 }
-            except (KeyError, TypeError, ValueError) as error:
-                measured = None
-                margin = None
-                evaluation_status = "error"
-                message = "La métrique requise par la règle est absente ou invalide."
-                details = {
-                    "metric_path": rule.metric_path,
-                    "error_type": type(error).__name__,
-                }
-            evaluation = RuleEvaluation(
-                organization_id=organization_id,
-                calculation_id=calculation.id,
-                rule_set_id=rule_set.id,
-                rule_id=rule.id,
-                object_type="calculation",
-                object_id=calculation.id,
-                status=evaluation_status,
-                measured_value=measured,
-                limit_value=rule.limit_value,
-                margin=margin,
-                unit=rule.unit,
-                message=message,
-                details=details,
-                created_at=utc_now(),
+                for rule in rules
             )
-            session.add(evaluation)
-            evaluations.append(evaluation)
+    organization_id = calculation.scenario.model_version.project.organization_id
+    evaluations: list[RuleEvaluation] = []
+    for rule in frozen_rules:
+        try:
+            rule_set_id = uuid.UUID(str(rule["rule_set_id"]))
+            rule_id = uuid.UUID(str(rule["rule_id"]))
+            metric_path = str(rule["metric_path"])
+            operator = str(rule["operator"])
+            measured = _metric_value(result_payload, metric_path)
+            compliant, margin = _evaluate_threshold(
+                operator=operator,
+                limit_value=rule.get("limit_value"),
+                upper_limit_value=rule.get("upper_limit_value"),
+                measured=measured,
+            )
+            evaluation_status = "compliant" if compliant else "non_compliant"
+            message = "Contrôle conforme." if compliant else str(rule["message"])
+            details: dict[str, Any] = {
+                "rule_code": rule.get("code"),
+                "rule_set_hash": rule.get("rule_set_hash"),
+                "metric_path": metric_path,
+                "operator": operator,
+                "upper_limit_value": rule.get("upper_limit_value"),
+                "severity": rule.get("severity"),
+                "source_clause_ref": rule.get("source_clause_ref"),
+            }
+        except (KeyError, TypeError, ValueError) as error:
+            try:
+                rule_set_id = uuid.UUID(str(rule["rule_set_id"]))
+                rule_id = uuid.UUID(str(rule["rule_id"]))
+            except (KeyError, ValueError):
+                continue
+            measured = None
+            margin = None
+            evaluation_status = "error"
+            message = "La métrique requise par la règle est absente ou invalide."
+            details = {
+                "rule_code": rule.get("code"),
+                "rule_set_hash": rule.get("rule_set_hash"),
+                "metric_path": rule.get("metric_path"),
+                "error_type": type(error).__name__,
+                "severity": rule.get("severity"),
+                "source_clause_ref": rule.get("source_clause_ref"),
+            }
+        evaluation = RuleEvaluation(
+            organization_id=organization_id,
+            calculation_id=calculation.id,
+            rule_set_id=rule_set_id,
+            rule_id=rule_id,
+            object_type="calculation",
+            object_id=calculation.id,
+            status=evaluation_status,
+            measured_value=measured,
+            limit_value=rule.get("limit_value"),
+            margin=margin,
+            unit=rule.get("unit"),
+            message=message,
+            details=details,
+            created_at=utc_now(),
+        )
+        session.add(evaluation)
+        evaluations.append(evaluation)
     session.flush()
     if evaluations:
         _audit(
@@ -636,6 +776,54 @@ def evaluate_calculation_rules(
             },
         )
     return evaluations
+
+
+def summarize_rule_evaluations(
+    evaluations: list[RuleEvaluation],
+) -> dict[str, Any]:
+    """Produit un verdict normatif distinct du résultat physique du moteur.
+
+    Une absence de règles n'est jamais assimilée à une conformité. Une erreur
+    d'évaluation rend le verdict indéterminé. Seules les règles de sévérité
+    ``blocking`` rendent directement le résultat non conforme et bloquant.
+    """
+
+    counts = {
+        "total": len(evaluations),
+        "compliant": sum(item.status == "compliant" for item in evaluations),
+        "non_compliant": sum(item.status == "non_compliant" for item in evaluations),
+        "not_applicable": sum(item.status == "not_applicable" for item in evaluations),
+        "errors": sum(item.status == "error" for item in evaluations),
+    }
+    blocking_failures = [
+        item
+        for item in evaluations
+        if item.details.get("severity") == "blocking" and item.status in {"non_compliant", "error"}
+    ]
+    reservations = [
+        item
+        for item in evaluations
+        if item.status == "non_compliant" and item not in blocking_failures
+    ]
+
+    if not evaluations:
+        status = "not_evaluated"
+    elif blocking_failures:
+        status = "non_compliant"
+    elif counts["errors"]:
+        status = "indeterminate"
+    elif reservations:
+        status = "compliant_with_reservations"
+    else:
+        status = "compliant"
+
+    return {
+        "status": status,
+        "counts": counts,
+        "blocking_failure_count": len(blocking_failures),
+        "reservation_count": len(reservations),
+        "blocking_rule_ids": [str(item.rule_id) for item in blocking_failures],
+    }
 
 
 def list_rule_evaluations(
@@ -655,9 +843,7 @@ def list_rule_evaluations(
         conditions.append(RuleEvaluation.rule_set_id == rule_set_id)
     if status is not None:
         conditions.append(RuleEvaluation.status == status)
-    total = session.scalar(
-        select(func.count()).select_from(RuleEvaluation).where(*conditions)
-    ) or 0
+    total = session.scalar(select(func.count()).select_from(RuleEvaluation).where(*conditions)) or 0
     items = session.scalars(
         select(RuleEvaluation)
         .where(*conditions)
@@ -698,9 +884,7 @@ def list_audit_events(
         conditions.append(AuditEvent.created_at >= created_from)
     if created_to is not None:
         conditions.append(AuditEvent.created_at <= created_to)
-    total = session.scalar(
-        select(func.count()).select_from(AuditEvent).where(*conditions)
-    ) or 0
+    total = session.scalar(select(func.count()).select_from(AuditEvent).where(*conditions)) or 0
     items = session.scalars(
         select(AuditEvent)
         .where(*conditions)

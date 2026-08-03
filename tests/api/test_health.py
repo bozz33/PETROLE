@@ -16,9 +16,7 @@ from hydro_shared.observability import bound_context
 def test_sante_api() -> None:
     """Le contrôle de santé expose un contrat stable et l'environnement actif."""
 
-    application = create_application(
-        Settings(environment="test", background_jobs_enabled=False)
-    )
+    application = create_application(Settings(environment="test", background_jobs_enabled=False))
     with TestClient(application) as client:
         response = client.get(
             "/api/v1/health",
@@ -35,12 +33,33 @@ def test_sante_api() -> None:
     }
 
 
+def test_readiness_verifie_base_et_stockage(tmp_path) -> None:
+    """La readiness confirme les deux dépendances requises par les routes métier."""
+
+    application = create_application(
+        Settings(
+            environment="test",
+            database_url="sqlite+pysqlite:///:memory:",
+            background_jobs_enabled=False,
+            object_storage_backend="filesystem",
+            object_storage_directory=tmp_path / "objects",
+        )
+    )
+    with TestClient(application) as client:
+        response = client.get("/api/v1/health/ready")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ready",
+        "database": "ready",
+        "object_storage": "ready",
+    }
+
+
 def test_schema_openapi_versionne() -> None:
     """Le schéma OpenAPI reste sous le préfixe contractuel /api/v1."""
 
-    application = create_application(
-        Settings(environment="test", background_jobs_enabled=False)
-    )
+    application = create_application(Settings(environment="test", background_jobs_enabled=False))
     with TestClient(application) as client:
         response = client.get("/api/v1/openapi.json")
 
@@ -50,6 +69,7 @@ def test_schema_openapi_versionne() -> None:
     schema = response.json()
     assert schema["info"]["version"] == "0.1.0"
     assert "/api/v1/health" in schema["paths"]
+    assert "/api/v1/health/ready" in schema["paths"]
 
 
 def test_correlation_alimente_automatiquement_le_journal_audit() -> None:

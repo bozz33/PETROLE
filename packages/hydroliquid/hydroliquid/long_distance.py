@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from itertools import pairwise
 
 from hydro_domain.canonical import CanonicalInput
 from hydro_domain.enums import EquipmentStatus, FrictionModel
@@ -549,6 +550,7 @@ class LongDistanceLiquidEngine(HydraulicEngine):
                 lower=1.0,
                 upper=max(outlet_pressure_target * 2.0, 1.0e6),
                 tolerance=options.pressure_tolerance_pa,
+                variable_tolerance=options.pressure_tolerance_pa,
                 max_iterations=options.max_iterations,
                 diagnostics=diagnostics,
                 log_iterations=options.store_iterations,
@@ -576,6 +578,8 @@ class LongDistanceLiquidEngine(HydraulicEngine):
             lower=MINIMUM_FLOW_M3_S,
             upper=min(INITIAL_FLOW_GUESS_M3_S, upper),
             tolerance=options.pressure_tolerance_pa,
+            variable_tolerance=options.flow_tolerance_m3_s,
+            hard_upper=options.max_flow_m3_s,
             max_iterations=options.max_iterations,
             diagnostics=diagnostics,
             log_iterations=options.store_iterations,
@@ -806,23 +810,52 @@ class LongDistanceLiquidEngine(HydraulicEngine):
             ]
             if not inside:
                 continue
-            flow = inside[0].flow_m3_s
+            intervals = [
+                (left, right, right.chainage_m - left.chainage_m)
+                for left, right in pairwise(inside)
+                if right.chainage_m > left.chainage_m
+            ]
+            weighted_length = sum(dx for _, _, dx in intervals)
+            flow = (
+                sum(left.flow_m3_s * dx for left, _, dx in intervals) / weighted_length
+                if weighted_length > 0.0
+                else inside[0].flow_m3_s
+            )
             velocity = velocity_m_s(flow, segment.inner_diameter_m)
             re = reynolds(velocity, segment.inner_diameter_m, state.kinematic_viscosity_m2_s)
             lam = friction_factor(re, segment.relative_roughness, model)
-            friction_loss = (
-                lam
-                * (segment.length_m / segment.inner_diameter_m)
-                * velocity
-                * abs(velocity)
-                / (2.0 * G)
-            )
-            k_total = segment.total_fitting_k()
-            minor_loss = (
-                0.0
-                if k_total in (0.0, float("inf"))
-                else k_total * velocity * abs(velocity) / (2.0 * G)
-            )
+            friction_loss = 0.0
+            for left, _, dx in intervals:
+                interval_velocity = velocity_m_s(left.flow_m3_s, segment.inner_diameter_m)
+                interval_re = reynolds(
+                    interval_velocity,
+                    segment.inner_diameter_m,
+                    state.kinematic_viscosity_m2_s,
+                )
+                interval_lambda = friction_factor(
+                    interval_re,
+                    segment.relative_roughness,
+                    model,
+                )
+                friction_loss += (
+                    interval_lambda
+                    * (dx / segment.inner_diameter_m)
+                    * interval_velocity
+                    * abs(interval_velocity)
+                    / (2.0 * G)
+                )
+            flow_by_chainage = {point.chainage_m: point.flow_m3_s for point in inside}
+            minor_loss = 0.0
+            for fitting in segment.fittings:
+                fitting_chainage = (
+                    fitting.chainage_m if fitting.chainage_m is not None else segment.end_chainage_m
+                )
+                fitting_flow = flow_by_chainage.get(fitting_chainage, flow)
+                fitting_k = fitting.effective_k()
+                if fitting_k in (0.0, float("inf")):
+                    continue
+                fitting_velocity = velocity_m_s(fitting_flow, segment.inner_diameter_m)
+                minor_loss += fitting_k * fitting_velocity * abs(fitting_velocity) / (2.0 * G)
             pressures = [p.pressure_pa for p in inside]
             results.append(
                 SegmentResult(
@@ -870,8 +903,11 @@ class LongDistanceLiquidEngine(HydraulicEngine):
                 # Le NPSH disponible se calcule à la bride d'aspiration : la pression
                 # d'aspiration de la station, diminuée des pertes de son collecteur.
                 npsha = None
-                if pump.is_active:
-                    velocity = 0.0
+                if pump.is_active and station.suction_line_diameter_m is not None:
+                    velocity = velocity_m_s(
+                        passage.flow_m3_s,
+                        station.suction_line_diameter_m,
+                    )
                     suction_pressure = passage.suction_pressure_pa
                     if station.suction_line_k:
                         suction_pressure -= (

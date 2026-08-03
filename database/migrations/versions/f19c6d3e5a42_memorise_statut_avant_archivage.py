@@ -25,9 +25,7 @@ def upgrade() -> None:
         "projects",
         sa.Column("archived_from_status", sa.String(length=20), nullable=True),
     )
-    op.execute(
-        "UPDATE projects SET archived_from_status = 'draft' WHERE status = 'archived'"
-    )
+    op.execute("UPDATE projects SET archived_from_status = 'draft' WHERE status = 'archived'")
     op.create_check_constraint(
         op.f("ck_projects_archive_state_valid"),
         "projects",

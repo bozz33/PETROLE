@@ -83,7 +83,9 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("from_node_id <> to_node_id", name=op.f("ck_network_edges_different_nodes")),
+        sa.CheckConstraint(
+            "from_node_id <> to_node_id", name=op.f("ck_network_edges_different_nodes")
+        ),
         sa.CheckConstraint("sequence > 0", name=op.f("ck_network_edges_sequence_positive")),
         sa.CheckConstraint("length_m > 0", name=op.f("ck_network_edges_length_positive")),
         sa.CheckConstraint(

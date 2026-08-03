@@ -212,9 +212,7 @@ def list_rules(
     access: ApplicationAccess,
 ) -> list[RuleRead]:
     del access
-    return [
-        RuleRead.model_validate(item) for item in governance.list_rules(session, rule_set_id)
-    ]
+    return [RuleRead.model_validate(item) for item in governance.list_rules(session, rule_set_id)]
 
 
 @router.post(

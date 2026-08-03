@@ -1469,6 +1469,7 @@ Le backend et les cœurs du MVP sont conservés. Le produit final ajoute des mot
 | SIM_NOT_CONVERGED | Tolérance non atteinte. |
 
 | SIM_CANCELLED | Calcul annulé. |
+| SIM_TECHNICAL_ERROR | Échec technique du processus après épuisement des reprises. |
 
 | ERR_UNIT_UNKNOWN | Unité inconnue. |
 

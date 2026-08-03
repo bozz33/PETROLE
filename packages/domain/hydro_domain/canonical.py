@@ -73,6 +73,8 @@ class CanonicalInput:
     scenario: Scenario
     engine: str
     rule_set_ids: tuple[str, ...] = ()
+    #: Copie figée des éditions, jeux et règles réellement utilisés par le calcul.
+    rule_manifest: tuple[dict[str, Any], ...] = ()
     provenance: Provenance = field(default_factory=Provenance)
     schema_version: str = INPUT_SCHEMA_VERSION
     engine_version: str = ENGINE_VERSION
@@ -134,7 +136,10 @@ class CanonicalInput:
                 "segments": [o.as_dict() for o in self.scenario.segment_overrides],
             },
             "scenario": self.scenario.as_dict(),
-            "rules": {"rule_set_ids": list(self.rule_set_ids)},
+            "rules": {
+                "rule_set_ids": list(self.rule_set_ids),
+                "manifest": [dict(item) for item in self.rule_manifest],
+            },
             "solver": self.scenario.solver.as_dict(),
         }
 

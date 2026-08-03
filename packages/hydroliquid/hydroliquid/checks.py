@@ -223,8 +223,8 @@ def check_npsh(pumps: list[PumpResult], margins: dict[str, float]) -> CheckOutco
         outcome.executed.add("C-003")
     else:
         outcome.skipped["C-003"] = (
-            "Aucune courbe NPSHr disponible sur les pompes en service : le risque de cavitation "
-            "n'a pas pu être évalué."
+            "Courbe NPSHr ou diamètre du collecteur d'aspiration indisponible sur les pompes "
+            "en service : le risque de cavitation n'a pas pu être évalué."
         )
     return outcome
 

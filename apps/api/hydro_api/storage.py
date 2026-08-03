@@ -25,6 +25,9 @@ class ObjectStorage(Protocol):
     def delete(self, key: str) -> None:
         """Supprime un objet après échec transactionnel."""
 
+    def check(self) -> None:
+        """Vérifie que le stockage est joignable et prêt."""
+
 
 def _validated_key(key: str) -> PurePosixPath:
     path = PurePosixPath(key)
@@ -68,6 +71,10 @@ class FilesystemObjectStorage:
         target = self._path(key)
         if target.is_file():
             target.unlink()
+
+    def check(self) -> None:
+        if not self.root.is_dir():
+            raise OSError("Le répertoire de stockage local est indisponible.")
 
 
 class S3ObjectStorage:
@@ -129,6 +136,9 @@ class S3ObjectStorage:
     def delete(self, key: str) -> None:
         normalized = _validated_key(key).as_posix()
         self.client.delete_object(Bucket=self.bucket, Key=normalized)
+
+    def check(self) -> None:
+        self.client.head_bucket(Bucket=self.bucket)
 
 
 @lru_cache(maxsize=16)

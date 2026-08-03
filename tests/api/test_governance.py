@@ -203,7 +203,15 @@ def test_cycle_normatif_et_evaluation_d_un_calcul(governance_api) -> None:
     evaluations = result["result"]["rule_evaluations"]
     assert len(evaluations) == 1
     assert evaluations[0]["status"] == "non_compliant"
+    assert evaluations[0]["rule_code"] == "P-MAX-001"
+    assert evaluations[0]["rule_set_hash"] == rule_set_approval.json()["content_hash"]
+    assert evaluations[0]["severity"] == "blocking"
     assert evaluations[0]["measured_value"] > evaluations[0]["limit_value"]
+    assert result["result"]["physical_approvable"] is True
+    assert result["result"]["compliance_status"] == "non_compliant"
+    assert result["result"]["compliance"]["blocking_failure_count"] == 1
+    assert result["result"]["decision_eligible"] is False
+    assert result["result"]["approvable"] is False
     listed = client.get(
         "/api/v1/evaluations",
         params={

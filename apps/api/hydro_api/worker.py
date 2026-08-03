@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 import signal
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import timedelta
-from threading import Event
+from threading import Event, Thread
 
 from sqlalchemy import select
 
@@ -18,6 +20,70 @@ from hydro_api.services import core
 from hydro_shared.observability import bound_context, configure_logging, get_logger
 
 _LOGGER = get_logger("calcul_differe")
+
+
+def _mark_calculation_technical_error(
+    calculation: CalculationRun | None,
+    *,
+    exception_type: str,
+) -> None:
+    """Distingue une panne d'infrastructure d'un échec de convergence scientifique."""
+
+    if calculation is None or calculation.status == "SIM_CANCELLED":
+        return
+    calculation.status = "SIM_TECHNICAL_ERROR"
+    calculation.finished_at = utc_now()
+    calculation.diagnostics = {
+        "worker_error": (
+            "Le processus de calcul n'a pas pu terminer l'exécution après le nombre maximal "
+            "de tentatives."
+        ),
+        "exception_type": exception_type,
+    }
+
+
+def _refresh_lock(settings: Settings, job_id: uuid.UUID) -> bool:
+    """Actualise le bail d'une tâche longue avec une transaction indépendante."""
+
+    factory = session_factory(settings.database_url)
+    with factory() as session:
+        job = session.get(BackgroundJob, job_id)
+        if job is None or job.status != "running":
+            return False
+        job.locked_at = utc_now()
+        session.commit()
+        return True
+
+
+@contextmanager
+def _job_heartbeat(settings: Settings, job_id: uuid.UUID) -> Iterator[None]:
+    """Maintient le bail actif pendant un calcul plus long que le seuil de reprise."""
+
+    stop_event = Event()
+    interval_seconds = max(1.0, min(settings.worker_stale_seconds / 3.0, 30.0))
+
+    def heartbeat_loop() -> None:
+        while not stop_event.wait(interval_seconds):
+            try:
+                if not _refresh_lock(settings, job_id):
+                    return
+            except Exception as error:  # pragma: no cover - dépend d'une panne DB transitoire
+                _LOGGER.warning(
+                    "battement_tache_echoue",
+                    type_exception=type(error).__name__,
+                )
+
+    thread = Thread(
+        target=heartbeat_loop,
+        name=f"hydro-heartbeat-{str(job_id)[:8]}",
+        daemon=True,
+    )
+    thread.start()
+    try:
+        yield
+    finally:
+        stop_event.set()
+        thread.join(timeout=1.0)
 
 
 def recover_stale_jobs(settings: Settings) -> int:
@@ -37,6 +103,11 @@ def recover_stale_jobs(settings: Settings) -> int:
             if job.attempts >= job.maximum_attempts:
                 job.status = "failed"
                 job.finished_at = utc_now()
+                calculation = session.get(CalculationRun, job.resource_id)
+                _mark_calculation_technical_error(
+                    calculation,
+                    exception_type="WorkerLeaseExpired",
+                )
             else:
                 job.status = "queued"
                 job.available_at = utc_now()
@@ -91,12 +162,10 @@ def _mark_failure(settings: Settings, job_id: uuid.UUID, error: Exception) -> No
             job.status = "failed"
             job.finished_at = utc_now()
             if calculation is not None:
-                calculation.status = "SIM_NOT_CONVERGED"
-                calculation.finished_at = utc_now()
-                calculation.diagnostics = {
-                    "worker_error": "Le processus de calcul n'a pas pu terminer l'exécution après trois tentatives.",
-                    "exception_type": type(error).__name__,
-                }
+                _mark_calculation_technical_error(
+                    calculation,
+                    exception_type=type(error).__name__,
+                )
         session.commit()
 
 
@@ -115,9 +184,7 @@ def process_one(settings: Settings) -> bool:
             if job.kind != "calculation":
                 raise ValueError(f"Type de tâche inconnu : {job.kind}.")
             calculation = session.scalar(
-                select(CalculationRun)
-                .where(CalculationRun.id == job.resource_id)
-                .with_for_update()
+                select(CalculationRun).where(CalculationRun.id == job.resource_id).with_for_update()
             )
             if calculation is None:
                 raise ValueError("Le calcul associé à la tâche est introuvable.")
@@ -127,9 +194,7 @@ def process_one(settings: Settings) -> bool:
             calculation.status = "SIM_RUNNING"
             calculation.started_at = calculation.started_at or utc_now()
             session.commit()
-            organization_id = (
-                str(calculation.scenario.model_version.project.organization_id)
-            )
+            organization_id = str(calculation.scenario.model_version.project.organization_id)
             correlation_id = str(job.payload.get("correlation_id") or job.id)
             with bound_context(
                 correlation_id=correlation_id,
@@ -141,7 +206,8 @@ def process_one(settings: Settings) -> bool:
                         "calcul_differe_demarre",
                         tentative=job.attempts,
                     )
-                    core.execute_calculation(session, job.resource_id)
+                    with _job_heartbeat(settings, job.id):
+                        core.execute_calculation(session, job.resource_id)
                     session.refresh(job)
                     if job.status != "cancelled":
                         job.status = "completed"

@@ -27,6 +27,8 @@ from hydro_shared.errors import BoundaryConditionError
 #: mégapascals, 1 Pa correspond à un résidu relatif de l'ordre de 10⁻⁷ : très en deçà de la
 #: précision des données d'entrée, tout en restant atteignable numériquement.
 DEFAULT_PRESSURE_TOLERANCE_PA = 1.0
+#: Tolérance sur l'inconnue débit du solveur, en m³/s.
+DEFAULT_FLOW_TOLERANCE_M3_S = 1.0e-9
 #: Tolérance par défaut sur le bilan de masse, en relatif (D10 § 3).
 DEFAULT_MASS_BALANCE_TOLERANCE = 1e-6
 #: Nombre maximal d'itérations par défaut.
@@ -60,6 +62,7 @@ class SolverOptions:
 
     friction_model: FrictionModel = FrictionModel.COLEBROOK_WHITE
     pressure_tolerance_pa: float = DEFAULT_PRESSURE_TOLERANCE_PA
+    flow_tolerance_m3_s: float = DEFAULT_FLOW_TOLERANCE_M3_S
     mass_balance_tolerance: float = DEFAULT_MASS_BALANCE_TOLERANCE
     max_iterations: int = DEFAULT_MAX_ITERATIONS
     profile_step_m: float = DEFAULT_PROFILE_STEP_M
@@ -96,6 +99,16 @@ class SolverOptions:
                 "La tolérance de bilan de masse doit être strictement positive.",
                 mass_balance_tolerance=self.mass_balance_tolerance,
             )
+        if self.flow_tolerance_m3_s <= 0:
+            raise BoundaryConditionError(
+                "La tolérance de débit doit être strictement positive.",
+                flow_tolerance_m3_s=self.flow_tolerance_m3_s,
+            )
+        if self.max_flow_m3_s is not None and self.max_flow_m3_s <= 0:
+            raise BoundaryConditionError(
+                "La borne maximale de débit doit être strictement positive.",
+                max_flow_m3_s=self.max_flow_m3_s,
+            )
         if self.max_iterations < 1:
             raise BoundaryConditionError(
                 "Le nombre maximal d'itérations doit être au moins 1.",
@@ -121,6 +134,7 @@ class SolverOptions:
         return {
             "friction_model": self.friction_model.value,
             "pressure_tolerance_pa": self.pressure_tolerance_pa,
+            "flow_tolerance_m3_s": self.flow_tolerance_m3_s,
             "mass_balance_tolerance": self.mass_balance_tolerance,
             "max_iterations": self.max_iterations,
             "profile_step_m": self.profile_step_m,

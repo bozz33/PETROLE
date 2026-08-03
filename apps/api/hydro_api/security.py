@@ -279,6 +279,7 @@ def _allowed_roles(request: Request) -> frozenset[str]:
         return frozenset({"admin"})
     return frozenset({"admin", "engineer", "operator"})
 
+
 async def authorize_application_request(
     request: Request,
     session: DatabaseSession,

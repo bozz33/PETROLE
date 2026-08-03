@@ -10,20 +10,58 @@ from sqlalchemy import (
     JSON,
     Boolean,
     CheckConstraint,
+    Column,
     DateTime,
     Float,
     ForeignKey,
     Index,
     Integer,
     String,
+    Table,
     Text,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from hydro_api.database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from hydro_shared.observability import correlation_id_var
+
+project_rule_sets = Table(
+    "project_rule_sets",
+    Base.metadata,
+    Column(
+        "project_id",
+        Uuid(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "rule_set_id",
+        Uuid(as_uuid=True),
+        ForeignKey("rule_sets.id", ondelete="RESTRICT"),
+        primary_key=True,
+    ),
+)
+
+
+project_responsibles = Table(
+    "project_responsibles",
+    Base.metadata,
+    Column(
+        "project_id",
+        Uuid(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "user_id",
+        Uuid(as_uuid=True),
+        ForeignKey("user_accounts.id", ondelete="RESTRICT"),
+        primary_key=True,
+    ),
+)
 
 
 class UserAccount(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -322,18 +360,37 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     country_code: Mapped[str | None] = mapped_column(String(2))
     unit_system: Mapped[str] = mapped_column(String(20), default="SI", nullable=False)
-    rule_set_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
-    responsible_user_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
     archived_from_status: Mapped[str | None] = mapped_column(String(20))
 
     organization: Mapped[Organization] = relationship(back_populates="projects")
     site: Mapped[Site | None] = relationship(back_populates="projects")
+    rule_sets: Mapped[list[Any]] = relationship(
+        "RuleSet",
+        secondary=project_rule_sets,
+        order_by="RuleSet.code, RuleSet.version_number",
+    )
+    responsible_users: Mapped[list[UserAccount]] = relationship(
+        secondary=project_responsibles,
+        order_by="UserAccount.email",
+    )
     model_versions: Mapped[list[ModelVersion]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
         order_by="ModelVersion.version_number",
     )
+
+    @property
+    def rule_set_ids(self) -> list[uuid.UUID]:
+        """Identifiants normatifs issus des relations protégées par clés étrangères."""
+
+        return [item.id for item in self.rule_sets]
+
+    @property
+    def responsible_user_ids(self) -> list[uuid.UUID]:
+        """Identifiants des responsables membres de l'organisation."""
+
+        return [item.id for item in self.responsible_users]
 
 
 class ModelVersion(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -347,6 +404,13 @@ class ModelVersion(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="status_valid",
         ),
         Index("ix_model_versions_project_status", "project_id", "status"),
+        Index(
+            "uq_model_versions_one_approved_per_project",
+            "project_id",
+            unique=True,
+            postgresql_where=text("status = 'approved'"),
+            sqlite_where=text("status = 'approved'"),
+        ),
     )
 
     project_id: Mapped[uuid.UUID] = mapped_column(
@@ -565,7 +629,7 @@ class CalculationRun(UUIDPrimaryKeyMixin, Base):
         CheckConstraint(
             "status IN ('SIM_QUEUED', 'SIM_RUNNING', 'SIM_CONVERGED', "
             "'SIM_CONVERGED_WARN', 'SIM_INVALID_INPUT', 'SIM_NO_PHYSICAL_SOLUTION', "
-            "'SIM_NOT_CONVERGED', 'SIM_CANCELLED')",
+            "'SIM_NOT_CONVERGED', 'SIM_CANCELLED', 'SIM_TECHNICAL_ERROR')",
             name="status_valid",
         ),
         Index("ix_calculation_runs_scenario_created", "scenario_id", "created_at"),

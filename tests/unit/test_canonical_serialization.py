@@ -73,6 +73,29 @@ class TestCatalogueCanonique:
 
         assert _entree_avec_modele(model_a).fingerprint != _entree_avec_modele(model_b).fingerprint
 
+    def test_un_manifeste_normatif_different_change_l_empreinte(self):
+        source = entree_canonique()
+        first = CanonicalInput(
+            pipeline=source.pipeline,
+            fluid=source.fluid,
+            scenario=source.scenario,
+            engine=source.engine,
+            rule_set_ids=("11111111-1111-1111-1111-111111111111",),
+            rule_manifest=({"content_hash": "sha256:a", "rules": []},),
+        )
+        second = CanonicalInput(
+            pipeline=source.pipeline,
+            fluid=source.fluid,
+            scenario=source.scenario,
+            engine=source.engine,
+            rule_set_ids=("11111111-1111-1111-1111-111111111111",),
+            rule_manifest=({"content_hash": "sha256:b", "rules": []},),
+        )
+
+        assert first.fingerprint != second.fingerprint
+        restored = canonical_input_from_dict(first.as_dict())
+        assert restored.rule_manifest == first.rule_manifest
+
     def test_la_methode_d_interpolation_change_l_empreinte(self):
         linear = PumpModel(
             id="M1",

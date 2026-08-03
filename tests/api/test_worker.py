@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -9,17 +11,14 @@ from tests.factories import entree_canonique
 
 from hydro_api.application import create_application
 from hydro_api.config import Settings, get_settings
-from hydro_api.database.base import Base
+from hydro_api.database.base import Base, utc_now
 from hydro_api.database.session import database_engine, session_factory
-from hydro_api.models import BackgroundJob
-from hydro_api.worker import process_one
+from hydro_api.models import BackgroundJob, CalculationRun
+from hydro_api.worker import _refresh_lock, process_one
 
 
 def test_worker_execute_un_calcul_mis_en_file() -> None:
-    database_url = (
-        "sqlite+pysqlite:///file:calcul-differe"
-        "?mode=memory&cache=shared&uri=true"
-    )
+    database_url = "sqlite+pysqlite:///file:calcul-differe?mode=memory&cache=shared&uri=true"
     settings = Settings(
         environment="test",
         database_url=database_url,
@@ -101,9 +100,7 @@ def test_worker_execute_un_calcul_mis_en_file() -> None:
             json={"engine": "long_distance_liquid"},
         )
         assert cancellable.status_code == 202
-        cancelled = client.post(
-            f"/api/v1/calculations/{cancellable.json()['id']}/cancel"
-        )
+        cancelled = client.post(f"/api/v1/calculations/{cancellable.json()['id']}/cancel")
         assert cancelled.status_code == 200
         assert cancelled.json()["status"] == "SIM_CANCELLED"
         assert process_one(settings) is False
@@ -114,6 +111,92 @@ def test_worker_execute_un_calcul_mis_en_file() -> None:
         assert jobs[0].attempts == 1
         assert jobs[0].payload["correlation_id"]
         assert jobs[1].payload["source_calculation_id"] == calculation_id
+
+    Base.metadata.drop_all(engine)
+    engine.dispose()
+    session_factory.cache_clear()
+    database_engine.cache_clear()
+
+
+def test_worker_distingue_erreur_technique_et_non_convergence(monkeypatch) -> None:
+    database_url = "sqlite+pysqlite:///file:calcul-erreur?mode=memory&cache=shared&uri=true"
+    settings = Settings(
+        environment="test",
+        database_url=database_url,
+        background_jobs_enabled=True,
+    )
+    engine = database_engine(database_url)
+    Base.metadata.create_all(engine)
+    application = create_application(settings)
+    application.dependency_overrides[get_settings] = lambda: settings
+    canonical = entree_canonique().payload()
+
+    with TestClient(application) as client:
+        organization = client.post(
+            "/api/v1/organizations",
+            json={"name": "Exploitant incident", "slug": "exploitant-incident"},
+        ).json()
+        project = client.post(
+            "/api/v1/projects",
+            json={
+                "organization_id": organization["id"],
+                "name": "Oléoduc incident",
+                "code": "INC-01",
+            },
+        ).json()
+        model = client.post(
+            f"/api/v1/projects/{project['id']}/models",
+            json={
+                "name": "Modèle incident",
+                "payload": {
+                    "units": canonical["units"],
+                    "fluid": canonical["fluid"],
+                    "network": canonical["network"],
+                    "equipment": canonical["equipment"],
+                    "rules": canonical["rules"],
+                },
+            },
+        ).json()
+        scenario = client.post(
+            f"/api/v1/models/{model['id']}/scenarios",
+            json={"name": "Nominal", "payload": canonical["scenario"]},
+        ).json()
+        queued = client.post(
+            f"/api/v1/scenarios/{scenario['id']}/calculations",
+            headers={"Idempotency-Key": "calcul-erreur-technique"},
+            json={},
+        ).json()
+
+    def fail_execution(*_args, **_kwargs):
+        raise RuntimeError("panne simulée")
+
+    monkeypatch.setattr("hydro_api.worker.core.execute_calculation", fail_execution)
+    assert process_one(settings) is True
+    with Session(engine) as session:
+        job = session.scalar(select(BackgroundJob))
+        assert job is not None
+        job.attempts = job.maximum_attempts - 1
+        job.available_at = utc_now()
+        session.commit()
+
+    assert process_one(settings) is True
+    with Session(engine) as session:
+        job = session.scalar(select(BackgroundJob))
+        calculation = session.get(CalculationRun, uuid.UUID(queued["id"]))
+        assert job is not None and job.status == "failed"
+        assert calculation is not None
+        assert calculation.status == "SIM_TECHNICAL_ERROR"
+        assert calculation.diagnostics["exception_type"] == "RuntimeError"
+
+        job.status = "running"
+        job_id = job.id
+        previous_lock = job.locked_at
+        session.commit()
+    assert _refresh_lock(settings, job_id) is True
+    with Session(engine) as session:
+        refreshed = session.get(BackgroundJob, job_id)
+        assert refreshed is not None
+        assert refreshed.locked_at != previous_lock
 
     Base.metadata.drop_all(engine)
     engine.dispose()

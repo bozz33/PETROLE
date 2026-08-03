@@ -103,9 +103,7 @@ class RuleSetStandard(UUIDPrimaryKeyMixin, Base):
     """Association explicite entre un jeu de règles et ses éditions sources."""
 
     __tablename__ = "rule_set_standards"
-    __table_args__ = (
-        UniqueConstraint("rule_set_id", "standard_id", name="uq_rule_set_standard"),
-    )
+    __table_args__ = (UniqueConstraint("rule_set_id", "standard_id", name="uq_rule_set_standard"),)
 
     rule_set_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),

@@ -24,6 +24,24 @@ def _report_data() -> HydraulicReportData:
     result = engine.simulate(canonical)
     result_payload = result.as_dict()
     result_payload["explanation"] = engine.explain(result).as_dict()
+    result_payload["physical_approvable"] = result_payload["approvable"]
+    result_payload["compliance_status"] = "non_compliant"
+    result_payload["decision_eligible"] = False
+    result_payload["approvable"] = False
+    result_payload["compliance"] = {
+        "status": "non_compliant",
+        "counts": {"total": 1},
+        "blocking_failure_count": 1,
+    }
+    result_payload["rule_evaluations"] = [
+        {
+            "rule_id": "33333333-3333-3333-3333-333333333333",
+            "status": "non_compliant",
+            "severity": "blocking",
+            "message": "La pression calculée dépasse la limite approuvée.",
+            "source_clause_ref": "clause interne 4.2",
+        }
+    ]
     return HydraulicReportData(
         report_id="11111111-1111-1111-1111-111111111111",
         calculation_id="22222222-2222-2222-2222-222222222222",
@@ -52,6 +70,8 @@ def test_pdf_est_lisible_complet_et_trace():
     assert "Traçabilité et reproductibilité" in extracted
     assert "Méthode numérique" in extracted
     assert "Contrôles et marges" in extracted
+    assert "Conformité normative" in extracted
+    assert "Règle bloquante" in extracted
     assert "sha256:" in extracted
     assert "Vérification ingénieur requise" in extracted
 

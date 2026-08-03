@@ -34,7 +34,7 @@ from hydro_api.services import data_import
 from hydro_api.storage import ObjectStorageDependency
 
 router = APIRouter(tags=["Données"])
-DatabaseSession = Annotated[Session, Depends(get_session)]
+DatabaseSession = Annotated[Session, Depends(get_session, scope="function")]
 IdempotencyKey = Annotated[
     str,
     Header(

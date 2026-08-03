@@ -7,7 +7,7 @@ from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -40,7 +40,7 @@ def secured_api(tmp_path) -> Generator[tuple[TestClient, object], None, None]:
             database_url="sqlite+pysqlite://",
             authentication_required=True,
             background_jobs_enabled=False,
-            jwt_secret=SECRET_TEST,
+            jwt_secret=SecretStr(SECRET_TEST),
             object_storage_backend="filesystem",
             object_storage_directory=tmp_path / "objects",
         )
@@ -92,7 +92,7 @@ def test_configuration_de_production_refuse_une_securite_incomplete() -> None:
             environment="production",
             authentication_required=True,
             background_jobs_enabled=True,
-            jwt_secret="secret-trop-court",
+            jwt_secret=SecretStr("secret-trop-court"),
         )
 
     with pytest.raises(ValidationError, match="BACKGROUND_JOBS_ENABLED"):
@@ -100,14 +100,14 @@ def test_configuration_de_production_refuse_une_securite_incomplete() -> None:
             environment="production",
             authentication_required=True,
             background_jobs_enabled=False,
-            jwt_secret=SECRET_TEST,
+            jwt_secret=SecretStr(SECRET_TEST),
         )
 
     settings = Settings(
         environment="production",
         authentication_required=True,
         background_jobs_enabled=True,
-        jwt_secret=SECRET_TEST,
+        jwt_secret=SecretStr(SECRET_TEST),
     )
     assert settings.authentication_required is True
 
@@ -241,6 +241,20 @@ def test_roles_cloisonnement_et_protection_du_dernier_administrateur(
         headers=viewer_headers,
     )
     assert members_forbidden.status_code == 403
+
+    audit = client.get(
+        "/api/v1/audit-events",
+        headers=admin_headers,
+        params={"organization_id": organization_id},
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] >= 1
+    audit_forbidden = client.get(
+        "/api/v1/audit-events",
+        headers=viewer_headers,
+        params={"organization_id": organization_id},
+    )
+    assert audit_forbidden.status_code == 403
 
     forbidden_write = client.post(
         "/api/v1/projects",

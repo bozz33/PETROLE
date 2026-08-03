@@ -607,6 +607,7 @@ def run_optimization(
     project = model.project
     engine = get_engine("long_distance_liquid")
     base_payload = core.canonical_payload_for_calculation(
+        session,
         model,
         scenario,
         engine_name=engine.name,

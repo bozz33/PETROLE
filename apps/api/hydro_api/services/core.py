@@ -29,6 +29,7 @@ from hydro_api.models import (
 from hydro_api.schemas import (
     CalculationCreate,
     ModelVersionCreate,
+    ModelVersionUpdate,
     OrganizationCreate,
     OrganizationUpdate,
     ProjectCreate,
@@ -64,11 +65,13 @@ def _audit(
     action: str,
     object_type: str,
     object_id: uuid.UUID,
+    actor_id: uuid.UUID | None = None,
     details: dict[str, object] | None = None,
 ) -> None:
     session.add(
         AuditEvent(
             organization_id=organization_id,
+            actor_id=actor_id,
             action=action,
             object_type=object_type,
             object_id=object_id,
@@ -317,6 +320,40 @@ def list_model_versions(
     return items, total
 
 
+def update_model_version(
+    session: Session,
+    model_id: uuid.UUID,
+    data: ModelVersionUpdate,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> ModelVersion:
+    """Modifie les métadonnées d'un brouillon et recalcule son empreinte complète."""
+
+    model = get_model_version(session, model_id)
+    if model.status != "draft":
+        raise ResourceConflictError(
+            "Une version approuvée ou archivée est immuable ; créez un clone."
+        )
+    changes = data.model_dump(exclude_unset=True, exclude_none=True)
+    for field, value in changes.items():
+        setattr(model, field, value)
+    from hydro_api.services.network import refresh_model_hash
+
+    refresh_model_hash(session, model)
+    project = get_project(session, model.project_id)
+    _audit(
+        session,
+        organization_id=project.organization_id,
+        action="model_version.updated",
+        object_type="model_version",
+        object_id=model.id,
+        actor_id=actor_id,
+        details={"fields": sorted(changes)},
+    )
+    _flush(session, "Impossible de modifier la version du modèle.")
+    return model
+
+
 def approve_model_version(session: Session, model_id: uuid.UUID) -> ModelVersion:
     model = session.scalar(
         select(ModelVersion).where(ModelVersion.id == model_id).with_for_update()
@@ -329,6 +366,19 @@ def approve_model_version(session: Session, model_id: uuid.UUID) -> ModelVersion
         raise ResourceConflictError(
             "Seule une version de modèle au statut brouillon peut être approuvée."
         )
+    from hydro_api.models import NetworkNode
+    from hydro_api.services.network import validate_network
+
+    normalized_node_count = session.scalar(
+        select(func.count()).select_from(NetworkNode).where(NetworkNode.model_version_id == model.id)
+    ) or 0
+    if normalized_node_count:
+        validation = validate_network(session, model.id)
+        if not validation.valid:
+            details = "; ".join(f"{issue.code}: {issue.message}" for issue in validation.errors)
+            raise ResourceConflictError(
+                "Le réseau normalisé doit être valide avant approbation. " + details
+            )
     existing = session.scalar(
         select(ModelVersion.id).where(
             ModelVersion.project_id == model.project_id,
@@ -352,6 +402,37 @@ def approve_model_version(session: Session, model_id: uuid.UUID) -> ModelVersion
         details={"content_hash": model.content_hash},
     )
     _flush(session, "Impossible d'approuver la version du modèle.")
+    return model
+
+
+def archive_model_version(
+    session: Session,
+    model_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> ModelVersion:
+    """Archive une version sans altérer son contenu ni son approbation passée."""
+
+    model = session.scalar(
+        select(ModelVersion).where(ModelVersion.id == model_id).with_for_update()
+    )
+    if model is None:
+        raise ResourceNotFoundError("Version de modèle", model_id)
+    if model.status == "archived":
+        return model
+    project = get_project(session, model.project_id)
+    previous_status = model.status
+    model.status = "archived"
+    _audit(
+        session,
+        organization_id=project.organization_id,
+        action="model_version.archived",
+        object_type="model_version",
+        object_id=model.id,
+        actor_id=actor_id,
+        details={"previous_status": previous_status},
+    )
+    _flush(session, "Impossible d'archiver la version du modèle.")
     return model
 
 
@@ -427,9 +508,9 @@ def update_scenario(
 ) -> ScenarioRecord:
     item = get_scenario(session, scenario_id)
     model = get_model_version(session, item.model_version_id)
-    if model.status == "approved":
+    if model.status != "draft":
         raise ResourceConflictError(
-            "Un scénario lié à une version approuvée est immuable. Clonez la version."
+            "Un scénario lié à une version approuvée ou archivée est immuable. Clonez la version."
         )
     changes = data.model_dump(exclude_unset=True)
 
@@ -460,6 +541,7 @@ def get_calculation(session: Session, calculation_id: uuid.UUID) -> CalculationR
 
 
 def canonical_payload_for_calculation(
+    session: Session,
     model: ModelVersion,
     scenario: ScenarioRecord,
     *,
@@ -487,8 +569,22 @@ def canonical_payload_for_calculation(
     if scenario.description is not None:
         scenario_payload["description"] = scenario.description
 
-    network = model_payload.get("network")
-    fluid = model_payload.get("fluid")
+    from hydro_api.models import NetworkNode
+
+    normalized_node_count = session.scalar(
+        select(func.count()).select_from(NetworkNode).where(NetworkNode.model_version_id == model.id)
+    ) or 0
+    fluid: Any
+    network: Any
+    equipment: Any
+    if normalized_node_count:
+        from hydro_api.services.network import canonical_sections_from_normalized
+
+        fluid, network, equipment = canonical_sections_from_normalized(session, model)
+    else:
+        network = model_payload.get("network")
+        fluid = model_payload.get("fluid")
+        equipment = model_payload.get("equipment", {"pump_models": []})
     source_manifest = model_payload.get("manifest")
     if source_manifest is None:
         source_manifest = {}
@@ -515,7 +611,7 @@ def canonical_payload_for_calculation(
         "units": model_payload.get("units", {}),
         "fluid": fluid,
         "network": network,
-        "equipment": model_payload.get("equipment", {"pump_models": []}),
+        "equipment": equipment,
         "scenario": scenario_payload,
         "rules": model_payload.get("rules", {"rule_set_ids": []}),
         "provenance": Provenance.now(
@@ -563,6 +659,7 @@ def queue_calculation(
 
     engine_version = f"{engine.name}-{engine.version}"
     canonical_payload = canonical_payload_for_calculation(
+        session,
         model,
         scenario,
         engine_name=engine.name,
@@ -570,6 +667,13 @@ def queue_calculation(
         organization_id=project.organization_id,
     )
     canonical_input = canonical_input_from_dict(canonical_payload)
+    from hydro_api.services.governance import validate_rule_sets_for_calculation
+
+    validate_rule_sets_for_calculation(
+        session,
+        project.organization_id,
+        canonical_input.rule_set_ids,
+    )
     if not engine.supports(canonical_input):
         raise InvalidInputError(
             "Le moteur choisi ne couvre pas la topologie ou les équipements de ce modèle.",
@@ -663,10 +767,35 @@ def execute_calculation(
 
     calculation.status = "SIM_RUNNING"
     calculation.started_at = calculation.started_at or utc_now()
-    session.flush()
     result = engine.simulate(canonical_input)
+    session.expire(calculation)
+    locked_calculation = session.scalar(
+        select(CalculationRun).where(CalculationRun.id == calculation_id).with_for_update()
+    )
+    if locked_calculation is None:
+        raise ResourceNotFoundError("Calcul", calculation_id)
+    calculation = locked_calculation
+    if calculation.status == "SIM_CANCELLED":
+        return calculation
     result_payload = result.as_dict()
     result_payload["explanation"] = engine.explain(result).as_dict()
+    from hydro_api.services.governance import evaluate_calculation_rules
+
+    evaluations = evaluate_calculation_rules(session, calculation, result_payload)
+    result_payload["rule_evaluations"] = [
+        {
+            "id": str(item.id),
+            "rule_set_id": str(item.rule_set_id),
+            "rule_id": str(item.rule_id),
+            "status": item.status,
+            "measured_value": item.measured_value,
+            "limit_value": item.limit_value,
+            "margin": item.margin,
+            "unit": item.unit,
+            "message": item.message,
+        }
+        for item in evaluations
+    ]
     calculation.engine_version = result.engine_version
     calculation.status = result.status.value
     calculation.result_payload = result_payload
@@ -688,6 +817,126 @@ def execute_calculation(
     )
     _flush(session, "Impossible d'enregistrer le résultat du calcul.")
     return calculation
+
+
+def cancel_calculation(
+    session: Session,
+    calculation_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> CalculationRun:
+    """Annule une exécution en attente ou en cours et neutralise sa tâche."""
+
+    calculation = session.scalar(
+        select(CalculationRun).where(CalculationRun.id == calculation_id).with_for_update()
+    )
+    if calculation is None:
+        raise ResourceNotFoundError("Calcul", calculation_id)
+    if calculation.status == "SIM_CANCELLED":
+        return calculation
+    if calculation.status not in {"SIM_QUEUED", "SIM_RUNNING"}:
+        raise ResourceConflictError("Un calcul terminé ne peut plus être annulé.")
+    job = session.scalar(
+        select(BackgroundJob)
+        .where(
+            BackgroundJob.kind == "calculation",
+            BackgroundJob.resource_id == calculation.id,
+        )
+        .with_for_update()
+    )
+    if job is not None and job.status in {"queued", "running"}:
+        job.status = "cancelled"
+        job.locked_at = None
+        job.finished_at = utc_now()
+    calculation.status = "SIM_CANCELLED"
+    calculation.finished_at = utc_now()
+    calculation.diagnostics = {"reason": "Annulation demandée par un utilisateur autorisé."}
+    organization_id = calculation.scenario.model_version.project.organization_id
+    _audit(
+        session,
+        organization_id=organization_id,
+        action="calculation.cancelled",
+        object_type="calculation",
+        object_id=calculation.id,
+        actor_id=actor_id,
+        details={"job_id": str(job.id) if job is not None else None},
+    )
+    _flush(session, "Impossible d'annuler le calcul.")
+    return calculation
+
+
+def rerun_calculation(
+    session: Session,
+    calculation_id: uuid.UUID,
+    *,
+    idempotency_key: str,
+    synchronous: bool,
+    actor_id: uuid.UUID | None = None,
+) -> CalculationRun:
+    """Crée une nouvelle exécution à partir de l'entrée canonique archivée."""
+
+    source = get_calculation(session, calculation_id)
+    if source.status in {"SIM_QUEUED", "SIM_RUNNING"}:
+        raise ResourceConflictError("Attendez la fin ou annulez le calcul avant de le relancer.")
+    existing = session.scalar(
+        select(CalculationRun).where(
+            CalculationRun.scenario_id == source.scenario_id,
+            CalculationRun.idempotency_key == idempotency_key,
+        )
+    )
+    if existing is not None:
+        if existing.engine != source.engine or existing.input_hash != source.input_hash:
+            raise ResourceConflictError(
+                "La clé d'idempotence désigne une autre exécution de ce scénario."
+            )
+        return existing
+
+    replay = CalculationRun(
+        scenario_id=source.scenario_id,
+        idempotency_key=idempotency_key,
+        engine=source.engine,
+        engine_version=source.engine_version,
+        status="SIM_QUEUED",
+        input_hash=source.input_hash,
+        input_payload=deepcopy(source.input_payload),
+        created_at=utc_now(),
+    )
+    session.add(replay)
+    session.flush()
+    job = BackgroundJob(
+        kind="calculation",
+        resource_id=replay.id,
+        status="queued",
+        payload={
+            "calculation_id": str(replay.id),
+            "source_calculation_id": str(source.id),
+            "correlation_id": correlation_id_var.get(),
+        },
+        attempts=0,
+        maximum_attempts=3,
+        available_at=utc_now(),
+    )
+    session.add(job)
+    organization_id = source.scenario.model_version.project.organization_id
+    _audit(
+        session,
+        organization_id=organization_id,
+        action="calculation.rerun_queued",
+        object_type="calculation",
+        object_id=replay.id,
+        actor_id=actor_id,
+        details={
+            "source_calculation_id": str(source.id),
+            "input_hash": replay.input_hash,
+        },
+    )
+    _flush(session, "Impossible de mettre la relance du calcul en file.")
+    if synchronous:
+        execute_calculation(session, replay.id)
+        job.status = "completed"
+        job.finished_at = utc_now()
+        session.flush()
+    return replay
 
 
 def create_calculation(

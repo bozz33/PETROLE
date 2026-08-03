@@ -1,13 +1,21 @@
 """Schémas publics de l'API."""
 
+from hydro_api.schemas.catalog import (
+    CatalogItemCreate,
+    CatalogItemRead,
+    CatalogItemUpdate,
+    CatalogItemVersionCreate,
+)
 from hydro_api.schemas.core import (
     ApprovalResponse,
+    AuditEventRead,
     CalculationCreate,
     CalculationRead,
     CalculationResultRead,
     CalculationSummaryRead,
     ModelVersionCreate,
     ModelVersionRead,
+    ModelVersionUpdate,
     OrganizationCreate,
     OrganizationRead,
     OrganizationUpdate,
@@ -22,15 +30,33 @@ from hydro_api.schemas.core import (
     ScenarioRead,
     ScenarioUpdate,
 )
+from hydro_api.schemas.governance import (
+    RuleCreate,
+    RuleEvaluationRead,
+    RuleRead,
+    RuleSetCreate,
+    RuleSetRead,
+    StandardCreate,
+    StandardRead,
+    StandardUpdate,
+)
+from hydro_api.schemas.network import ModelCloneCreate
 
 __all__ = [
     "ApprovalResponse",
+    "AuditEventRead",
     "CalculationCreate",
     "CalculationRead",
     "CalculationResultRead",
     "CalculationSummaryRead",
+    "CatalogItemCreate",
+    "CatalogItemRead",
+    "CatalogItemUpdate",
+    "CatalogItemVersionCreate",
+    "ModelCloneCreate",
     "ModelVersionCreate",
     "ModelVersionRead",
+    "ModelVersionUpdate",
     "OrganizationCreate",
     "OrganizationRead",
     "OrganizationUpdate",
@@ -41,7 +67,15 @@ __all__ = [
     "ReportApproval",
     "ReportCreate",
     "ReportRead",
+    "RuleCreate",
+    "RuleEvaluationRead",
+    "RuleRead",
+    "RuleSetCreate",
+    "RuleSetRead",
     "ScenarioCreate",
     "ScenarioRead",
     "ScenarioUpdate",
+    "StandardCreate",
+    "StandardRead",
+    "StandardUpdate",
 ]

@@ -14,7 +14,7 @@ from hydro_api.schemas.sites import SiteCreate, SiteRead, SiteUpdate
 from hydro_api.services import sites
 
 router = APIRouter(tags=["Sites"])
-DatabaseSession = Annotated[Session, Depends(get_session)]
+DatabaseSession = Annotated[Session, Depends(get_session, scope="function")]
 
 
 @router.post(

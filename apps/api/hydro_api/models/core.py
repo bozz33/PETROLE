@@ -519,7 +519,7 @@ class BackgroundJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("kind", "resource_id"),
         CheckConstraint(
-            "status IN ('queued', 'running', 'completed', 'failed')",
+            "status IN ('queued', 'running', 'completed', 'failed', 'cancelled')",
             name="status_valid",
         ),
         Index("ix_background_jobs_status_available", "status", "available_at"),

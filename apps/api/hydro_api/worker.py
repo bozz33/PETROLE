@@ -76,6 +76,8 @@ def _mark_failure(settings: Settings, job_id: uuid.UUID, error: Exception) -> No
         job = session.get(BackgroundJob, job_id)
         if job is None:
             return
+        if job.status == "cancelled":
+            return
         calculation = session.get(CalculationRun, job.resource_id)
         job.last_error = (f"{type(error).__name__}: échec de l'exécution scientifique.")[:2_000]
         job.locked_at = None
@@ -112,11 +114,21 @@ def process_one(settings: Settings) -> bool:
                 return True
             if job.kind != "calculation":
                 raise ValueError(f"Type de tâche inconnu : {job.kind}.")
-            calculation = session.get(CalculationRun, job.resource_id)
+            calculation = session.scalar(
+                select(CalculationRun)
+                .where(CalculationRun.id == job.resource_id)
+                .with_for_update()
+            )
+            if calculation is None:
+                raise ValueError("Le calcul associé à la tâche est introuvable.")
+            if calculation.status == "SIM_CANCELLED" or job.status == "cancelled":
+                session.commit()
+                return True
+            calculation.status = "SIM_RUNNING"
+            calculation.started_at = calculation.started_at or utc_now()
+            session.commit()
             organization_id = (
                 str(calculation.scenario.model_version.project.organization_id)
-                if calculation is not None
-                else None
             )
             correlation_id = str(job.payload.get("correlation_id") or job.id)
             with bound_context(
@@ -130,9 +142,11 @@ def process_one(settings: Settings) -> bool:
                         tentative=job.attempts,
                     )
                     core.execute_calculation(session, job.resource_id)
-                    job.status = "completed"
-                    job.locked_at = None
-                    job.finished_at = utc_now()
+                    session.refresh(job)
+                    if job.status != "cancelled":
+                        job.status = "completed"
+                        job.locked_at = None
+                        job.finished_at = utc_now()
                     session.commit()
                     _LOGGER.info("calcul_differe_termine")
                 except Exception as error:

@@ -1,5 +1,6 @@
 """Modèles SQLAlchemy exposés à Alembic et aux services."""
 
+from hydro_api.models.catalog import CatalogItem
 from hydro_api.models.core import (
     AuditEvent,
     BackgroundJob,
@@ -22,24 +23,41 @@ from hydro_api.models.core import (
     TransferRun,
     UserAccount,
 )
+from hydro_api.models.governance import (
+    RuleDefinition,
+    RuleEvaluation,
+    RuleSet,
+    RuleSetStandard,
+    StandardReference,
+)
+from hydro_api.models.network import AssetInstance, NetworkEdge, NetworkNode
 
 __all__ = [
+    "AssetInstance",
     "AuditEvent",
     "BackgroundJob",
     "CalculationRun",
+    "CatalogItem",
     "Dataset",
     "DatasetImport",
     "DatasetRow",
     "GeneratedReport",
     "ModelVersion",
+    "NetworkEdge",
+    "NetworkNode",
     "OptimizationRun",
     "Organization",
     "OrganizationMembership",
     "Project",
     "RefreshSession",
+    "RuleDefinition",
+    "RuleEvaluation",
+    "RuleSet",
+    "RuleSetStandard",
     "ScenarioComparison",
     "ScenarioRecord",
     "Site",
+    "StandardReference",
     "StoredFile",
     "TankRecord",
     "TransferRun",

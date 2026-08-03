@@ -187,6 +187,19 @@ def test_approbation_unique_et_immutabilite_scenario(client):
     assert conflict.status_code == 409
     assert "déjà approuvée" in conflict.json()["detail"]
 
+    archived = client.post(f"/api/v1/models/{first['id']}/archive")
+    assert archived.status_code == 200
+    assert archived.json()["status"] == "archived"
+    assert archived.json()["approved_at"].removesuffix("Z") == approval.json()[
+        "approved_at"
+    ].removesuffix("Z")
+    still_immutable = client.patch(
+        f"/api/v1/scenarios/{scenario['id']}",
+        json={"payload": {"flow_m3_s": 0.6}},
+    )
+    assert still_immutable.status_code == 409
+    assert client.post(f"/api/v1/models/{second['id']}/approve").status_code == 200
+
 
 def test_conflit_unicite_retourne_409(client):
     create_organization(client, "meme-slug")

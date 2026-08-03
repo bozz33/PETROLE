@@ -17,6 +17,7 @@ from hydro_api.schemas import (
     CalculationSummaryRead,
     ModelVersionCreate,
     ModelVersionRead,
+    ModelVersionUpdate,
     OrganizationCreate,
     OrganizationRead,
     OrganizationUpdate,
@@ -35,7 +36,7 @@ from hydro_api.services import core
 from hydro_api.storage import ObjectStorageDependency
 
 router = APIRouter()
-DatabaseSession = Annotated[Session, Depends(get_session)]
+DatabaseSession = Annotated[Session, Depends(get_session, scope="function")]
 Limit = Annotated[int, Query(ge=1, le=200)]
 Offset = Annotated[int, Query(ge=0)]
 IdempotencyKey = Annotated[
@@ -207,6 +208,21 @@ def read_model_version(model_id: uuid.UUID, session: DatabaseSession):
     return core.get_model_version(session, model_id)
 
 
+@router.patch(
+    "/models/{model_id}",
+    response_model=ModelVersionRead,
+    summary="Modifier une version du modèle en brouillon",
+)
+def update_model_version(
+    model_id: uuid.UUID,
+    data: ModelVersionUpdate,
+    request: Request,
+    session: DatabaseSession,
+):
+    access = request.state.access_context
+    return core.update_model_version(session, model_id, data, actor_id=access.user_id)
+
+
 @router.post(
     "/models/{model_id}/approve",
     response_model=ApprovalResponse,
@@ -221,6 +237,20 @@ def approve_model_version(model_id: uuid.UUID, session: DatabaseSession):
         status=model.status,
         approved_at=model.approved_at,
     )
+
+
+@router.post(
+    "/models/{model_id}/archive",
+    response_model=ModelVersionRead,
+    summary="Archiver une version du modèle",
+)
+def archive_model_version(
+    model_id: uuid.UUID,
+    request: Request,
+    session: DatabaseSession,
+):
+    access = request.state.access_context
+    return core.archive_model_version(session, model_id, actor_id=access.user_id)
 
 
 @router.post(
@@ -314,6 +344,42 @@ def create_calculation(
 )
 def read_calculation(calculation_id: uuid.UUID, session: DatabaseSession):
     return core.get_calculation(session, calculation_id)
+
+
+@router.post(
+    "/calculations/{calculation_id}/cancel",
+    response_model=CalculationRead,
+    summary="Annuler un calcul en attente ou en cours",
+)
+def cancel_calculation(
+    calculation_id: uuid.UUID,
+    request: Request,
+    session: DatabaseSession,
+):
+    access = request.state.access_context
+    return core.cancel_calculation(session, calculation_id, actor_id=access.user_id)
+
+
+@router.post(
+    "/calculations/{calculation_id}/rerun",
+    response_model=CalculationRead,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Relancer exactement l'entrée archivée d'un calcul",
+)
+def rerun_calculation(
+    calculation_id: uuid.UUID,
+    request: Request,
+    session: DatabaseSession,
+    idempotency_key: IdempotencyKey,
+):
+    access = request.state.access_context
+    return core.rerun_calculation(
+        session,
+        calculation_id,
+        idempotency_key=idempotency_key,
+        synchronous=not request.app.state.settings.background_jobs_enabled,
+        actor_id=access.user_id,
+    )
 
 
 @router.get(

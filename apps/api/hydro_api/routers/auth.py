@@ -25,7 +25,7 @@ from hydro_api.security import ApplicationAccess, AuthenticatedAccess
 from hydro_api.services import auth
 
 router = APIRouter(tags=["Identité"])
-DatabaseSession = Annotated[Session, Depends(get_session)]
+DatabaseSession = Annotated[Session, Depends(get_session, scope="function")]
 
 
 @router.get(

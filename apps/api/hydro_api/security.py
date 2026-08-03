@@ -13,17 +13,24 @@ from sqlalchemy.orm import Session
 from hydro_api.config import Settings
 from hydro_api.database.session import get_session
 from hydro_api.models import (
+    AssetInstance,
     CalculationRun,
+    CatalogItem,
     Dataset,
     DatasetImport,
     GeneratedReport,
     ModelVersion,
+    NetworkEdge,
+    NetworkNode,
     OptimizationRun,
     OrganizationMembership,
     Project,
+    RuleDefinition,
+    RuleSet,
     ScenarioComparison,
     ScenarioRecord,
     Site,
+    StandardReference,
     StoredFile,
     TankRecord,
     TransferRun,
@@ -31,7 +38,7 @@ from hydro_api.models import (
 )
 from hydro_api.services import auth
 
-DatabaseSession = Annotated[Session, Depends(get_session)]
+DatabaseSession = Annotated[Session, Depends(get_session, scope="function")]
 AuthorizationHeader = Annotated[str | None, Header(alias="Authorization")]
 
 
@@ -135,6 +142,31 @@ def _organization_for_resource(
     try:
         if value := path_parameters.get("organization_id"):
             return uuid.UUID(value)
+        if value := path_parameters.get("catalog_item_id"):
+            catalog_item = session.get(CatalogItem, uuid.UUID(value))
+            return catalog_item.organization_id if catalog_item else None
+        if value := path_parameters.get("standard_id"):
+            standard = session.get(StandardReference, uuid.UUID(value))
+            return standard.organization_id if standard else None
+        if value := path_parameters.get("rule_set_id"):
+            rule_set = session.get(RuleSet, uuid.UUID(value))
+            return rule_set.organization_id if rule_set else None
+        if value := path_parameters.get("rule_id"):
+            rule = session.get(RuleDefinition, uuid.UUID(value))
+            rule_set = session.get(RuleSet, rule.rule_set_id) if rule else None
+            return rule_set.organization_id if rule_set else None
+        if value := path_parameters.get("node_id"):
+            node = session.get(NetworkNode, uuid.UUID(value))
+            model = session.get(ModelVersion, node.model_version_id) if node else None
+            return model.project.organization_id if model else None
+        if value := path_parameters.get("edge_id"):
+            edge = session.get(NetworkEdge, uuid.UUID(value))
+            model = session.get(ModelVersion, edge.model_version_id) if edge else None
+            return model.project.organization_id if model else None
+        if value := path_parameters.get("asset_id"):
+            asset = session.get(AssetInstance, uuid.UUID(value))
+            model = session.get(ModelVersion, asset.model_version_id) if asset else None
+            return model.project.organization_id if model else None
         if value := path_parameters.get("site_id"):
             site = session.get(Site, uuid.UUID(value))
             return site.organization_id if site else None
@@ -233,6 +265,8 @@ def _allowed_roles(request: Request) -> frozenset[str]:
     """Détermine les rôles autorisés, des routes sensibles aux routes générales."""
 
     path = request.url.path
+    if path.startswith("/api/v1/audit-events"):
+        return frozenset({"admin", "approver"})
     if "/members" in path:
         return frozenset({"admin"})
     if path.endswith("/approve"):

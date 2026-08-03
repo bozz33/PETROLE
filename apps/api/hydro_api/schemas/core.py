@@ -84,6 +84,13 @@ class ModelVersionCreate(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
+class ModelVersionUpdate(BaseModel):
+    """Métadonnées modifiables tant que la version reste en brouillon."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    payload: dict[str, Any] | None = None
+
+
 class ModelVersionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -137,6 +144,22 @@ class ApprovalResponse(BaseModel):
         if value is None:
             raise ValueError("La date d'approbation est obligatoire.")
         return value
+
+
+class AuditEventRead(BaseModel):
+    """Événement immuable du journal métier et de sécurité."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    organization_id: uuid.UUID | None
+    actor_id: uuid.UUID | None
+    action: str
+    object_type: str
+    object_id: uuid.UUID
+    correlation_id: str | None
+    details: dict[str, Any]
+    created_at: datetime
 
 
 class CalculationCreate(BaseModel):

@@ -16,8 +16,11 @@ from hydro_api import __version__
 from hydro_api.config import Settings, get_settings
 from hydro_api.errors import ResourceConflictError, ResourceNotFoundError
 from hydro_api.routers.auth import router as auth_router
+from hydro_api.routers.catalog import router as catalog_router
 from hydro_api.routers.data import router as data_router
+from hydro_api.routers.governance import router as governance_router
 from hydro_api.routers.health import router as health_router
+from hydro_api.routers.network import router as network_router
 from hydro_api.routers.operations import router as operations_router
 from hydro_api.routers.reports import router as reports_router
 from hydro_api.routers.resources import router as resources_router
@@ -179,7 +182,17 @@ def create_application(settings: Settings | None = None) -> FastAPI:
     application.include_router(health_router, prefix="/api/v1")
     application.include_router(auth_router, prefix="/api/v1")
     application.include_router(
+        catalog_router,
+        prefix="/api/v1",
+        dependencies=protected_dependencies,
+    )
+    application.include_router(
         data_router,
+        prefix="/api/v1",
+        dependencies=protected_dependencies,
+    )
+    application.include_router(
+        governance_router,
         prefix="/api/v1",
         dependencies=protected_dependencies,
     )
@@ -190,6 +203,11 @@ def create_application(settings: Settings | None = None) -> FastAPI:
     )
     application.include_router(
         sites_router,
+        prefix="/api/v1",
+        dependencies=protected_dependencies,
+    )
+    application.include_router(
+        network_router,
         prefix="/api/v1",
         dependencies=protected_dependencies,
     )

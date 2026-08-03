@@ -26,7 +26,7 @@ from hydro_api.schemas.operations import (
 from hydro_api.services import operations
 
 router = APIRouter(tags=["Opérations"])
-DatabaseSession = Annotated[Session, Depends(get_session)]
+DatabaseSession = Annotated[Session, Depends(get_session, scope="function")]
 IdempotencyKey = Annotated[
     str,
     Header(

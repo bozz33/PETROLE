@@ -15,9 +15,10 @@ services:
       - --reload-dir
       - /workspace/packages
     environment:
-      HYDRO_ENVIRONMENT: development
+      HYDRO_ENVIRONMENT: ${HYDRO_ENVIRONMENT:-development}
       HYDRO_RELOAD: "true"
-      HYDRO_AUTHENTICATION_REQUIRED: "false"
+      WEB_CONCURRENCY: "1"
+      HYDRO_AUTHENTICATION_REQUIRED: ${HYDRO_AUTHENTICATION_REQUIRED:-false}
       HYDRO_BACKGROUND_JOBS_ENABLED: "true"
       WATCHFILES_FORCE_POLLING: "true"
     volumes:
@@ -36,8 +37,8 @@ services:
       - /workspace/apps/api
       - /workspace/packages
     environment:
-      HYDRO_ENVIRONMENT: development
-      HYDRO_AUTHENTICATION_REQUIRED: "false"
+      HYDRO_ENVIRONMENT: ${HYDRO_ENVIRONMENT:-development}
+      HYDRO_AUTHENTICATION_REQUIRED: ${HYDRO_AUTHENTICATION_REQUIRED:-false}
       HYDRO_BACKGROUND_JOBS_ENABLED: "true"
       WATCHFILES_FORCE_POLLING: "true"
     volumes:

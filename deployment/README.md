@@ -1,4 +1,10 @@
-# Déploiement local
+# Déploiement
+
+La procédure complète pour installation, transfert des données, développement avec volumes,
+TLS, qualification et passage en production sur Ubuntu est décrite dans
+[`VPS.md`](VPS.md).
+
+## Déploiement local
 
 ## Développement avec rechargement automatique
 
@@ -30,7 +36,9 @@ non privilégié et rechargement désactivé.
 
 ## Sauvegarde et restauration locales
 
-La sauvegarde cohérente regroupe PostgreSQL et le stockage objet dans un dossier horodaté. Chaque archive est contrôlée puis accompagnée d'un manifeste SHA-256 :
+La sauvegarde cohérente regroupe PostgreSQL et le stockage objet dans un dossier horodaté. L'API,
+le worker et MinIO sont arrêtés brièvement pour empêcher une écriture entre les deux captures, puis
+redémarrés automatiquement. Chaque archive est contrôlée puis accompagnée d'un manifeste SHA-256 :
 
     powershell -ExecutionPolicy Bypass -File deployment/scripts/backup.ps1
 

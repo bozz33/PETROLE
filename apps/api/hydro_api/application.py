@@ -63,6 +63,13 @@ def create_application(settings: Settings | None = None) -> FastAPI:
     )
     application.state.settings = active_settings
 
+    def application_settings() -> Settings:
+        """Fournit la configuration appartenant à cette instance applicative."""
+
+        return active_settings
+
+    application.dependency_overrides[get_settings] = application_settings
+
     @application.middleware("http")
     async def correlate_request(
         request: Request,

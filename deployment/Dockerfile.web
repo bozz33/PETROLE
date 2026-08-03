@@ -1,9 +1,11 @@
+# syntax=docker/dockerfile:1.7
+
 FROM node:22-alpine AS development
 
 WORKDIR /workspace/apps/web
 
 COPY apps/web/package.json apps/web/package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 COPY apps/web/ ./
 

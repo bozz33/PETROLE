@@ -48,6 +48,15 @@ if ($LASTEXITCODE -ne 0 -or -not $helperImage) {
 $databaseArchive = Join-Path $destination "postgres.dump"
 $objectArchive = Join-Path $destination "object-storage.tar.gz"
 $databaseTemporaryPath = "/tmp/hydro-backup-$timestamp.dump"
+$servicesToRestart = @()
+foreach ($service in @("api", "worker", "minio")) {
+    $containerId = (Invoke-Compose ps -q $service | Select-Object -First 1).Trim()
+    if ($containerId) {
+        $servicesToRestart += $service
+    }
+}
+
+Invoke-Compose stop @servicesToRestart
 
 try {
     Invoke-Compose exec -T postgres sh -c (
@@ -69,10 +78,17 @@ try {
     }
 }
 finally {
-    Invoke-Compose exec -T postgres rm -f $databaseTemporaryPath
+    try {
+        Invoke-Compose exec -T postgres rm -f $databaseTemporaryPath
+    }
+    finally {
+        if ($servicesToRestart.Count -gt 0) {
+            Invoke-Compose up --detach @servicesToRestart
+        }
+    }
 }
 
-$alembicRevision = (Invoke-Compose exec -T api alembic current | Select-Object -First 1).Trim()
+$alembicRevision = (Invoke-Compose run --rm --no-deps api alembic current | Select-Object -First 1).Trim()
 $manifest = [ordered]@{
     format_version = 1
     created_at_utc = (Get-Date).ToUniversalTime().ToString("o")

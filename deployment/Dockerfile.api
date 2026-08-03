@@ -20,7 +20,8 @@ COPY pyproject.toml README.md LICENSE ./
 COPY apps/api ./apps/api
 COPY packages ./packages
 
-RUN pip install --editable ".[dev,pandapipes]"
+RUN --mount=type=cache,target=/root/.cache/pip \
+    PIP_NO_CACHE_DIR=0 pip install --editable ".[dev,pandapipes]"
 
 USER hydro
 
@@ -34,7 +35,8 @@ COPY pyproject.toml README.md LICENSE ./
 COPY apps/api ./apps/api
 COPY packages ./packages
 
-RUN pip wheel --wheel-dir /tmp/wheels .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    PIP_NO_CACHE_DIR=0 pip wheel --wheel-dir /tmp/wheels .
 
 FROM base AS runtime
 

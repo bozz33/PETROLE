@@ -13,7 +13,10 @@ htmlcov
 dist
 build
 node_modules
+**/node_modules
 apps/web/dist
+**/dist
+**/test-results
 doc
 docs/specifications/source
 var

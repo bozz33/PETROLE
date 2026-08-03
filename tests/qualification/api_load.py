@@ -16,6 +16,7 @@ import asyncio
 import json
 import math
 import time
+from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -41,6 +42,9 @@ class LoadResult:
     concurrent_users: int
     requests_per_user: int
     request_count: int
+    paths: tuple[str, ...]
+    status_counts: dict[str, int]
+    error_paths: dict[str, int]
     error_count: int
     duration_s: float
     throughput_request_s: float
@@ -55,17 +59,18 @@ async def _virtual_user(
     client: httpx.AsyncClient,
     user_index: int,
     requests_per_user: int,
-) -> list[tuple[float, int]]:
-    observations: list[tuple[float, int]] = []
+    paths: tuple[str, ...],
+) -> list[tuple[float, int, str]]:
+    observations: list[tuple[float, int, str]] = []
     for request_index in range(requests_per_user):
-        path = DEFAULT_PATHS[(user_index + request_index) % len(DEFAULT_PATHS)]
+        path = paths[(user_index + request_index) % len(paths)]
         started = time.perf_counter()
         try:
             response = await client.get(path)
             status_code = response.status_code
         except httpx.HTTPError:
             status_code = 0
-        observations.append((time.perf_counter() - started, status_code))
+        observations.append((time.perf_counter() - started, status_code, path))
     return observations
 
 
@@ -73,6 +78,7 @@ async def run_load(
     base_url: str,
     concurrent_users: int,
     requests_per_user: int,
+    paths: tuple[str, ...] = DEFAULT_PATHS,
 ) -> LoadResult:
     """Exécute la charge et calcule le percentile par rang le plus proche."""
 
@@ -87,14 +93,18 @@ async def run_load(
         warmup.raise_for_status()
         batches = await asyncio.gather(
             *(
-                _virtual_user(client, user_index, requests_per_user)
+                _virtual_user(client, user_index, requests_per_user, paths)
                 for user_index in range(concurrent_users)
             )
         )
     duration_s = time.perf_counter() - campaign_started
     observations = [observation for batch in batches for observation in batch]
-    durations = sorted(duration for duration, _ in observations)
-    error_count = sum(not 200 <= status_code < 400 for _, status_code in observations)
+    durations = sorted(duration for duration, _, _ in observations)
+    status_counts = Counter(str(status_code) for _, status_code, _ in observations)
+    error_paths = Counter(
+        path for _, status_code, path in observations if not 200 <= status_code < 400
+    )
+    error_count = sum(error_paths.values())
     p95_index = math.ceil(0.95 * len(durations)) - 1
     median_index = len(durations) // 2
     return LoadResult(
@@ -103,6 +113,9 @@ async def run_load(
         concurrent_users=concurrent_users,
         requests_per_user=requests_per_user,
         request_count=len(observations),
+        paths=paths,
+        status_counts=dict(sorted(status_counts.items())),
+        error_paths=dict(sorted(error_paths.items())),
         error_count=error_count,
         duration_s=duration_s,
         throughput_request_s=len(observations) / duration_s,
@@ -119,6 +132,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--users", type=int, default=25)
     parser.add_argument("--requests-per-user", type=int, default=20)
+    parser.add_argument(
+        "--paths",
+        nargs="+",
+        default=list(DEFAULT_PATHS),
+        help="Chemins HTTP répartis entre les utilisateurs virtuels.",
+    )
     parser.add_argument("--output", type=Path)
     return parser
 
@@ -127,7 +146,10 @@ def main() -> int:
     args = _parser().parse_args()
     if args.users < 1 or args.requests_per_user < 1:
         raise SystemExit("Le nombre d'utilisateurs et de requêtes doit être positif.")
-    result = asyncio.run(run_load(args.base_url, args.users, args.requests_per_user))
+    paths = tuple(args.paths)
+    if not paths or any(not path.startswith("/") for path in paths):
+        raise SystemExit("Chaque chemin HTTP doit commencer par une barre oblique.")
+    result = asyncio.run(run_load(args.base_url, args.users, args.requests_per_user, paths))
     payload = asdict(result)
     rendered = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     if args.output:

@@ -11,6 +11,7 @@ services:
       HYDRO_HOST: 0.0.0.0
       HYDRO_PORT: 8000
       HYDRO_LOG_LEVEL: ${HYDRO_LOG_LEVEL:-info}
+      WEB_CONCURRENCY: ${HYDRO_WEB_CONCURRENCY:-2}
       HYDRO_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-hydro}:${POSTGRES_PASSWORD:-hydro_dev}@postgres:5432/${POSTGRES_DB:-hydro}
       HYDRO_AUTHENTICATION_REQUIRED: ${HYDRO_AUTHENTICATION_REQUIRED:-true}
       HYDRO_JWT_SECRET: ${HYDRO_JWT_SECRET:-development-secret-change-before-production}
@@ -22,7 +23,7 @@ services:
       HYDRO_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-hydro_dev_storage}
       HYDRO_S3_REGION: ${HYDRO_S3_REGION:-us-east-1}
     ports:
-      - "8000:8000"
+      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,7 +78,7 @@ services:
       dockerfile: deployment/Dockerfile.web
       target: production
     ports:
-      - "5173:80"
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_HTTP_PORT:-5173}:80"
     depends_on:
       api:
         condition: service_healthy
@@ -92,7 +93,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-hydro}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hydro_dev}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -112,8 +113,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-hydro}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-hydro_dev_storage}
     ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${MINIO_BIND_ADDRESS:-127.0.0.1}:${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_BIND_ADDRESS:-127.0.0.1}:${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - object_storage_data:/data
     restart: unless-stopped

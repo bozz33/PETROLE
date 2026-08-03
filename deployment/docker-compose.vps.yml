@@ -1,0 +1,31 @@
+services:
+  caddy:
+    image: caddy:2.11.4-alpine
+    environment:
+      HYDRO_DOMAIN: ${HYDRO_DOMAIN:?HYDRO_DOMAIN doit être renseigné}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL doit être renseigné}
+    ports:
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:${PUBLIC_HTTP_PORT:-80}:80"
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:${PUBLIC_HTTPS_PORT:-443}:443"
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:${PUBLIC_HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - type: bind
+        source: ./Caddyfile
+        target: /etc/caddy/Caddyfile
+        read_only: true
+      - type: volume
+        source: caddy_data
+        target: /data
+      - type: volume
+        source: caddy_config
+        target: /config
+    depends_on:
+      web:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - application
+
+volumes:
+  caddy_data:
+  caddy_config:

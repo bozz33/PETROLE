@@ -1,0 +1,57 @@
+services:
+  qualification-api:
+    profiles: [qualification]
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.api
+      target: development
+    environment:
+      HOME: /tmp
+      MPLCONFIGDIR: /tmp/matplotlib
+      HYDRO_ENVIRONMENT: test
+      HYDRO_LOG_LEVEL: ${QUALIFICATION_LOG_LEVEL:-info}
+      WEB_CONCURRENCY: ${HYDRO_WEB_CONCURRENCY:-2}
+      HYDRO_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-hydro}:${POSTGRES_PASSWORD:-hydro_dev}@postgres:5432/${POSTGRES_DB:-hydro}
+      HYDRO_AUTHENTICATION_REQUIRED: "false"
+      HYDRO_JWT_SECRET: ${HYDRO_JWT_SECRET:-development-secret-change-before-production}
+      HYDRO_OBJECT_STORAGE_BACKEND: s3
+      HYDRO_OBJECT_STORAGE_BUCKET: ${HYDRO_OBJECT_STORAGE_BUCKET:-hydro-reports}
+      HYDRO_S3_ENDPOINT_URL: http://minio:9000
+      HYDRO_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-hydro}
+      HYDRO_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-hydro_dev_storage}
+      HYDRO_S3_REGION: ${HYDRO_S3_REGION:-us-east-1}
+      HYDRO_BACKGROUND_JOBS_ENABLED: "false"
+    user: "${QUALIFICATION_UID:-1000}:${QUALIFICATION_GID:-1000}"
+    command:
+      - uvicorn
+      - hydro_api.application:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --no-access-log
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+    networks:
+      - application
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/api/v1/health/ready", timeout=2)
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  qualification-web:
+    profiles: [qualification]
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.web
+      target: development
+    networks:
+      - application

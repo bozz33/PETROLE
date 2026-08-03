@@ -25,12 +25,42 @@ def test_sante_api() -> None:
 
     assert response.status_code == 200
     assert response.headers["x-correlation-id"] == "test-sante-001"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["cross-origin-resource-policy"] == "same-origin"
     assert response.json() == {
         "status": "ok",
         "service": "hydro-api",
         "version": "0.1.0",
         "environment": "test",
     }
+
+
+def test_racine_api_expose_sonde_neutre() -> None:
+    """La racine évite une erreur 404 aux sondes génériques sans être documentée."""
+
+    application = create_application(Settings(environment="test", background_jobs_enabled=False))
+    with TestClient(application) as client:
+        response = client.get("/")
+        openapi = client.get("/api/v1/openapi.json")
+
+    assert response.status_code == 200
+    assert response.json() == {"service": "hydro-api", "status": "ok"}
+    assert "/" not in openapi.json()["paths"]
+
+
+def test_erreur_http_ne_peut_pas_etre_mise_en_cache() -> None:
+    """Les réponses d'erreur héritent des en-têtes de défense de l'API."""
+
+    application = create_application(Settings(environment="test", background_jobs_enabled=False))
+    with TestClient(application) as client:
+        response = client.get("/route-inconnue")
+
+    assert response.status_code == 404
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["x-content-type-options"] == "nosniff"
 
 
 def test_readiness_verifie_base_et_stockage(tmp_path) -> None:

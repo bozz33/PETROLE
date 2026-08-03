@@ -35,6 +35,7 @@ gravitaire est explicitement sélectionné (D07 § 8).
 from __future__ import annotations
 
 import time
+from bisect import bisect_left, bisect_right
 from dataclasses import dataclass, field
 from itertools import pairwise
 
@@ -220,7 +221,16 @@ def _build_grid(pipeline: Pipeline, options: SolverOptions) -> list[float]:
 class _Marcher:
     """Propagation de la charge le long du tracé pour un débit donné."""
 
-    __slots__ = ("_fittings_by_chainage", "grid", "options", "pipeline", "state")
+    __slots__ = (
+        "_fittings_by_chainage",
+        "_injections_at_grid",
+        "_segments_at_grid",
+        "_stations_at_grid",
+        "grid",
+        "options",
+        "pipeline",
+        "state",
+    )
 
     def __init__(
         self, pipeline: Pipeline, state: FluidState, options: SolverOptions, grid: list[float]
@@ -242,6 +252,57 @@ class _Marcher:
                     self._fittings_by_chainage.get(position, 0.0) + fitting.effective_k()
                 )
 
+        # Une marche utilise une grille immuable. Résoudre la géométrie, les stations et les
+        # injections une fois ici évite de balayer tous les tronçons à chaque point de profil.
+        # Sans ce cache, un réseau de n tronçons échantillonné à n points dégrade la marche en
+        # O(n²), alors que la topologie du MVP est une chaîne ordonnée (D11 § 4.4).
+        self._segments_at_grid = self._segments_for_grid(pipeline, grid)
+        self._stations_at_grid = tuple(pipeline.station_at(chainage) for chainage in grid)
+        self._injections_at_grid = tuple(
+            sum(
+                injection.flow_m3_s
+                for injection in pipeline.injections
+                if injection.is_active and abs(injection.chainage_m - chainage) < 1e-6
+            )
+            for chainage in grid
+        )
+
+    @staticmethod
+    def _segments_for_grid(pipeline: Pipeline, grid: list[float]) -> tuple[PipeSegment, ...]:
+        """Associe chaque point de grille à son tronçon gouvernant en temps logarithmique.
+
+        Aux frontières, la convention reste exactement celle de :meth:`_segment_for` : le
+        tronçon aval gouverne l'intervalle suivant et le dernier point appartient au tronçon
+        amont. Les contrôles topologiques garantissent une chaîne continue ; le repli conserve
+        néanmoins le comportement défensif historique pour une entrée invalide.
+        """
+
+        segments = pipeline.segments
+        starts = tuple(segment.start_chainage_m for segment in segments)
+        last_grid_index = len(grid) - 1
+        resolved: list[PipeSegment] = []
+
+        for index, chainage in enumerate(grid):
+            forward = index < last_grid_index
+            segment_index = (
+                bisect_right(starts, chainage) - 1 if forward else bisect_left(starts, chainage) - 1
+            )
+            if 0 <= segment_index < len(segments):
+                candidate = segments[segment_index]
+                if (
+                    candidate.start_chainage_m <= chainage < candidate.end_chainage_m
+                    if forward
+                    else candidate.start_chainage_m < chainage <= candidate.end_chainage_m
+                ):
+                    resolved.append(candidate)
+                    continue
+
+            resolved.append(
+                segments[-1] if chainage >= segments[-1].start_chainage_m else segments[0]
+            )
+
+        return tuple(resolved)
+
     def march(self, inlet_flow_m3_s: float, inlet_pressure_pa: float) -> _MarchResult:
         """Parcourt le pipeline et retourne le profil hydraulique complet."""
         rho = self.state.density_kg_m3
@@ -261,19 +322,17 @@ class _Marcher:
             elevation = self.pipeline.elevation_at(chainage)
 
             # 1. Injection ou soutirage au point courant : il modifie le débit aval.
-            for injection in self.pipeline.injections:
-                if injection.is_active and abs(injection.chainage_m - chainage) < 1e-6:
-                    flow += injection.flow_m3_s
+            flow += self._injections_at_grid[index]
 
             # 2. Perte singulière ponctuelle.
-            segment = self._segment_for(chainage, forward=index < len(self.grid) - 1)
+            segment = self._segments_at_grid[index]
             k_total = self._fittings_by_chainage.get(chainage, 0.0)
             if k_total:
                 velocity = velocity_m_s(flow, segment.inner_diameter_m)
                 head -= k_total * velocity * abs(velocity) / (2.0 * G)
 
             # 3. Station : la charge augmente de la hauteur fournie.
-            station = self.pipeline.station_at(chainage)
+            station = self._stations_at_grid[index]
             if station is not None:
                 suction_head = head
                 suction_pressure = (suction_head - elevation) * rho * G
@@ -802,30 +861,25 @@ class LongDistanceLiquidEngine(HydraulicEngine):
         model: FrictionModel,
     ) -> list[SegmentResult]:
         results: list[SegmentResult] = []
+        chainages = [point.chainage_m for point in points]
         for segment in pipeline.segments:
-            inside = [
-                p
-                for p in points
-                if segment.start_chainage_m - 1e-9 <= p.chainage_m <= segment.end_chainage_m + 1e-9
-            ]
+            # Le profil est ordonné par chainage. Une recherche par dichotomie conserve les
+            # extrémités partagées entre tronçons, sans reconstruire le profil complet pour
+            # chaque segment (ce qui était quadratique sur les grands réseaux).
+            start_index = bisect_left(chainages, segment.start_chainage_m - 1e-9)
+            end_index = bisect_right(chainages, segment.end_chainage_m + 1e-9)
+            inside = points[start_index:end_index]
             if not inside:
                 continue
-            intervals = [
-                (left, right, right.chainage_m - left.chainage_m)
-                for left, right in pairwise(inside)
-                if right.chainage_m > left.chainage_m
-            ]
-            weighted_length = sum(dx for _, _, dx in intervals)
-            flow = (
-                sum(left.flow_m3_s * dx for left, _, dx in intervals) / weighted_length
-                if weighted_length > 0.0
-                else inside[0].flow_m3_s
-            )
-            velocity = velocity_m_s(flow, segment.inner_diameter_m)
-            re = reynolds(velocity, segment.inner_diameter_m, state.kinematic_viscosity_m2_s)
-            lam = friction_factor(re, segment.relative_roughness, model)
+            weighted_length = 0.0
+            weighted_flow = 0.0
             friction_loss = 0.0
-            for left, _, dx in intervals:
+            for left, right in pairwise(inside):
+                dx = right.chainage_m - left.chainage_m
+                if dx <= 0.0:
+                    continue
+                weighted_length += dx
+                weighted_flow += left.flow_m3_s * dx
                 interval_velocity = velocity_m_s(left.flow_m3_s, segment.inner_diameter_m)
                 interval_re = reynolds(
                     interval_velocity,
@@ -844,6 +898,10 @@ class LongDistanceLiquidEngine(HydraulicEngine):
                     * abs(interval_velocity)
                     / (2.0 * G)
                 )
+            flow = weighted_flow / weighted_length if weighted_length > 0.0 else inside[0].flow_m3_s
+            velocity = velocity_m_s(flow, segment.inner_diameter_m)
+            re = reynolds(velocity, segment.inner_diameter_m, state.kinematic_viscosity_m2_s)
+            lam = friction_factor(re, segment.relative_roughness, model)
             flow_by_chainage = {point.chainage_m: point.flow_m3_s for point in inside}
             minor_loss = 0.0
             for fitting in segment.fittings:

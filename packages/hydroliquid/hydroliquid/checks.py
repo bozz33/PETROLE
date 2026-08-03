@@ -12,7 +12,9 @@ exploitable (D-v2 § 4.9).
 
 from __future__ import annotations
 
+from bisect import bisect_left, bisect_right
 from dataclasses import dataclass, field
+from itertools import pairwise
 
 from hydro_domain.geometry import PipeSegment
 from hydro_domain.results import ProfilePointResult, PumpResult, StationResult
@@ -245,6 +247,27 @@ def check_maximum_pressure(
     la limite produit un avertissement ``WARN_NEAR_LIMIT``.
     """
     outcome = CheckOutcome()
+    chainages = [point.chainage_m for point in profile]
+    ordered_profile = all(previous <= current for previous, current in pairwise(chainages))
+
+    def points_for_segment(segment: PipeSegment) -> list[ProfilePointResult]:
+        """Retourne les points inclus dans un tronçon sans coût quadratique.
+
+        Les résultats produits par le moteur sont naturellement ordonnés. Le repli par
+        filtrage préserve toutefois le contrat de cette fonction publique si un appelant lui
+        fournit exceptionnellement un profil non ordonné.
+        """
+
+        if not ordered_profile:
+            return [
+                point
+                for point in profile
+                if segment.start_chainage_m <= point.chainage_m <= segment.end_chainage_m
+            ]
+        start_index = bisect_left(chainages, segment.start_chainage_m)
+        end_index = bisect_right(chainages, segment.end_chainage_m)
+        return profile[start_index:end_index]
+
     segments_with_limit = [s for s in segments if s.maop_pa is not None]
     if not segments_with_limit:
         outcome.skipped["C-004"] = (
@@ -258,9 +281,7 @@ def check_maximum_pressure(
         limit = segment.maop_pa
         if limit is None:  # garde défensive si le modèle devient mutable
             continue
-        points = [
-            p for p in profile if segment.start_chainage_m <= p.chainage_m <= segment.end_chainage_m
-        ]
+        points = points_for_segment(segment)
         if not points:
             continue
         worst = max(points, key=lambda p: p.pressure_pa)
@@ -312,9 +333,7 @@ def check_maximum_pressure(
         limit = segment.minimum_pressure_pa
         if limit is None:  # garde défensive si le modèle devient mutable
             continue
-        points = [
-            p for p in profile if segment.start_chainage_m <= p.chainage_m <= segment.end_chainage_m
-        ]
+        points = points_for_segment(segment)
         if not points:
             continue
         worst = min(points, key=lambda p: p.pressure_pa)

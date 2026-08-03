@@ -2,6 +2,12 @@
 
 FROM python:3.11-slim AS base
 
+# Le venv créé par ``ensurepip`` suit l'image Python et peut embarquer des bibliothèques
+# vendues obsolètes. Ces versions corrigent les composants vendus signalés par les scans
+# d'image et de dépendances, tout en restant reproductibles.
+ARG PIP_VERSION=26.1.2
+ARG SETUPTOOLS_VERSION=83.0.0
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -11,6 +17,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /workspace
 
 RUN python -m venv /opt/venv \
+    && /opt/venv/bin/python -m pip install --no-cache-dir "pip==${PIP_VERSION}" "setuptools==${SETUPTOOLS_VERSION}" \
+    && /usr/local/bin/python -m pip install --no-cache-dir "pip==${PIP_VERSION}" \
     && groupadd --gid 10001 hydro \
     && useradd --uid 10001 --gid hydro --create-home --shell /usr/sbin/nologin hydro
 
@@ -42,6 +50,12 @@ FROM base AS runtime
 
 COPY --from=build /tmp/wheels /tmp/wheels
 RUN pip install /tmp/wheels/* \
+    # setuptools n'est requis que pour construire/installer le paquet. Le retirer de l'image
+    # d'exécution réduit la surface d'attaque et évite d'embarquer ses dépendances vendues.
+    && python -m pip uninstall --yes setuptools \
+    # L'image Python fournit aussi setuptools hors du venv. Il n'est pas utilisé par Uvicorn
+    # ni le worker et doit disparaître du système final pour ne pas conserver de copie vendue.
+    && /usr/local/bin/python -m pip uninstall --yes setuptools \
     && rm -rf /tmp/wheels
 
 USER hydro

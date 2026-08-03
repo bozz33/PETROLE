@@ -164,3 +164,11 @@ sont terminées et que la campagne de qualification VPS est réussie.
 - ne pas annoncer « conforme » ou « 100 % » sans preuve correspondant au périmètre annoncé ;
 - corriger d'abord les erreurs réelles, puis mettre à jour tests et documentation ;
 - mettre à jour ce fichier à chaque jalon, avec date, commit, tests réussis et limites restantes.
+
+## Requalification backend du 3 août 2026
+
+La requalification consolidée est consignée dans
+[`docs/validation/qualification_backend_mvp_20260803.md`](docs/validation/qualification_backend_mvp_20260803.md).
+Elle confirme 485 tests Docker, 41/41 cas scientifiques, les scans d'images et le
+DAST local, tout en maintenant explicitement la frontière entre un MVP logiciel
+validé et une certification industrielle ou normative non démontrée.

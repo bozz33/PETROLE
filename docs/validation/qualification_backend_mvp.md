@@ -6,6 +6,11 @@
 - Portée : API, persistance, worker, stockage objet, calculs liquides, transferts,
   optimisation, rapports et exploitation locale
 
+> **Mise à jour.** Les résultats de cette première campagne restent des éléments
+> historiques. La requalification consolidée du 3 août 2026, incluant les nouveaux
+> benchmarks, scans d'images et DAST local, fait foi pour l'état courant :
+> [`qualification_backend_mvp_20260803.md`](qualification_backend_mvp_20260803.md).
+
 ## Verdict
 
 Le backend franchit les portes automatisées exécutées localement. Il n'est cependant pas

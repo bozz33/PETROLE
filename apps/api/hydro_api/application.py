@@ -63,6 +63,12 @@ def create_application(settings: Settings | None = None) -> FastAPI:
     )
     application.state.settings = active_settings
 
+    @application.get("/", include_in_schema=False)
+    def api_root() -> dict[str, str]:
+        """Expose une réponse neutre pour les sondes qui ciblent la racine."""
+
+        return {"service": "hydro-api", "status": "ok"}
+
     def application_settings() -> Settings:
         """Fournit la configuration appartenant à cette instance applicative."""
 
@@ -97,6 +103,15 @@ def create_application(settings: Settings | None = None) -> FastAPI:
                 )
                 raise
             response.headers["X-Correlation-ID"] = correlation_id
+            # L'API transporte potentiellement des éléments d'exploitation et
+            # d'authentification : elle ne doit pas être mise en cache par un
+            # navigateur ou un proxy partagé. Les en-têtes de défense restent
+            # applicables aussi aux réponses d'erreur générées par FastAPI.
+            response.headers.setdefault("Cache-Control", "no-store")
+            response.headers.setdefault("X-Content-Type-Options", "nosniff")
+            response.headers.setdefault("X-Frame-Options", "DENY")
+            response.headers.setdefault("Referrer-Policy", "no-referrer")
+            response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
             logger.info(
                 "requete_http_terminee",
                 methode=request.method,

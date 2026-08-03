@@ -1,0 +1,34 @@
+{
+  "schema_version": "hydro-external-benchmarks/1",
+  "retrieved_at": "2026-08-03",
+  "scope": "Benchmarks externes compatibles avec le MVP liquide stationnaire",
+  "sources": [
+    {
+      "name": "pandapipes 0.14.0 - réseaux d'eau à une conduite",
+      "documentation_url": "https://pandapipes.readthedocs.io/en/latest/networks/one_pipe/one_pipe_networks.html",
+      "license": "BSD-3-Clause",
+      "reference_files": [
+        {"system": "STANET", "network": "water_one_pipe1", "sha256": "746953d0a3a1335d3b9c5529c6f5d8c0ba1b85cf0e82ed942a952b1b8814f96c"},
+        {"system": "STANET", "network": "water_one_pipe2", "sha256": "e9538fe57ca82e360d2c3498b054bab713b0c45c080d1b00879d54867bb867db"},
+        {"system": "STANET", "network": "water_one_pipe3", "sha256": "eb3f6d16343c5f63f0688dd149083f7d2e5181df7a8cdb9075eb5dcb7dda6e85"},
+        {"system": "OpenModelica", "network": "water_one_pipe1", "sha256": "dfdadecb7d0355c3ae7d6e69d5e40277462bb0bea00ffe41cd31ba03ac9ce07c"},
+        {"system": "OpenModelica", "network": "water_one_pipe2", "sha256": "bac6cd2bb1cdf6dab00c5def1d40131519896b7aca13e9cb2203e0838f2c743b"},
+        {"system": "OpenModelica", "network": "water_one_pipe3", "sha256": "d94b4631f05f367afcbb0b5603f2f6da03c4e5821af60c92fd8cc40df84c6552"}
+      ]
+    },
+    {
+      "name": "DWSIM Validation Report",
+      "publication_date": "2026-05-03",
+      "url": "https://mrabcdkqjhotmejgtayb.supabase.co/storage/v1/object/public/dwsim-files/DWSIM_Validation_Report.pdf",
+      "sha256": "08b53a15a92a8748c740a76cb9730f0c343e9596f7c724cd9d34e3a6edbcf9c0",
+      "case": "U03 - Pump - H2O 1 kg/s, delta P 10 bar, efficiency 75 %",
+      "expected_power_w": 1337.345,
+      "tolerance_relative": 0.05
+    }
+  ],
+  "review": {
+    "software_review": "Exécutée localement le 3 août 2026",
+    "engineering_approval": "À obtenir avant pilote industriel",
+    "known_model_difference": "EXT-PP-STANET-01 utilise Colebrook en zone de transition ; HydroLiquid interpole les régimes."
+  }
+}

@@ -256,7 +256,8 @@ def check_maximum_pressure(
     outcome.executed.add("C-004")
     for segment in segments_with_limit:
         limit = segment.maop_pa
-        assert limit is not None  # garanti par le filtre ci-dessus
+        if limit is None:  # garde défensive si le modèle devient mutable
+            continue
         points = [
             p for p in profile if segment.start_chainage_m <= p.chainage_m <= segment.end_chainage_m
         ]
@@ -309,7 +310,8 @@ def check_maximum_pressure(
     minimum_limits = [s for s in segments if s.minimum_pressure_pa is not None]
     for segment in minimum_limits:
         limit = segment.minimum_pressure_pa
-        assert limit is not None
+        if limit is None:  # garde défensive si le modèle devient mutable
+            continue
         points = [
             p for p in profile if segment.start_chainage_m <= p.chainage_m <= segment.end_chainage_m
         ]

@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Clé d'idempotence publique et déterministe du test de réseau normalisé"
+regexes = ['''calcul-reseau-normalise-001''']

@@ -30,6 +30,7 @@ from hydro_tanks import (
     compute_transfer_balance,
     constant_operating_point,
 )
+from hydro_validation.external_cases import EXTERNAL_CASES
 from hydro_validation.models import ValidationCase, ValidationObservation
 from hydro_validation.mvp_cases import MVP_CASES
 from hydroliquid import (
@@ -556,7 +557,7 @@ DETAILED_CASES: tuple[ValidationCase, ...] = (
     ),
 )
 
-CASES: tuple[ValidationCase, ...] = (*MVP_CASES, *DETAILED_CASES)
+CASES: tuple[ValidationCase, ...] = (*MVP_CASES, *DETAILED_CASES, *EXTERNAL_CASES)
 
 
 def validation_cases() -> tuple[ValidationCase, ...]:

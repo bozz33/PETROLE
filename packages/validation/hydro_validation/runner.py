@@ -181,6 +181,8 @@ def render_markdown(result: ValidationSuiteResult) -> str:
                 f"{observation.acceptance_limit:.6g}{unit} | "
                 f"{observation.absolute_error:.6g}{unit} | {observation_verdict} |"
             )
+            if observation.detail:
+                lines.append(f"\nNote — {observation.name} : {observation.detail}\n")
 
     lines.extend(
         [

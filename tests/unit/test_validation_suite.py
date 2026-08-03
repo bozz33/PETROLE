@@ -14,9 +14,9 @@ from hydro_validation.runner import render_markdown, run_validation_suite, selec
 def test_all_registered_validation_cases_pass() -> None:
     result = run_validation_suite()
 
-    assert len(result.cases) == 34
+    assert len(result.cases) == 41
     assert result.passed
-    assert result.passed_count == 34
+    assert result.passed_count == 41
     assert result.failed_count == 0
     assert len(result.sha256) == 64
 
@@ -35,6 +35,15 @@ def test_porte_scientifique_mvp_couvre_v001_a_v020() -> None:
     result = run_validation_suite(["V-*"])
     assert result.passed
     assert result.passed_count == 20
+
+
+def test_benchmarks_externes_sont_tous_reproductibles() -> None:
+    result = run_validation_suite(["EXT-*"])
+
+    assert len(result.cases) == 7
+    assert result.passed
+    transition = next(case for case in result.cases if case.case_id == "EXT-PP-STANET-01")
+    assert "Écart de modèle B" in transition.observations[0].detail
 
 
 def test_markdown_report_contains_traceability() -> None:

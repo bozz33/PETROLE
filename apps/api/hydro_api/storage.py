@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
+from tempfile import NamedTemporaryFile
 from typing import Annotated, Any, Protocol
 
 from fastapi import Depends, Request
@@ -73,8 +74,19 @@ class FilesystemObjectStorage:
             target.unlink()
 
     def check(self) -> None:
+        """Vérifie que le répertoire existe réellement et reste inscriptible."""
+
+        self.root.mkdir(parents=True, exist_ok=True)
         if not self.root.is_dir():
             raise OSError("Le répertoire de stockage local est indisponible.")
+        with NamedTemporaryFile(
+            mode="wb",
+            prefix=".hydro-readiness-",
+            dir=self.root,
+            delete=True,
+        ) as probe:
+            probe.write(b"ready")
+            probe.flush()
 
 
 class S3ObjectStorage:

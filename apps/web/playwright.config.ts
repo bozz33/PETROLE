@@ -13,6 +13,7 @@ export default defineConfig({
     : "list",
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:4173",
+    channel: process.env.PLAYWRIGHT_USE_BUNDLED_CHROMIUM === "true" ? undefined : "chrome",
     headless: true,
     screenshot: "only-on-failure",
     trace: "on-first-retry",

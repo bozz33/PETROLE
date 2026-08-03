@@ -172,7 +172,11 @@ test("affiche le tableau de bord et conserve le thème sombre", async ({ page })
 
 test("navigue avec la palette de commandes", async ({ page }) => {
   await page.goto("/");
-  await page.keyboard.press("Control+K");
+  await page.evaluate(() => {
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }),
+    );
+  });
 
   const dialog = page.getByRole("dialog", { name: "Recherche globale" });
   await expect(dialog).toBeVisible();

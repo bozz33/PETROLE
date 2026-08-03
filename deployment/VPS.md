@@ -40,6 +40,10 @@ docker version
 docker compose version
 ```
 
+Les scripts VPS acceptent aussi l'installation Compose v2 qui fournit la commande autonome
+`docker-compose` au lieu du sous-programme `docker compose` ; ils sélectionnent automatiquement
+la commande disponible. Pour les vérifications manuelles ci-dessous, utiliser la même forme.
+
 ## 3. Installer le dépôt définitif
 
 ```bash

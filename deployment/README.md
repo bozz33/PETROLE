@@ -4,6 +4,10 @@ La procédure complète pour installation, transfert des données, développemen
 TLS, qualification et passage en production sur Ubuntu est décrite dans
 [`VPS.md`](VPS.md).
 
+Les exemples emploient la syntaxe Compose v2 `docker compose`. Si votre installation expose
+Compose v2 sous la commande autonome `docker-compose`, remplacez simplement la commande dans
+les exemples ; les scripts VPS détectent les deux formes automatiquement.
+
 ## Déploiement local
 
 ## Développement avec rechargement automatique

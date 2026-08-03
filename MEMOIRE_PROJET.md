@@ -81,6 +81,24 @@ conteneurisé reste donc à exécuter sur le VPS, comme Trivy et ZAP.
 Le test E2E public, Trivy, ZAP, la restauration réelle, le redémarrage et le certificat définitif
 restent à exécuter sur le VPS, car ils exigent son domaine, son accès SSH et ses services actifs.
 
+## Reprise du déploiement conteneurisé du 3 août 2026
+
+- dépôt de développement installé sous `/opt/petrole` ; les sources montées sont accessibles en
+  lecture par l'utilisateur non privilégié `hydro` (UID 10001) des conteneurs ;
+- pile de développement démarrée avec PostgreSQL, MinIO, API, worker et web ; les ports hôte
+  constatés sont `127.0.0.1:15432`, `127.0.0.1:19000`, `127.0.0.1:19001`,
+  `127.0.0.1:18000` et `127.0.0.1:15173` ;
+- migrations Alembic appliquées jusqu'à `4d7f9a3b2c85 (head)` ; le worker a ensuite démarré sans
+  erreur et l'endpoint `http://127.0.0.1:18000/api/v1/health/ready` a retourné
+  `database=ready` et `object_storage=ready` ; le serveur Vite a retourné sa page HTML ;
+- correction de portabilité : les scripts VPS détectent maintenant Compose v2 sous la forme
+  `docker compose` ou `docker-compose`, afin de fonctionner avec les deux installations prises
+  en charge ;
+- commandes de contrôle réussies : `bash -n deployment/scripts/vps/*.sh`, ShellCheck lorsque
+  disponible, détection Compose et `config --quiet` pour les fichiers Compose de développement ;
+- état Git de départ : `main` au commit `d6fbbfe`; `docs/charte graphique.png` reste non suivi et
+  n'a pas été modifié.
+
 ## Architecture utile
 
 - `apps/api` : API FastAPI ;

@@ -10,6 +10,24 @@ readonly VPS_REPOSITORY_ROOT
 VPS_MODE="development"
 VPS_ENV_FILE="${VPS_REPOSITORY_ROOT}/deployment/.env.vps"
 VPS_COMPOSE_ARGUMENTS=()
+VPS_COMPOSE_COMMAND=()
+
+detecter_compose() {
+    if command -v docker >/dev/null 2>&1 \
+        && docker compose version >/dev/null 2>&1; then
+        VPS_COMPOSE_COMMAND=(docker compose)
+        return 0
+    fi
+
+    if command -v docker-compose >/dev/null 2>&1 \
+        && docker-compose version >/dev/null 2>&1; then
+        VPS_COMPOSE_COMMAND=(docker-compose)
+        return 0
+    fi
+
+    echo "Docker Compose v2 est requis (commande 'docker compose' ou 'docker-compose')." >&2
+    return 2
+}
 
 initialiser_contexte_vps() {
     VPS_MODE="${1:-development}"
@@ -28,6 +46,7 @@ initialiser_contexte_vps() {
         return 2
     fi
     VPS_ENV_FILE="$(realpath "${VPS_ENV_FILE}")"
+    detecter_compose
 
     VPS_COMPOSE_ARGUMENTS=(
         --env-file "${VPS_ENV_FILE}"
@@ -44,7 +63,7 @@ initialiser_contexte_vps() {
 }
 
 compose_vps() {
-    docker compose "${VPS_COMPOSE_ARGUMENTS[@]}" "$@"
+    "${VPS_COMPOSE_COMMAND[@]}" "${VPS_COMPOSE_ARGUMENTS[@]}" "$@"
 }
 
 valeur_environnement() {

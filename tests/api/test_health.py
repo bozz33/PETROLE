@@ -10,6 +10,7 @@ from hydro_api.application import create_application
 from hydro_api.config import Settings
 from hydro_api.database.base import Base, utc_now
 from hydro_api.models import AuditEvent
+from hydro_api.storage import object_storage_for
 from hydro_shared.observability import bound_context
 
 
@@ -54,6 +55,26 @@ def test_readiness_verifie_base_et_stockage(tmp_path) -> None:
         "database": "ready",
         "object_storage": "ready",
     }
+
+
+def test_stockage_local_recree_un_repertoire_supprime(tmp_path) -> None:
+    """Le contrôle local restaure le répertoire puis confirme son écriture."""
+
+    root = tmp_path / "objects-recreated"
+    storage = object_storage_for(
+        Settings(
+            environment="test",
+            background_jobs_enabled=False,
+            object_storage_backend="filesystem",
+            object_storage_directory=root,
+        )
+    )
+    root.rmdir()
+
+    storage.check()
+
+    assert root.is_dir()
+    assert list(root.iterdir()) == []
 
 
 def test_schema_openapi_versionne() -> None:

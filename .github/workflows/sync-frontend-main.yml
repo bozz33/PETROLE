@@ -1,0 +1,42 @@
+name: Synchroniser le frontend avec main
+
+on:
+  push:
+    branches:
+      - feature/frontend-shadcn-admin
+    paths:
+      - .github/workflows/sync-frontend-main.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer tout l'historique
+        uses: actions/checkout@v4
+        with:
+          ref: feature/frontend-shadcn-admin
+          fetch-depth: 0
+
+      - name: Fusionner main en préservant le frontend validé
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main feature/frontend-shadcn-admin
+          git merge --no-ff --no-edit -X ours origin/main
+
+      - name: Valider les contrats et le frontend
+        run: |
+          python -m compileall -q apps/api packages
+          cd apps/web
+          npm ci
+          npm run typecheck
+          npm run build
+
+      - name: Retirer le workflow temporaire et publier la fusion
+        run: |
+          git rm .github/workflows/sync-frontend-main.yml
+          git commit --amend --no-edit
+          git push origin HEAD:feature/frontend-shadcn-admin

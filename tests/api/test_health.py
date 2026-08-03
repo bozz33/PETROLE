@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from hydro_api.application import create_application
-from hydro_api.config import Settings, get_settings
+from hydro_api.config import Settings
 from hydro_api.database.base import Base, utc_now
 from hydro_api.models import AuditEvent
 from hydro_api.storage import object_storage_for

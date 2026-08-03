@@ -9,6 +9,7 @@ import { ThemeProvider } from "./theme";
 import "./styles.css";
 import "./petrole-theme.css";
 import "./shadcn-shell.css";
+import "./auth-theme.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

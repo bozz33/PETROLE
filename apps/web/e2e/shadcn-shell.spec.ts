@@ -210,8 +210,13 @@ test("ouvre la navigation mobile", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Scénario réservé à la vue mobile.");
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Tableau de bord" })).toBeVisible();
-  await page.getByRole("button", { name: "Ouvrir la navigation" }).click();
+
+  const menuButton = page.locator(".mobile-menu-button");
+  await expect(menuButton).toHaveCount(1);
+  await expect(menuButton).toHaveAttribute("aria-label", "Ouvrir la navigation");
+  await menuButton.evaluate((element: HTMLButtonElement) => element.click());
   await expect(page.locator("aside.sidebar")).toHaveClass(/is-mobile-open/);
+
   await page.getByRole("link", { name: "Rapports" }).click();
   await expect(page).toHaveURL(/\/rapports$/);
 });

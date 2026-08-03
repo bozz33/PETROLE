@@ -1,10 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { RouterProvider } from "@tanstack/react-router";
 
-import { App } from "./App";
-import { AuthProvider } from "./auth";
-import { NavigationProvider } from "./routing";
+import { router } from "./router";
 import { ThemeProvider } from "./theme";
 import "./shadcn-tokens.css";
 import "./styles.css";
@@ -31,11 +30,7 @@ createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <NavigationProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </NavigationProvider>
+        <RouterProvider router={router} />
       </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>,

@@ -95,7 +95,11 @@ test("la navigation interne change de page sans rechargement externe", async ({ 
   await expect(page.getByRole("heading", { level: 1, name: "Tableau de bord" })).toBeVisible();
 
   if (testInfo.project.name === "mobile") {
-    await page.getByRole("button", { name: "Ouvrir la navigation" }).click();
+    const menuButton = page.locator(".mobile-menu-button");
+    await expect(menuButton).toHaveCount(1);
+    await expect(menuButton).toHaveAttribute("aria-label", "Ouvrir la navigation");
+    await menuButton.evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.locator("aside.sidebar")).toHaveClass(/is-mobile-open/);
   }
 
   await page.getByRole("link", { name: "Modélisation" }).click();

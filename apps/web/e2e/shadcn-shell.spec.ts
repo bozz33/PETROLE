@@ -123,7 +123,7 @@ async function installApiMock(page: Page): Promise<void> {
     respond(route, { version: 8, name: "PETROLE test style", sources: {}, layers: [] }),
   );
 
-  await page.route("**/api/v1/**", async (route) => {
+  await page.route(/\/api\/v1\//, async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname.replace("/api/v1", "");
     const fixtures: Record<string, unknown> = {
@@ -167,16 +167,16 @@ test("affiche le tableau de bord et conserve le thème sombre", async ({ page })
   await page.getByRole("button", { name: "Activer le mode sombre" }).click();
   await expect(page.locator("html")).toHaveClass(/dark/);
   await page.reload();
+  await expect(page.getByRole("heading", { level: 1, name: "Tableau de bord" })).toBeVisible();
   await expect(page.locator("html")).toHaveClass(/dark/);
 });
 
-test("navigue avec la palette de commandes", async ({ page }) => {
+test("navigue avec la palette de commandes", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "bureau", "La palette globale est vérifiée sur bureau.");
+
   await page.goto("/");
-  await page.evaluate(() => {
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }),
-    );
-  });
+  await expect(page.getByRole("heading", { level: 1, name: "Tableau de bord" })).toBeVisible();
+  await page.getByRole("search").getByLabel("Rechercher").click();
 
   const dialog = page.getByRole("dialog", { name: "Recherche globale" });
   await expect(dialog).toBeVisible();
@@ -206,6 +206,7 @@ test("affiche le réseau avec React Flow et MapLibre", async ({ page }) => {
 test("ouvre la navigation mobile", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Scénario réservé à la vue mobile.");
   await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: "Tableau de bord" })).toBeVisible();
   await page.getByRole("button", { name: "Ouvrir la navigation" }).click();
   await expect(page.locator("aside.sidebar")).toHaveClass(/is-mobile-open/);
   await page.getByRole("link", { name: "Rapports" }).click();
@@ -215,6 +216,7 @@ test("ouvre la navigation mobile", async ({ page }, testInfo) => {
 test("réduit et restaure la barre latérale", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "bureau", "Scénario réservé à la vue bureau.");
   await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: "Tableau de bord" })).toBeVisible();
   await page.getByRole("button", { name: "Réduire la barre latérale" }).click();
   await expect(page.locator(".app-shell")).toHaveClass(/sidebar-collapsed/);
   await page.getByRole("button", { name: "Déployer la barre latérale" }).click();

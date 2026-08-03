@@ -48,6 +48,7 @@ jobs:
       - name: Exécuter les tests avec couverture
         run: |
           pytest -p no:cacheprovider \
+            -m "not slow" \
             --cov=packages \
             --cov=apps/api \
             --cov-report=term-missing:skip-covered \

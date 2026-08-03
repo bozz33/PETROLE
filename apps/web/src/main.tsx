@@ -6,6 +6,7 @@ import { App } from "./App";
 import { AuthProvider } from "./auth";
 import { NavigationProvider } from "./routing";
 import { ThemeProvider } from "./theme";
+import "./shadcn-tokens.css";
 import "./styles.css";
 import "./petrole-theme.css";
 import "./shadcn-shell.css";

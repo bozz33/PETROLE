@@ -16,7 +16,7 @@ dependencies = [
     # NumPy 2.4+ publie des stubs réservés à Python 3.12+, tandis que le
     # projet garantit encore Python 3.11. Cette borne maintient le typage
     # statique compatible sur toute la plage d'exécution annoncée.
-    "numpy>=1.26,<2.4",
+    "numpy>=1.26,<2.5",
     "scipy>=1.11",
     "pint>=0.23",
     "fluids>=1.0",

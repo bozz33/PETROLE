@@ -145,6 +145,10 @@ async function json(route: Route, body: unknown, status = 200): Promise<void> {
 }
 
 async function installApiMock(page: Page): Promise<void> {
+  await page.route("https://demotiles.maplibre.org/style.json", async (route) => {
+    await json(route, { version: 8, name: "PETROLE test style", sources: {}, layers: [] });
+  });
+
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname.replace("/api/v1", "");
@@ -230,7 +234,7 @@ test("ouvre la palette de commandes et navigue avec TanStack Router", async ({ p
   await expect(page.getByRole("heading", { level: 1, name: "Rapports" })).toBeVisible();
 });
 
-test("affiche le réseau technique avec React Flow", async ({ page }) => {
+test("affiche le réseau avec React Flow et MapLibre", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Visualiser le réseau" }).click();
 
@@ -239,6 +243,14 @@ test("affiche le réseau technique avec React Flow", async ({ page }) => {
   await expect(page.locator(".react-flow__node")).toHaveCount(3);
   await expect(page.locator(".react-flow__edge")).toHaveCount(2);
   await expect(page.getByText("350 km")).toBeVisible();
+
+  await page.getByRole("button", { name: "Carte" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Carte du réseau" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Carte géographique du pipeline" })).toBeVisible();
+  await expect(page.getByText("3", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Schéma" }).click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(3);
 });
 
 test("ouvre et ferme le menu mobile", async ({ page }, testInfo) => {

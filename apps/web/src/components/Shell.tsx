@@ -6,12 +6,14 @@ import { InternalLink, useNavigation } from "../routing";
 const NAVIGATION = [
   { to: "/", label: "Vue d'ensemble", mark: "01" },
   { to: "/projets", label: "Projets et versions", mark: "02" },
-  { to: "/calcul", label: "Calcul hydraulique", mark: "03" },
-  { to: "/stockage", label: "Stockage et transferts", mark: "04" },
-  { to: "/decision", label: "Comparaison et décision", mark: "05" },
-  { to: "/donnees", label: "Données et imports", mark: "06" },
-  { to: "/rapports", label: "Rapports", mark: "07" },
-  { to: "/administration", label: "Administration", mark: "08" },
+  { to: "/modelisation", label: "Modélisation", mark: "03" },
+  { to: "/bibliotheques", label: "Bibliothèques", mark: "04" },
+  { to: "/calcul", label: "Calcul hydraulique", mark: "05" },
+  { to: "/stockage", label: "Stockage et transferts", mark: "06" },
+  { to: "/decision", label: "Comparaison et décision", mark: "07" },
+  { to: "/donnees", label: "Données et imports", mark: "08" },
+  { to: "/rapports", label: "Rapports", mark: "09" },
+  { to: "/administration", label: "Administration", mark: "10" },
 ];
 
 const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
@@ -22,6 +24,14 @@ const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   "/projets": {
     title: "Projets et versions",
     subtitle: "Organisations, référentiels et modèles de calcul versionnés.",
+  },
+  "/modelisation": {
+    title: "Modélisation",
+    subtitle: "Construire et valider le réseau, ses tronçons et ses équipements.",
+  },
+  "/bibliotheques": {
+    title: "Bibliothèques techniques",
+    subtitle: "Versionner les produits, pompes, vannes, matériaux et accessoires.",
   },
   "/calcul": {
     title: "Calcul hydraulique",
@@ -179,13 +189,17 @@ export function StatusBadge({ value }: { value: string }) {
     normalized.includes("approved") ||
     normalized.includes("converged") ||
     normalized.includes("completed") ||
-    normalized.includes("generated");
+    normalized.includes("generated") ||
+    normalized === "valide" ||
+    normalized === "conforme";
   const negative =
     normalized.includes("invalid") ||
     normalized.includes("failed") ||
     normalized.includes("error") ||
     normalized.includes("rejected") ||
-    normalized.includes("not_converged");
+    normalized.includes("not_converged") ||
+    normalized === "invalide" ||
+    normalized === "non conforme";
   const kind = negative ? "negative" : positive ? "positive" : "neutral";
   return <span className={"status-badge " + kind}>{value.replaceAll("_", " ")}</span>;
 }

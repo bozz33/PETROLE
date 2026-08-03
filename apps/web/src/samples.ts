@@ -107,3 +107,29 @@ export const EXAMPLE_SCENARIO: Record<string, unknown> = {
   objective: null,
   energy_price_per_joule: null,
 };
+
+/** Charges utiles de départ pour les familles du catalogue technique. */
+export const EXAMPLE_CATALOG_PAYLOADS: Record<string, Record<string, unknown>> = {
+  fluids: EXAMPLE_MODEL.fluid as Record<string, unknown>,
+  pumps: {
+    manufacturer: "Constructeur à préciser",
+    curve: {
+      flows_m3_s: [0.1, 0.2, 0.3],
+      heads_m: [210, 185, 145],
+      efficiencies: [0.72, 0.82, 0.76],
+      powers_w: null,
+      npshr_m: [3.5, 4.5, 6.0],
+      reference_speed_rpm: 3000,
+      interpolation: "pchip",
+    },
+    motor_rated_power_w: 750000,
+    npsh_margin_m: 1,
+    min_speed_ratio: 0.7,
+    max_speed_ratio: 1,
+    minimum_continuous_flow_m3_s: 0.08,
+    data_source: "Courbe constructeur à référencer",
+  },
+  valves: { k_coefficient: 0.2, nominal_diameter_m: 0.5 },
+  materials: { roughness_m: 0.000045, mawp_pa: 8000000 },
+  accessories: { k_coefficient: 0.3, accessory_type: "coude" },
+};

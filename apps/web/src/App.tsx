@@ -1,8 +1,10 @@
 import { Shell } from "./components/Shell";
 import { AdministrationPage } from "./pages/AdministrationPage";
+import { BibliothequesPage } from "./pages/BibliothequesPage";
 import { CalculPage } from "./pages/CalculPage";
 import { DecisionPage } from "./pages/DecisionPage";
 import { DonneesPage } from "./pages/DonneesPage";
+import { ModelisationPage } from "./pages/ModelisationPage";
 import { ProjetsPage } from "./pages/ProjetsPage";
 import { RapportsPage } from "./pages/RapportsPage";
 import { StockagePage } from "./pages/StockagePage";
@@ -12,6 +14,8 @@ import { useNavigation } from "./routing";
 const PAGES: Record<string, () => JSX.Element> = {
   "/": TableauBordPage,
   "/projets": ProjetsPage,
+  "/modelisation": ModelisationPage,
+  "/bibliotheques": BibliothequesPage,
   "/calcul": CalculPage,
   "/stockage": StockagePage,
   "/decision": DecisionPage,

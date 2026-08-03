@@ -291,6 +291,105 @@ export interface AuditEvent {
   created_at: string;
 }
 
+export type CatalogCollection =
+  | "fluids"
+  | "pumps"
+  | "valves"
+  | "materials"
+  | "accessories";
+
+export interface CatalogItem {
+  id: string;
+  organization_id: string;
+  parent_id: string | null;
+  kind: "fluid" | "pump" | "valve" | "material" | "accessory";
+  code: string;
+  name: string;
+  version_number: number;
+  status: "draft" | "approved" | "archived";
+  payload: Record<string, unknown>;
+  source: string | null;
+  content_hash: string;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NetworkNode {
+  id: string;
+  model_version_id: string;
+  code: string;
+  name: string;
+  kind: "source" | "tank" | "station" | "junction" | "terminal" | "injection" | "offtake";
+  elevation_m: number;
+  latitude: number | null;
+  longitude: number | null;
+  status: "available" | "maintenance" | "unavailable";
+  payload: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProfilePoint {
+  chainage_m: number;
+  elevation_m: number;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface NetworkEdge {
+  id: string;
+  model_version_id: string;
+  from_node_id: string;
+  to_node_id: string;
+  material_catalog_item_id: string | null;
+  code: string;
+  name: string;
+  sequence: number;
+  length_m: number;
+  inner_diameter_m: number;
+  roughness_m: number;
+  mawp_pa: number;
+  status: "available" | "maintenance" | "unavailable";
+  profile_payload: ProfilePoint[];
+  fittings_payload: Array<Record<string, unknown>>;
+  payload: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssetInstance {
+  id: string;
+  model_version_id: string;
+  catalog_item_id: string;
+  node_id: string | null;
+  edge_id: string | null;
+  code: string;
+  name: string;
+  role: "main" | "standby" | "auxiliary" | "isolation" | "control" | "measurement";
+  status: "available" | "maintenance" | "unavailable" | "bypassed";
+  payload: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NetworkValidationIssue {
+  code: string;
+  message: string;
+  object_type: string;
+  object_id: string | null;
+}
+
+export interface NetworkValidationReport {
+  model_version_id: string;
+  valid: boolean;
+  errors: NetworkValidationIssue[];
+  warnings: NetworkValidationIssue[];
+  node_count: number;
+  edge_count: number;
+  asset_count: number;
+}
+
 export interface ModelVersion {
   id: string;
   project_id: string;

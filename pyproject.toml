@@ -58,8 +58,8 @@ dev = [
     "mypy>=1.11",
     "types-python-dateutil",
 ]
-# Moteur secondaire : intégré par adaptateur après preuve de concept (DEC-ENGINE-002 du D-v2)
-pandapipes = ["pandapipes>=0.11"]
+# Moteur secondaire : plage validée par la preuve de concept POC-OS-04.
+pandapipes = ["pandapipes>=0.14,<0.15"]
 
 [project.scripts]
 hydro-validate = "hydro_validation.cli:main"

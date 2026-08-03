@@ -17,3 +17,17 @@ Tous les moteurs implémentent l'interface `HydraulicEngine` (`validate`, `simul
 Positif : comparaison croisée systématique, remplacement d'un moteur sans toucher au produit, aucune dépendance irréversible à `pandapipes` (DEC-ENGINE-002).
 
 Négatif : une couche d'abstraction supplémentaire ; justifiée par la stratégie de validation D10.
+
+## Preuve de concept POC-OS-04
+
+La plage `pandapipes >= 0.14, < 0.15` est validée automatiquement contre le moteur principal
+sur une conduite horizontale avec pertes singulières et sur une conduite avec dénivelé. Les
+essais contrôlent séparément la pression aval, le facteur de frottement, la perte linéaire, la
+perte singulière et le bilan de charge. Ils sont exécutés par
+`tests/unit/test_pandapipes_adapter.py` dans l'image de développement.
+
+L'adaptateur reste limité aux chaînes de tronçons entièrement en service, avec débit et
+pression absolue amont imposés, modèle de Colebrook–White et points altimétriques placés aux
+frontières des tronçons. Il refuse les stations, injections actives, surcharges d'équipement,
+accessoires fermés et zones gravitaires. Un résultat pandapipes ne peut jamais être approuvé :
+ce moteur de comparaison n'exécute pas l'ensemble des contrôles C-001 à C-012.

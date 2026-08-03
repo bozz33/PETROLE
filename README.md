@@ -163,6 +163,13 @@ docker compose -f deployment/docker-compose.yml -f deployment/docker-compose.dev
 La campagne contient 34 cas : les 20 portes de réception `V-001` à `V-020` et 14 cas
 analytiques détaillés des familles `VAL-LIQ-*`, `VAL-PMP-*` et `VAL-TNK-*`.
 
+La preuve de concept comparative pandapipes s'exécute dans la même image :
+
+```bash
+docker compose -f deployment/docker-compose.yml -f deployment/docker-compose.dev.yml \
+  exec -T api pytest tests/unit/test_pandapipes_adapter.py -q
+```
+
 ---
 
 ## Intégrité scientifique
@@ -192,4 +199,5 @@ et le produit n'affiche jamais une conformité complète lorsqu'il n'a vérifié
 ## Licence
 
 Apache-2.0 — voir [LICENSE](LICENSE). L'inventaire des dépendances open source, de leurs
-licences et de leur justification est tenu dans [`docs/dependances.md`](docs/dependances.md).
+licences et de leur justification est tenu dans
+[`docs/specifications/14_Strategie_open_source_et_licences.md`](docs/specifications/14_Strategie_open_source_et_licences.md).

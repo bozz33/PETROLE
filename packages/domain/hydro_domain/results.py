@@ -279,6 +279,14 @@ class SimulationResult:
     assumptions: dict[str, Any] = field(default_factory=dict)
     #: Empreinte de l'environnement de calcul (versions, dépendances, commit).
     environment: dict[str, Any] = field(default_factory=dict)
+    #: Autorisation propre au moteur de présenter le résultat comme approuvable.
+    #:
+    #: Un moteur secondaire peut converger numériquement sans exécuter tous les contrôles
+    #: scientifiques obligatoires. Ce verrou distingue cette limite de périmètre d'une
+    #: violation physique du scénario.
+    approval_permitted: bool = True
+    #: Motif explicite du verrou d'approbation, lorsqu'il est actif.
+    approval_block_reason: str | None = None
 
     # ------------------------------------------------------------------ synthèse
 
@@ -299,11 +307,12 @@ class SimulationResult:
     def is_approvable(self) -> bool:
         """Un résultat n'est approuvable que si la physique **et** la numérique tiennent.
 
-        Les trois conditions sont cumulatives (NFR-SCI-005) : convergence atteinte, bilan de
-        masse sous tolérance, aucune violation critique.
+        Les quatre conditions sont cumulatives (NFR-SCI-005) : moteur autorisé à conclure,
+        convergence atteinte, bilan de masse sous tolérance, aucune violation critique.
         """
         return (
-            self.status.has_results
+            self.approval_permitted
+            and self.status.has_results
             and self.diagnostics.converged
             and self.diagnostics.mass_balance_ok
             and not self.has_critical_violation
@@ -340,6 +349,8 @@ class SimulationResult:
             "gravity_zone_count": len(self.gravity_zones),
             "feasible": self.is_feasible,
             "approvable": self.is_approvable,
+            "approval_permitted": self.approval_permitted,
+            "approval_block_reason": self.approval_block_reason,
             "iterations": self.diagnostics.iterations,
             "residual": self.diagnostics.residual,
         }

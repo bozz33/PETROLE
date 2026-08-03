@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from hydro_domain.results import SimulationResult
 from hydro_shared.codes import (
     MANDATORY_CHECKS,
     ErrorCode,
@@ -182,3 +183,20 @@ class TestSolverDiagnostics:
         diag.record_iteration(2, residual=1e-5, flow=1.42)
         assert diag.as_dict()["iteration_count_logged"] == 2
         assert diag.iteration_log[1]["residual"] == pytest.approx(1e-5)
+
+
+def test_verrou_moteur_interdit_approbation_sans_fausser_la_convergence():
+    """Un moteur au périmètre incomplet peut converger sans autoriser une approbation."""
+    result = SimulationResult(
+        status=SimulationStatus.CONVERGED,
+        scenario_id="SC-COMPARAISON",
+        engine="moteur_secondaire",
+        diagnostics=SolverDiagnostics(converged=True),
+        approval_permitted=False,
+        approval_block_reason="Contrôles scientifiques incomplets.",
+    )
+
+    assert result.is_feasible
+    assert not result.is_approvable
+    assert result.summary()["approval_permitted"] is False
+    assert result.summary()["approval_block_reason"] == "Contrôles scientifiques incomplets."

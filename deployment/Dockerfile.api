@@ -20,7 +20,7 @@ COPY pyproject.toml README.md LICENSE ./
 COPY apps/api ./apps/api
 COPY packages ./packages
 
-RUN pip install --editable ".[dev]"
+RUN pip install --editable ".[dev,pandapipes]"
 
 USER hydro
 

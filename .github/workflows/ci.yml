@@ -108,6 +108,8 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Exécuter les parcours Playwright
+        env:
+          PLAYWRIGHT_USE_BUNDLED_CHROMIUM: "true"
         run: npm run test:e2e
 
       - name: Archiver le diagnostic Playwright

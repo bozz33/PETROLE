@@ -1,6 +1,6 @@
 # Mémoire du projet PETROLE
 
-Dernière mise à jour : 3 août 2026.
+Dernière mise à jour : 5 août 2026.
 
 Ce fichier sert de point de reprise entre deux sessions de développement. Il décrit l'état
 constaté du dépôt, les preuves disponibles et les prochaines actions. Toute nouvelle session
@@ -164,6 +164,104 @@ sont terminées et que la campagne de qualification VPS est réussie.
 - ne pas annoncer « conforme » ou « 100 % » sans preuve correspondant au périmètre annoncé ;
 - corriger d'abord les erreurs réelles, puis mettre à jour tests et documentation ;
 - mettre à jour ce fichier à chaque jalon, avec date, commit, tests réussis et limites restantes.
+
+## Synchronisation GitHub du 5 août 2026
+
+Le serveur `/opt/petrole` était en retard de 28 commits sur `origin/release/mvp-rc1`
+(localement `4d7a91e`, distant `adf0082`). Les corrections décrites par la note de
+reprise « Corrections appliquées sur release/mvp-rc1 » ont été intégrées par
+fast-forward pur, après vérification que l'arbre de travail était propre et qu'aucun
+worktree frontend ni fichier non suivi n'était à préserver.
+
+Appliqué sur le serveur :
+
+- `git pull --ff-only origin release/mvp-rc1` → HEAD désormais `adf0082`, arbre propre ;
+- 22 fichiers modifiés, 8 créés : migration `8b1f2d6c4e90`, `apps/api/hydro_api/models/constraints.py`,
+  `packages/shared/hydro_shared/testing/postgres.py`, ADR-011 et ADR-012, tests
+  `test_json_persistence.py` et `test_model_constraints.py` ;
+- migration Alembic appliquée à la base de développement : `4d7f9a3b2c85 → 8b1f2d6c4e90 (head)` ;
+- `alembic check` sans dérive (« No new upgrade operations detected ») ;
+- la contrainte `ck_calculation_runs_status_valid` contient bien `SIM_NUMERIC_ERROR` ;
+- redémarrage de l'API et du worker ; `/api/v1/health/ready` retourne
+  `{"status":"ready","database":"ready","object_storage":"ready"}` ;
+- validation scientifique : **41/41 cas réussis**, empreinte
+  `004684cf11b9fd469540fce7ad866b6fe7f6702341388a256925481b1adb0b17`.
+
+Limites constatées sur ce serveur :
+
+- la politique PostgreSQL des tests (`deployment/scripts/check_test_database_policy.py`)
+  n'était pas exécutable depuis le conteneur `api` car `deployment/` était en mode `0700`
+  (propriétaire root uniquement), alors que le processus applicatif tourne sous
+  l'utilisateur non privilégié `hydro` (UID 10001). La campagne `qualify.sh` l'exécute
+  dans une base jetable dédiée ; ce point de droits reste à assouplir pour permettre
+  le contrôle depuis l'intérieur du conteneur ;
+- la campagne `qualify.sh` complète (Ruff, mypy, tests PostgreSQL, Trivy, Gitleaks,
+  ZAP, Playwright, HTTPS public) reste à exécuter sur le VPS pour lever le tag
+  `v0.1.0-rc.1`. Ce qui précède valide la synchronisation du code, la migration et la
+  non-régression du noyau scientifique, pas la pleine qualification production.
+
+## Correction de l'environnement VPS du 5 août 2026
+
+- permissions corrigées : `deployment/` et `var/` sont désormais traversables et
+  lisibles par l'utilisateur `hydro` des conteneurs, ce qui permet d'exécuter la
+  politique PostgreSQL et d'écrire les preuves depuis l'intérieur des conteneurs ;
+- le `.venv` local (structure Windows `Scripts/`, inutilisable sur Linux) a été
+  supprimé et recréé sous `/opt/petrole/.venv` avec Python 3.12.3 système ;
+  l'installation éditable `pip install -e ".[dev]"` réussit, `pip check` est propre
+  et les outils `ruff`, `mypy`, `pytest`, `hydro-validate` sont disponibles.
+
+## Qualification exécutable du 5 août 2026 (commit 8c52b87)
+
+Le serveur n'expose pas de domaine public ni de TLS pour PETROLE, donc les étapes
+Playwright, OWASP ZAP et `curl https://…` de `qualify.sh` ne sont pas exécutables
+ici. Toutes les autres étapes ont été lancées et archivées sous
+`var/validation-vps/qualification-run/`. Quatre défauts bloquants introduits ou
+révélés par la série ADR-TEST-DB-001 ont été corrigés sur `release/mvp-rc1` :
+
+1. `style` — `ruff format` 0.16 du serveur plus strict que la version des commits :
+   reformatage de `postgres.py`, `test_auth_and_sites.py`, `test_json_persistence.py`.
+2. `fix(policy)` — le scanneur AST signalait faussement `tests/qualification/import_million.py`,
+   un benchmark autonome piloté par `qualify.sh` (exception prévue par l'ADR-TEST-DB-001) ;
+   `tests/qualification/` est désormais exclu du contrôle.
+3. `fix(api)` — `SimulationResult` est `frozen`, donc `result.status = …` du commit
+   JSON strict aurait levé `FrozenInstanceError`, et `SimulationStatus.SIM_NUMERIC_ERROR`
+   n'existe pas (le membre est `NUMERIC_ERROR`). Un résultat convergé avec NaN aurait
+   persisté `SIM_CONVERGED` au lieu de `SIM_NUMERIC_ERROR`. Remplacé par un statut
+   effectif local recopié dans `result_payload` et `calculation.status`.
+4. `test(json)` — avec psycopg3, le blocage d'un NaN remonte en `ValueError` (adaptateur
+   `Jsonb`) et non `StatementError` ; le test accepte désormais les deux.
+
+Résultats vérifiés (preuves dans `var/validation-vps/qualification-run/`) :
+
+| Contrôle | Résultat |
+|---|---|
+| Politique PostgreSQL (AST) | verte |
+| Ruff format / lint | 131 fichiers, aucune alerte |
+| Mypy | 0 erreur sur 95 fichiers |
+| Base jetable PostgreSQL/PostGIS + Alembic `upgrade head` | `8b1f2d6c4e90` |
+| `alembic check` | aucune dérive |
+| Tests `not slow` | **499 réussis** |
+| Tests `slow` (performance) | **3 réussis** (p95 1000 tronçons 0,125 s ; 10 000 tronçons 11,7 s) |
+| Validation scientifique | **41/41** |
+| Charge API (25 users, 500 req) | **0 erreur**, p95 **0,94 s** (NFR-PERF-005 < 2 s) |
+| Frontend typecheck / tests / build | 2 tests, build 2 714 modules |
+| npm audit (high+) | **0 vulnérabilité** |
+| Gitleaks (137 commits) | **aucun secret** |
+| Trivy image API production (`runtime`) | **0 HIGH/CRITICAL non corrigée** |
+| Trivy image web production (`nginx`) | **0 HIGH/CRITICAL non corrigée** |
+
+Note honnête sur Trivy : les images **de développement** (`hydro-platform-api`,
+`hydro-platform-web`, targets `development`) contiennent des vulnérabilités HIGH/CRITICAL
+**corrigées** dans des outils de build (`esbuild`, `tar`, `wheel`, `setuptools`,
+`brace-expansion`). Elles ne sont jamais déployées : l'image dev monte le code en volume
+et n'est utilisée qu'en développement. Seules les images **production** (`runtime` pour
+l'API, `nginx` pour le web) ont été scannées propres.
+
+Reste pour lever `v0.1.0-rc.1` : configurer un domaine public + TLS (Caddy), puis
+exécuter Playwright, OWASP ZAP et le contrôle HTTPS public, et réaliser la sauvegarde
+et la restauration réelles sur l'infrastructure cible. Les commits correctifs
+(`8206b1f`, `2766d44`, `ba94693`, `8c52b87`) sont locaux à `release/mvp-rc1` et
+restent à pousser vers `origin` après revue.
 
 ## Requalification backend du 3 août 2026
 

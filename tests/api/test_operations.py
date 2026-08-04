@@ -7,46 +7,15 @@ from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 from tests.factories import entree_canonique, pipeline, scenario, station_serie
-
-from hydro_api.application import create_application
-from hydro_api.config import Settings
-from hydro_api.database.session import get_session
 
 
 @pytest.fixture
-def operations_client(tmp_path) -> Generator[TestClient, None, None]:
-    engine = create_engine(
-        "postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
-    )
-    application = create_application(
-        Settings(
-            environment="test",
-            database_url="postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
-            background_jobs_enabled=False,
-            object_storage_backend="filesystem",
-            object_storage_directory=tmp_path / "objects",
-        )
-    )
+def operations_client(api_client_factory) -> Generator[TestClient, None, None]:
+    """Client métier isolé par la transaction PostgreSQL du test."""
 
-    def session_override():
-        with Session(engine, expire_on_commit=False) as session:
-            try:
-                yield session
-                session.commit()
-            except Exception:
-                session.rollback()
-                raise
-
-    application.dependency_overrides[get_session] = session_override
-    try:
-        with TestClient(application) as client:
-            yield client
-    finally:
-        Base.metadata.drop_all(engine)
-        engine.dispose()
+    with api_client_factory() as client:
+        yield client
 
 
 def _organization(client: TestClient) -> dict:

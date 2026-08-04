@@ -23,6 +23,10 @@ class SimulationStatus(StrEnum):
     NO_PHYSICAL_SOLUTION = "SIM_NO_PHYSICAL_SOLUTION"
     NOT_CONVERGED = "SIM_NOT_CONVERGED"
     CANCELLED = "SIM_CANCELLED"
+    # Résultat déclaré convergent mais contenant une valeur non finie : ce
+    # n'est ni une panne d'infrastructure (TECHNICAL_ERROR) ni une entrée
+    # invalide, mais une incohérence numérique qui ne peut être approuvée.
+    NUMERIC_ERROR = "SIM_NUMERIC_ERROR"
     TECHNICAL_ERROR = "SIM_TECHNICAL_ERROR"
 
     @property

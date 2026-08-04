@@ -45,9 +45,10 @@ from hydro_api.schemas import (
 from hydro_api.storage import ObjectStorage
 from hydro_domain import Provenance, canonical_input_from_dict
 from hydro_reporting import HydraulicReportData, build_hydraulic_calculation_pdf
-from hydro_shared.codes import ErrorCode
+from hydro_shared.codes import ErrorCode, SimulationStatus
 from hydro_shared.errors import InvalidInputError
 from hydro_shared.hashing import sha256_of, sha256_of_bytes
+from hydro_shared.json_safety import normalize_json_numbers
 from hydro_shared.observability import correlation_id_var
 from hydro_shared.versioning import INPUT_SCHEMA_VERSION
 from hydroliquid import get_engine
@@ -1066,6 +1067,27 @@ def execute_calculation(
         summarize_rule_evaluations,
     )
 
+    # Contrat numérique (ADR-TEST-DB-001) : aucune valeur non finie (NaN,
+    # Infinity) ne doit atteindre l'évaluation des règles, le rapport, l'audit
+    # ou PostgreSQL. On normalise le résultat ET les diagnostics en amont, en
+    # conservant chaque occurrence pour un diagnostic scientifique exploitable.
+    result_normalization = normalize_json_numbers(result_payload)
+    result_payload = result_normalization.value
+    if result_normalization.has_non_finite:
+        result_payload["data_quality"] = {
+            "non_finite_values": [
+                {"path": item.path, "kind": item.kind.value}
+                for item in result_normalization.occurrences
+            ]
+        }
+        # Un résultat déclaré convergent mais contenant une valeur non finie
+        # est une incohérence numérique : il ne peut être approuvable.
+        if result.status.value == "SIM_CONVERGED":
+            result.status = SimulationStatus.SIM_NUMERIC_ERROR
+            result_payload["status"] = "SIM_NUMERIC_ERROR"
+            result_payload["approvable"] = False
+            result_payload["decision_eligible"] = False
+
     evaluations = evaluate_calculation_rules(session, calculation, result_payload)
     result_payload["rule_evaluations"] = [
         {
@@ -1100,7 +1122,9 @@ def execute_calculation(
     calculation.engine_version = result.engine_version
     calculation.status = result.status.value
     calculation.result_payload = result_payload
-    calculation.diagnostics = result.diagnostics.as_dict()
+    diagnostics_payload = result.diagnostics.as_dict()
+    diagnostics_normalization = normalize_json_numbers(diagnostics_payload, path="$.diagnostics")
+    calculation.diagnostics = diagnostics_normalization.value
     calculation.finished_at = utc_now()
 
     organization_id = calculation.scenario.model_version.project.organization_id

@@ -1,7 +1,7 @@
 """Tests du socle HTTP de l'API.
 
-Les tests qui necessitent une base de donnees utilisent exclusivement
-PostgreSQL via les fixtures partagees du conftest (ADR-TEST-DB-001).
+Les tests qui nécessitent une base utilisent exclusivement PostgreSQL via les
+fixtures partagées (ADR-TEST-DB-001).
 """
 
 from __future__ import annotations
@@ -9,18 +9,17 @@ from __future__ import annotations
 import uuid
 
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 from hydro_api.application import create_application
 from hydro_api.config import Settings
-from hydro_api.models import AuditEvent
 from hydro_api.database.base import utc_now
+from hydro_api.models import AuditEvent
 from hydro_api.storage import object_storage_for
 from hydro_shared.observability import bound_context
 
 
 def test_sante_api() -> None:
-    """Le controle de sante expose un contrat stable et l'environnement actif."""
+    """Le contrôle de santé expose un contrat stable et l'environnement actif."""
 
     application = create_application(Settings(environment="test", background_jobs_enabled=False))
     with TestClient(application) as client:
@@ -45,7 +44,7 @@ def test_sante_api() -> None:
 
 
 def test_racine_api_expose_sonde_neutre() -> None:
-    """La racine evite une erreur 404 aux sondes generiques sans etre documentee."""
+    """La racine évite une erreur 404 aux sondes génériques sans être documentée."""
 
     application = create_application(Settings(environment="test", background_jobs_enabled=False))
     with TestClient(application) as client:
@@ -58,7 +57,7 @@ def test_racine_api_expose_sonde_neutre() -> None:
 
 
 def test_erreur_http_ne_peut_pas_etre_mise_en_cache() -> None:
-    """Les reponses d'erreur heritent des en-tetes de defense de l'API."""
+    """Les réponses d'erreur héritent des en-têtes de défense de l'API."""
 
     application = create_application(Settings(environment="test", background_jobs_enabled=False))
     with TestClient(application) as client:
@@ -69,10 +68,9 @@ def test_erreur_http_ne_peut_pas_etre_mise_en_cache() -> None:
     assert response.headers["x-content-type-options"] == "nosniff"
 
 
-def test_readiness_verifie_base_et_stockage(api_client, tmp_path) -> None:
-    """La readiness confirme les deux dependances requises par les routes metier."""
+def test_readiness_verifie_base_et_stockage(api_client) -> None:
+    """La readiness confirme les deux dépendances requises par les routes métier."""
 
-    # api_client fournit deja PostgreSQL via le conftest.
     response = api_client.get("/api/v1/health/ready")
 
     assert response.status_code == 200
@@ -84,7 +82,7 @@ def test_readiness_verifie_base_et_stockage(api_client, tmp_path) -> None:
 
 
 def test_stockage_local_recree_un_repertoire_supprime(tmp_path) -> None:
-    """Le controle local restaure le repertoire puis confirme son ecriture."""
+    """Le contrôle local restaure le répertoire puis confirme son écriture."""
 
     root = tmp_path / "objects-recreated"
     storage = object_storage_for(
@@ -104,7 +102,7 @@ def test_stockage_local_recree_un_repertoire_supprime(tmp_path) -> None:
 
 
 def test_schema_openapi_versionne() -> None:
-    """Le schema OpenAPI reste sous le prefixe contractuel /api/v1."""
+    """Le schéma OpenAPI reste sous le préfixe contractuel /api/v1."""
 
     application = create_application(Settings(environment="test", background_jobs_enabled=False))
     with TestClient(application) as client:
@@ -120,7 +118,7 @@ def test_schema_openapi_versionne() -> None:
 
 
 def test_correlation_alimente_automatiquement_le_journal_audit(pg_session) -> None:
-    """Le contexte HTTP est copie dans tout evenement cree pendant la requete."""
+    """Le contexte HTTP est copié dans tout événement créé pendant la requête."""
 
     event = AuditEvent(
         organization_id=None,

@@ -3,56 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Generator
 
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from tests.factories import entree_canonique, pipeline, station_serie
 
-from hydro_api.application import create_application
-from hydro_api.config import Settings
-from hydro_api.database.session import get_session
 from hydro_api.models import AuditEvent, CalculationRun, GeneratedReport, StoredFile
-
-
-@pytest.fixture
-def database_engine():
-    engine = create_engine(
-        "postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
-    )
-    try:
-        yield engine
-    finally:
-        Base.metadata.drop_all(engine)
-        engine.dispose()
-
-
-@pytest.fixture
-def client(database_engine, tmp_path) -> Generator[TestClient, None, None]:
-    application = create_application(
-        Settings(
-            environment="test",
-            database_url="postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
-            background_jobs_enabled=False,
-            object_storage_backend="filesystem",
-            object_storage_directory=tmp_path / "objects",
-        )
-    )
-
-    def session_override():
-        with Session(database_engine, expire_on_commit=False) as session:
-            try:
-                yield session
-                session.commit()
-            except Exception:
-                session.rollback()
-                raise
-
-    application.dependency_overrides[get_session] = session_override
-    with TestClient(application) as test_client:
-        yield test_client
 
 
 def create_organization(client: TestClient, slug: str = "operateur-nord") -> dict:

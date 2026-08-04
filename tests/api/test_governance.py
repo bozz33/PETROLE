@@ -2,14 +2,8 @@
 
 from __future__ import annotations
 
-
-import pytest
 from fastapi.testclient import TestClient
 from tests.factories import entree_canonique
-
-from hydro_api.application import create_application
-from hydro_api.config import Settings
-
 
 
 def create_organization(client: TestClient) -> dict:

@@ -4,25 +4,28 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from functools import lru_cache
-from typing import Annotated
+from typing import Any
 
-from fastapi import Depends
+from fastapi import Request
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
-from hydro_api.config import Settings, get_settings
+from hydro_api.config import Settings
 
 
 @lru_cache(maxsize=8)
 def database_engine(database_url: str) -> Engine:
     """Crée un moteur par URL et le réutilise dans le processus."""
 
-    connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    return create_engine(
-        database_url,
-        pool_pre_ping=True,
-        connect_args=connect_args,
-    )
+    engine_options: dict[str, Any] = {"pool_pre_ping": True}
+    if database_url.startswith("sqlite"):
+        engine_options["connect_args"] = {"check_same_thread": False}
+        if ":memory:" in database_url:
+            # TestClient traite les requêtes dans un autre thread. StaticPool
+            # garantit que toutes les sessions utilisent la même base mémoire.
+            engine_options["poolclass"] = StaticPool
+    return create_engine(database_url, **engine_options)
 
 
 @lru_cache(maxsize=8)
@@ -36,14 +39,10 @@ def session_factory(database_url: str) -> sessionmaker[Session]:
     )
 
 
-SettingsDependency = Annotated[Settings, Depends(get_settings)]
-
-
-def get_session(
-    settings: SettingsDependency,
-) -> Generator[Session, None, None]:
+def get_session(request: Request) -> Generator[Session, None, None]:
     """Fournit une transaction isolée à une requête HTTP."""
 
+    settings: Settings = request.app.state.settings
     factory = session_factory(settings.database_url)
     with factory() as session:
         try:

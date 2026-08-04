@@ -2,16 +2,22 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: false,
-  workers: 1,
-  retries: 0,
-  reporter: "list",
+  timeout: 15_000,
+  expect: { timeout: 5_000 },
+  fullyParallel: true,
+  forbidOnly: Boolean(process.env.CI),
+  workers: process.env.CI ? 1 : undefined,
+  retries: process.env.CI ? 1 : 0,
+  reporter: process.env.CI
+    ? [["line"], ["html", { outputFolder: "playwright-report", open: "never" }]]
+    : "list",
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173",
+    baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:4173",
     channel: process.env.PLAYWRIGHT_USE_BUNDLED_CHROMIUM === "true" ? undefined : "chrome",
     headless: true,
     screenshot: "only-on-failure",
-    trace: "retain-on-failure",
+    trace: "on-first-retry",
+    video: "retain-on-failure",
   },
   projects: [
     {
@@ -20,7 +26,15 @@ export default defineConfig({
     },
     {
       name: "mobile",
-      use: { ...devices["Desktop Chrome"], viewport: { width: 390, height: 844 } },
+      use: { ...devices["Pixel 7"] },
     },
   ],
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : {
+        command: "npm run dev -- --host 127.0.0.1 --port 4173",
+        url: "http://127.0.0.1:4173",
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      },
 });

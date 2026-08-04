@@ -1,0 +1,108 @@
+/* Compatibilité visuelle avec le composant d'authentification existant pendant sa migration. */
+@media (min-width: 901px) {
+  .access-page:has(> .access-card) {
+    position: relative;
+    grid-template-columns: minmax(360px, 0.9fr) minmax(430px, 1.1fr);
+    overflow: hidden;
+  }
+
+  .access-page:has(> .access-card)::before {
+    content: "";
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 100svh;
+    background:
+      radial-gradient(circle at 78% 20%, rgb(242 165 22 / 18%), transparent 18rem),
+      radial-gradient(circle at 18% 88%, rgb(28 113 128 / 34%), transparent 22rem),
+      linear-gradient(145deg, #061318, #0a3540 62%, #0f4c5c);
+  }
+
+  .access-page:has(> .access-card)::after {
+    content: "PETROLE\A\A Décider avec des calculs traçables.\A\A Pipelines liquides, stations de pompage, réservoirs, transferts et notes de calcul reproductibles.";
+    position: absolute;
+    top: 50%;
+    left: clamp(38px, 5vw, 76px);
+    width: min(520px, 38vw);
+    color: #e8f1f3;
+    font-size: clamp(1rem, 1.6vw, 1.35rem);
+    font-weight: 500;
+    line-height: 1.65;
+    white-space: pre-line;
+    transform: translateY(-50%);
+  }
+
+  .access-page:has(> .access-card)::first-line {
+    color: #ffffff;
+    font-size: clamp(2rem, 4vw, 4rem);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+  }
+
+  .access-page > .access-card {
+    grid-column: 2;
+    grid-row: 1;
+    place-self: center;
+    width: min(520px, calc(100% - 72px));
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+}
+
+.access-page > .access-card .access-brand {
+  display: flex;
+  margin-bottom: 34px;
+}
+
+.access-page > .access-card .access-brand .brand-symbol {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+  background: var(--petrole);
+  border: 0;
+}
+
+.access-page > .access-card .access-brand .brand-symbol::after {
+  content: "";
+  width: 22px;
+  height: 22px;
+  background-color: #ffffff;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5S5.5 10 5.5 15a6.5 6.5 0 0 0 13 0C18.5 10 12 2.5 12 2.5z' fill='black'/%3E%3C/svg%3E");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+}
+
+.access-page > .access-card .access-brand strong {
+  color: transparent;
+  font-size: 0;
+}
+
+.access-page > .access-card .access-brand strong::after {
+  content: "PETROLE";
+  color: var(--foreground);
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+}
+
+.access-page > .access-card .access-brand small {
+  color: transparent;
+  font-size: 0;
+}
+
+.access-page > .access-card .access-brand small::after {
+  content: "Hydraulique & stockage";
+  color: var(--foreground-muted);
+  font-size: 0.7rem;
+}
+
+@media (max-width: 900px) {
+  .access-page > .access-card {
+    width: min(520px, calc(100% - 36px));
+    padding: 44px 0 64px;
+  }
+}

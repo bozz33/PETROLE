@@ -1,0 +1,60 @@
+name: Régénérer le verrou frontend
+
+on:
+  push:
+    branches:
+      - feature/frontend-shadcn-admin
+    paths:
+      - apps/web/package.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: frontend-lock-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lockfile:
+    name: Mettre à jour package-lock.json
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Récupérer la branche
+        uses: actions/checkout@v4
+        with:
+          ref: feature/frontend-shadcn-admin
+          fetch-depth: 0
+
+      - name: Installer Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Régénérer le verrou npm
+        working-directory: apps/web
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Valider la cohérence du verrou
+        working-directory: apps/web
+        run: npm ci --ignore-scripts
+
+      - name: Committer le verrou généré
+        run: |
+          if git diff --quiet -- apps/web/package-lock.json; then
+            echo "Le verrou est déjà à jour."
+            exit 0
+          fi
+          cp apps/web/package-lock.json /tmp/package-lock.json
+          git fetch origin feature/frontend-shadcn-admin
+          git reset --hard origin/feature/frontend-shadcn-admin
+          cp /tmp/package-lock.json apps/web/package-lock.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/package-lock.json
+          git commit -m "chore(frontend): régénère le verrou Shadcn Admin"
+          git push origin HEAD:feature/frontend-shadcn-admin

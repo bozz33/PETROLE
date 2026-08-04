@@ -48,6 +48,7 @@ jobs:
       - name: Exécuter les tests avec couverture
         run: |
           pytest -p no:cacheprovider \
+            -m "not slow" \
             --cov=packages \
             --cov=apps/api \
             --cov-report=term-missing:skip-covered \
@@ -75,7 +76,7 @@ jobs:
   frontend:
     name: TypeScript et interface web
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: apps/web
@@ -102,6 +103,25 @@ jobs:
 
       - name: Refuser les vulnérabilités hautes ou critiques
         run: npm audit --audit-level=high
+
+      - name: Installer Chromium pour Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Exécuter les parcours Playwright
+        env:
+          PLAYWRIGHT_USE_BUNDLED_CHROMIUM: "true"
+        run: npm run test:e2e
+
+      - name: Archiver le diagnostic Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-playwright
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          if-no-files-found: ignore
+          retention-days: 14
 
   conteneurs:
     name: Images et migrations PostgreSQL

@@ -1,15 +1,11 @@
-/** Navigation interne limitée aux routes statiques de l'application. */
+/** Adaptateur de navigation conservant le contrat interne sur TanStack Router. */
 
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import {
-  createContext,
   type MouseEvent,
   type PropsWithChildren,
   type ReactNode,
   useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
 } from "react";
 
 interface NavigationContextValue {
@@ -17,7 +13,6 @@ interface NavigationContextValue {
   navigate: (target: string, replace?: boolean) => void;
 }
 
-const NavigationContext = createContext<NavigationContextValue | null>(null);
 const INTERNAL_PATH = /^\/[A-Za-z0-9/_-]*$/;
 
 export function validatedPath(target: string): string {
@@ -27,35 +22,27 @@ export function validatedPath(target: string): string {
   return target.length > 1 ? target.replace(/\/$/, "") : target;
 }
 
+/**
+ * Composant de compatibilité temporaire. Le fournisseur réel est désormais
+ * RouterProvider dans main.tsx.
+ */
 export function NavigationProvider({ children }: PropsWithChildren) {
-  const [path, setPath] = useState(() => validatedPath(window.location.pathname));
-
-  useEffect(() => {
-    const synchronize = () => setPath(validatedPath(window.location.pathname));
-    window.addEventListener("popstate", synchronize);
-    return () => window.removeEventListener("popstate", synchronize);
-  }, []);
-
-  const navigate = useCallback((target: string, replace = false) => {
-    const nextPath = validatedPath(target);
-    if (nextPath === window.location.pathname) {
-      return;
-    }
-    window.history[replace ? "replaceState" : "pushState"]({}, "", nextPath);
-    setPath(nextPath);
-    window.scrollTo({ top: 0, behavior: "instant" });
-  }, []);
-
-  const value = useMemo(() => ({ path, navigate }), [navigate, path]);
-  return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;
+  return <>{children}</>;
 }
 
 export function useNavigation(): NavigationContextValue {
-  const context = useContext(NavigationContext);
-  if (!context) {
-    throw new Error("Le contexte de navigation est absent.");
-  }
-  return context;
+  const path = useRouterState({ select: (state) => state.location.pathname });
+  const tanstackNavigate = useNavigate();
+
+  const navigate = useCallback(
+    (target: string, replace = false) => {
+      const nextPath = validatedPath(target);
+      void tanstackNavigate({ to: nextPath as never, replace });
+    },
+    [tanstackNavigate],
+  );
+
+  return { path: validatedPath(path), navigate };
 }
 
 export function InternalLink({

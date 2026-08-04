@@ -1,11 +1,17 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { RouterProvider } from "@tanstack/react-router";
 
-import { App } from "./App";
-import { AuthProvider } from "./auth";
-import { NavigationProvider } from "./routing";
+import { router } from "./router";
+import { ThemeProvider } from "./theme";
+import "./shadcn-tokens.css";
 import "./styles.css";
+import "./petrole-theme.css";
+import "./shadcn-shell.css";
+import "./auth-theme.css";
+import "./auth-fallback.css";
+import "./responsive-shell.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,11 +31,9 @@ if (!container) {
 createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <NavigationProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </NavigationProvider>
+      <ThemeProvider>
+        <RouterProvider router={router} />
+      </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

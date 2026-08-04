@@ -2,15 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
-
-import pytest
 from fastapi.testclient import TestClient
 from tests.factories import brut_leger, entree_canonique, modele_pompe
-
-from hydro_api.application import create_application
-from hydro_api.config import Settings
-from hydro_api.database.session import get_session
 
 
 def create_model(client: TestClient) -> tuple[dict, dict]:
@@ -250,14 +243,7 @@ def test_clone_reseau_remappe_les_references_sans_modifier_la_source(api_client)
     _, model = create_model(client)
     source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
     terminal = create_node(client, model["id"], code="DST", kind="terminal", elevation_m=90.0)
-    create_edge(
-        client,
-        model["id"],
-        code="T-01",
-        sequence=1,
-        start=source,
-        end=terminal,
-    )
+    create_edge(client, model["id"], code="T-01", sequence=1, start=source, end=terminal)
     source_scenario = client.post(
         f"/api/v1/models/{model['id']}/scenarios",
         json={"name": "Nominal", "payload": {"imposed_flow_m3_s": 0.2}},
@@ -297,14 +283,7 @@ def test_calcul_assemble_automatiquement_le_reseau_normalise(api_client) -> None
     _, model = create_model(client)
     source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
     terminal = create_node(client, model["id"], code="DST", kind="terminal", elevation_m=90.0)
-    create_edge(
-        client,
-        model["id"],
-        code="T-01",
-        sequence=1,
-        start=source,
-        end=terminal,
-    )
+    create_edge(client, model["id"], code="T-01", sequence=1, start=source, end=terminal)
     preview = client.get(f"/api/v1/models/{model['id']}/canonical-sections")
     assert preview.status_code == 200, preview.text
     assert preview.json()["network"]["segments"][0]["id"] == "T-01"
@@ -429,14 +408,7 @@ def test_suppressions_reseau_refusent_les_cascades_implicites(api_client) -> Non
     organization, model = create_model(client)
     source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
     terminal = create_node(client, model["id"], code="DST", kind="terminal", elevation_m=90.0)
-    edge = create_edge(
-        client,
-        model["id"],
-        code="T-01",
-        sequence=1,
-        start=source,
-        end=terminal,
-    )
+    edge = create_edge(client, model["id"], code="T-01", sequence=1, start=source, end=terminal)
     valve = client.post(
         "/api/v1/catalog/valves",
         json={

@@ -58,6 +58,14 @@ RUN pip install /tmp/wheels/* \
     && /usr/local/bin/python -m pip uninstall --yes setuptools \
     && rm -rf /tmp/wheels
 
+# Les migrations Alembic sont appliquées dans ce conteneur par les scripts VPS
+# (``alembic upgrade head`` depuis le WORKDIR). Le paquet installé expose le code
+# de l'API, mais ni ``alembic.ini`` ni ``database/migrations`` ne sont inclus
+# dans le wheel : ils doivent donc être copiés explicitement dans l'image finale.
+# Le WORKDIR /workspace correspond à la racine attendue par script_location.
+COPY alembic.ini ./
+COPY database ./database
+
 USER hydro
 
 EXPOSE 8000

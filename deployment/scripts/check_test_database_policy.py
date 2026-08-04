@@ -27,6 +27,15 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 TESTS_ROOT = REPO_ROOT / "tests"
 CONFIG_FILES = (REPO_ROOT / "pyproject.toml",)
 
+# Les programmes autonomes de tests/qualification/ sont des exécutables de
+# recette (charge, import massif, concurrence worker) pilotés directement par
+# qualify.sh et les scripts de recette. Ils ne font pas partie de la collection
+# pytest, reçoivent HYDRO_DATABASE_URL d'une base jetable contrôlée externe et
+# n'ouvrent aucune base embarquée. À ce titre ils relèvent de l'exception
+# prévue par l'ADR-TEST-DB-001 (tests spécialisés d'infrastructure), et non des
+# tests métier soumis au présent contrôle.
+QUALIFICATION_ROOT = TESTS_ROOT / "qualification"
+
 FORBIDDEN_IMPORTS = {
     "sqlite3": "L'import d'un moteur embarqué est interdit.",
     "sqlalchemy.create_engine": "Les moteurs sont fournis par les fixtures partagées.",
@@ -70,9 +79,7 @@ def _import_aliases(tree: ast.AST) -> dict[str, str]:
                 if imported.name == "*":
                     continue
                 local_name = imported.asname or imported.name
-                aliases[local_name] = (
-                    f"{module}.{imported.name}" if module else imported.name
-                )
+                aliases[local_name] = f"{module}.{imported.name}" if module else imported.name
     return aliases
 
 
@@ -133,16 +140,17 @@ def _check_python(path: Path) -> list[Violation]:
             )
         if call_name == "text" or call_name.endswith(".text"):
             violations.append(
-                Violation(path, node.lineno, "Le SQL textuel est interdit dans les fichiers de test.")
+                Violation(
+                    path, node.lineno, "Le SQL textuel est interdit dans les fichiers de test."
+                )
             )
 
         if not isinstance(node.func, ast.Attribute):
             continue
 
         owner_name = _qualified_name(node.func.value, aliases) or ""
-        if (
-            node.func.attr in FORBIDDEN_METADATA_METHODS
-            and (owner_name == "metadata" or owner_name.endswith(".metadata"))
+        if node.func.attr in FORBIDDEN_METADATA_METHODS and (
+            owner_name == "metadata" or owner_name.endswith(".metadata")
         ):
             violations.append(
                 Violation(
@@ -198,6 +206,8 @@ def _check_configuration(path: Path) -> list[Violation]:
 def main() -> int:
     violations: list[Violation] = []
     for path in sorted(TESTS_ROOT.rglob("*.py")):
+        if QUALIFICATION_ROOT in path.parents:
+            continue
         violations.extend(_check_python(path))
     for path in CONFIG_FILES:
         violations.extend(_check_configuration(path))

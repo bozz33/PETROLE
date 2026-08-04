@@ -1,110 +1,178 @@
 #!/usr/bin/env python3
-"""Controle automatique de la politique de base de donnees (ADR-TEST-DB-001).
+"""Vérifie la politique PostgreSQL des tests (ADR-TEST-DB-001).
 
-Analyse tous les fichiers Python du depot et echoue si l'un des motifs
-interdits est present :
+Le contrôle repose sur l'AST Python afin d'éviter les faux positifs des simples
+recherches de texte. Les fichiers de test ne peuvent pas :
 
-* ``sqlite``, ``pysqlite``, ``sqlite3`` — moteur SQLite
-* ``:memory:`` — base en memoire SQLite
-* ``StaticPool``, ``check_same_thread`` — configuration specifique a SQLite
-* ``Base.metadata.create_all`` — contourne Alembic
-* ``sqlalchemy.text(``, ``session.execute("`` — SQL brut dans les tests
+* importer ou configurer une base embarquée ;
+* créer leur propre moteur SQLAlchemy ;
+* créer ou supprimer le schéma avec ``metadata.create_all/drop_all`` ;
+* exécuter du SQL textuel ;
+* embarquer une URL de développement, recette ou production.
 
-Ce script doit etre execute avant pytest dans la qualification.
+Les opérations PostgreSQL indispensables à l'infrastructure sont centralisées
+hors de ``tests/`` dans ``hydro_shared.testing.postgres`` et sont protégées par
+une vérification stricte du suffixe ``_test``.
 """
 
 from __future__ import annotations
 
+import ast
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+TESTS_ROOT = REPO_ROOT / "tests"
+CONFIG_FILES = (REPO_ROOT / "pyproject.toml",)
 
-# Motifs interdits et leur justification.
-FORBIDDEN_PATTERNS: list[tuple[str, str]] = [
-    ("sqlite", "SQLite interdit par ADR-TEST-DB-001"),
-    ("pysqlite", "SQLite interdit par ADR-TEST-DB-001"),
-    ("sqlite3", "SQLite interdit par ADR-TEST-DB-001"),
-    (":memory:", "Base SQLite en memoire interdite"),
-    ("StaticPool", "Configuration SQLite interdite"),
-    ("check_same_thread", "Configuration SQLite interdite"),
-    ("Base.metadata.create_all", "Contourne Alembic, interdit"),
-    ("sqlalchemy.text(", "SQL brut interdit dans les tests"),
-    ('session.execute("', "SQL brut interdit dans les tests"),
-    ('connection.execute("', "SQL brut interdit dans les tests"),
-]
-
-# Chemins a exclure de l'analyse.
-EXCLUDED_DIRS: set[str] = {
-    "__pycache__",
-    ".venv",
-    ".git",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".ruff_cache",
-    "node_modules",
-    "dist",
+FORBIDDEN_MODULES = {
+    "sqlite3",
+    "sqlalchemy.pool.StaticPool",
 }
-
-# Fichiers autorises a mentionner sqlite dans leurs commentaires/documentation.
-ALLOWED_COMMENT_FILES: set[str] = {
-    "packages/shared/hydro_shared/json_safety.py",
-    "deployment/scripts/check_test_database_policy.py",
-    "apps/api/hydro_api/models/core.py",  # parametre sqlite_where, pas SQLite
+FORBIDDEN_CALLS = {
+    "create_engine": "Les moteurs sont fournis par les fixtures partagées.",
+    "sqlalchemy.create_engine": "Les moteurs sont fournis par les fixtures partagées.",
+    "sqlalchemy.engine.create_engine": "Les moteurs sont fournis par les fixtures partagées.",
+    "text": "Le SQL textuel est interdit dans les fichiers de test.",
+    "sqlalchemy.text": "Le SQL textuel est interdit dans les fichiers de test.",
+}
+FORBIDDEN_METADATA_METHODS = {"create_all", "drop_all"}
+FORBIDDEN_TEXT_FRAGMENTS = {
+    "sqlite": "Moteur embarqué interdit.",
+    "pysqlite": "Pilote embarqué interdit.",
+    ":memory:": "Base en mémoire interdite.",
+    "check_same_thread": "Option spécifique à une base embarquée interdite.",
+    "hydro_dev": "Identifiants de la base de développement interdits dans les tests.",
+    "@postgres:5432/hydro": "Base de développement interdite dans les tests.",
 }
 
 
-def _check_file(filepath: Path) -> list[str]:
-    """Verifie un fichier et retourne les violations trouvees."""
+@dataclass(frozen=True, slots=True)
+class Violation:
+    path: Path
+    line: int
+    message: str
 
-    violations: list[str] = []
+    def render(self) -> str:
+        return f"{self.path.relative_to(REPO_ROOT)}:{self.line}: {self.message}"
+
+
+def _qualified_name(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = _qualified_name(node.value)
+        return f"{parent}.{node.attr}" if parent else node.attr
+    return None
+
+
+def _string_values(tree: ast.AST):
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            yield node
+
+
+def _check_python(path: Path) -> list[Violation]:
     try:
-        content = filepath.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return violations
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+    except (OSError, UnicodeDecodeError, SyntaxError) as error:
+        return [Violation(path, 1, f"Fichier impossible à analyser : {error}")]
 
-    rel = str(filepath.relative_to(REPO_ROOT))
+    violations: list[Violation] = []
 
-    for pattern, reason in FORBIDDEN_PATTERNS:
-        if pattern not in content:
-            continue
-        # Autoriser les mentions dans les commentaires/documentation
-        if rel in ALLOWED_COMMENT_FILES:
-            continue
-        for lineno, line in enumerate(content.splitlines(), start=1):
-            if pattern in line:
-                violations.append(f"{rel}:{lineno}: {pattern} — {reason}")
-                break  # Une violation par pattern suffit
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "sqlite3":
+                    violations.append(
+                        Violation(path, node.lineno, "L'import sqlite3 est interdit.")
+                    )
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            for alias in node.names:
+                qualified = f"{module}.{alias.name}" if module else alias.name
+                if qualified in FORBIDDEN_MODULES or alias.name == "StaticPool":
+                    violations.append(
+                        Violation(path, node.lineno, f"Import interdit : {qualified}.")
+                    )
+        elif isinstance(node, ast.Call):
+            call_name = _qualified_name(node.func) or ""
+            if call_name in FORBIDDEN_CALLS:
+                violations.append(
+                    Violation(path, node.lineno, FORBIDDEN_CALLS[call_name])
+                )
+            if isinstance(node.func, ast.Attribute):
+                if (
+                    node.func.attr in FORBIDDEN_METADATA_METHODS
+                    and _qualified_name(node.func.value) in {"Base.metadata", "metadata"}
+                ):
+                    violations.append(
+                        Violation(
+                            path,
+                            node.lineno,
+                            "Le schéma de test doit être créé exclusivement par Alembic.",
+                        )
+                    )
+                if node.func.attr == "execute" and node.args:
+                    argument = node.args[0]
+                    if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+                        violations.append(
+                            Violation(
+                                path,
+                                node.lineno,
+                                "Une chaîne SQL brute est interdite dans les tests.",
+                            )
+                        )
+                    if isinstance(argument, ast.Call) and _qualified_name(argument.func) in {
+                        "text",
+                        "sqlalchemy.text",
+                    }:
+                        violations.append(
+                            Violation(
+                                path,
+                                node.lineno,
+                                "SQLAlchemy text() est interdit dans les tests.",
+                            )
+                        )
+
+    for node in _string_values(tree):
+        lowered = node.value.lower()
+        for fragment, reason in FORBIDDEN_TEXT_FRAGMENTS.items():
+            if fragment.lower() in lowered:
+                violations.append(Violation(path, node.lineno, reason))
 
     return violations
 
 
+def _check_configuration(path: Path) -> list[Violation]:
+    if not path.exists():
+        return []
+    violations: list[Violation] = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        lowered = line.lower()
+        if "sqlite" in lowered or "pysqlite" in lowered:
+            violations.append(
+                Violation(path, line_number, "Dépendance ou configuration SQLite interdite.")
+            )
+    return violations
+
+
 def main() -> int:
-    violations: list[str] = []
-
-    for py_file in REPO_ROOT.rglob("*.py"):
-        parts = set(py_file.parts)
-        if parts & EXCLUDED_DIRS:
-            continue
-        if "test" not in str(py_file) and "test" not in py_file.parts:
-            # On ne verifie que les fichiers de test et le code applicatif
-            pass
-        file_violations = _check_file(py_file)
-        violations.extend(file_violations)
-
-    # Ajouter aussi la verification des fichiers non-Python (config, etc.)
-    for extra in ["pyproject.toml", "alembic.ini"]:
-        extra_path = REPO_ROOT / extra
-        if extra_path.exists():
-            violations.extend(_check_file(extra_path))
+    violations: list[Violation] = []
+    for path in sorted(TESTS_ROOT.rglob("*.py")):
+        violations.extend(_check_python(path))
+    for path in CONFIG_FILES:
+        violations.extend(_check_configuration(path))
 
     if violations:
-        print(f"POLITIQUE VIOLÉE — {len(violations)} occurrence(s) interdite(s) :")
-        for v in sorted(violations):
-            print(f"  {v}")
+        print(f"POLITIQUE POSTGRESQL VIOLÉE — {len(violations)} anomalie(s) :")
+        for violation in sorted(violations, key=lambda item: (str(item.path), item.line)):
+            print(f"  {violation.render()}")
         return 1
 
-    print("Politique « zéro SQLite » respectée.")
+    print("Politique PostgreSQL des tests respectée : aucun moteur embarqué ni SQL brut.")
     return 0
 
 

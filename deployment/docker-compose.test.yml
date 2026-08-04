@@ -1,11 +1,9 @@
-# Compose de test PostgreSQL/PostGIS jetable (ADR-TEST-DB-001).
+# Infrastructure jetable de qualification PostgreSQL/PostGIS (ADR-TEST-DB-001).
 #
-# PostgreSQL valide le JSON strict (RFC 8259), interdit NaN/Infinity et garantit
-# que les tests s'exécutent sur le même moteur que la production. La base est
-# stockée en tmpfs (mémoire volatile) pour des performances reproductibles sans
-# persistance entre les campagnes.
-#
-# Usage : docker compose -f docker-compose.test.yml run --rm tests
+# La base est distincte de tout environnement applicatif, stockée en tmpfs et
+# migrée exclusivement par Alembic avant le lancement des tests.
+name: petrole-tests
+
 services:
   postgres-test:
     image: postgis/postgis:16-3.5
@@ -32,9 +30,10 @@ services:
       context: ..
       dockerfile: deployment/Dockerfile.api
       target: development
-    command: ["alembic", "upgrade", "head"]
+    command: ["alembic", "-c", "/workspace/alembic.ini", "upgrade", "head"]
     environment:
       HYDRO_DATABASE_URL: "postgresql+psycopg://petrole_test:test-only-password@postgres-test/petrole_test"
+      HYDRO_ENVIRONMENT: test
     volumes:
       - type: bind
         source: ..
@@ -45,7 +44,6 @@ services:
     networks:
       - test
 
-  # Exécute les tests après la migration.
   tests:
     profiles: [tests]
     build:
@@ -60,6 +58,7 @@ services:
         "-q"
       ]
     environment:
+      HYDRO_TEST_DATABASE_URL: "postgresql+psycopg://petrole_test:test-only-password@postgres-test/petrole_test"
       HYDRO_DATABASE_URL: "postgresql+psycopg://petrole_test:test-only-password@postgres-test/petrole_test"
       HYDRO_ENVIRONMENT: test
       HOME: /tmp

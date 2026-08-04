@@ -56,6 +56,9 @@ def test_postgresql_persiste_une_valeur_non_finie_comme_null_apres_normalisation
         session.add(event)
         session.flush()
         event_id = event.id
+        # Valide le SAVEPOINT de cette session. La transaction externe du test
+        # reste ouverte et sera annulée par la fixture après le scénario.
+        session.commit()
 
     with pg_session_factory() as session:
         persisted = session.get(AuditEvent, event_id)

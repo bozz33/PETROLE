@@ -1,5 +1,6 @@
 # ADR-012 — PostgreSQL/PostGIS comme unique base des tests de persistance
 
+- **Identifiant stable :** `ADR-TEST-DB-001`
 - **Statut :** accepté
 - **Date :** 2026-08-04
 - **Décision :** infrastructure de test et parité avec la production
@@ -26,7 +27,7 @@ PETROLE dépend de comportements propres à PostgreSQL/PostGIS : JSON/JSONB stri
 1. démarrage de PostgreSQL/PostGIS ;
 2. attente du healthcheck ;
 3. application des migrations Alembic ;
-4. vérification de la révision courante ;
+4. vérification de la révision courante et de l'absence de dérive ;
 5. exécution des tests ;
 6. destruction des conteneurs et volumes jetables.
 
@@ -44,6 +45,7 @@ PETROLE dépend de comportements propres à PostgreSQL/PostGIS : JSON/JSONB stri
 - `tests/conftest.py`
 - `packages/shared/hydro_shared/testing/postgres.py`
 - `deployment/scripts/check_test_database_policy.py`
+- `deployment/scripts/vps/qualify.sh`
 
 ## Références officielles
 

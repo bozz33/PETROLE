@@ -1,128 +1,266 @@
-"""Configuration commune de la suite de tests (ADR-TEST-DB-001).
+"""Configuration commune de la suite de tests PostgreSQL/PostGIS.
 
-Le repertoire ``tests`` est ajoute au chemin d'import pour que le module de fabriques
-:mod:`tests.factories` soit accessible depuis n'importe quel fichier de test.
+Politique ADR-TEST-DB-001 :
 
-Les tests d'integration utilisent **exclusivement PostgreSQL/PostGIS** via le compose
-:file:`deployment/docker-compose.test.yml`. SQLite est interdit dans tous les tests
-necessitant une base de donnees (cf. check_test_database_policy.py).
+* aucune base embarquée ou en mémoire ;
+* une URL dédiée fournie par ``HYDRO_TEST_DATABASE_URL`` ;
+* schéma créé exclusivement par Alembic ;
+* isolation des tests API par transaction externe SQLAlchemy et SAVEPOINT ;
+* base réellement commitée uniquement pour les scénarios multi-connexion
+  (worker), avec remise à zéro centralisée hors des fichiers de test.
 """
 
 from __future__ import annotations
 
+import os
 import sys
-from collections.abc import Generator
-from functools import lru_cache
+from collections.abc import Callable, Generator, Iterator
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import pytest
+from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine
+from sqlalchemy.engine import Connection, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from hydro_api.application import create_application
 from hydro_api.config import Settings
-from hydro_api.database.session import get_session
+from hydro_api.database.session import database_engine as application_database_engine
+from hydro_api.database.session import get_session, session_factory
+from hydro_shared.testing.postgres import reset_public_tables
 
-TESTS_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
+TESTS_ROOT = REPO_ROOT / "tests"
+TEST_DATABASE_ENV = "HYDRO_TEST_DATABASE_URL"
+
 if str(TESTS_ROOT) not in sys.path:
     sys.path.insert(0, str(TESTS_ROOT))
 
-#: URL de la base de test PostgreSQL/PostGIS (injectee par le compose de test).
-#: La valeur par defaut pointe vers le service ``postgres-test`` du compose.
-DEFAULT_TEST_DATABASE_URL = (
-    "postgresql+psycopg://petrole_test:test-only-password@localhost:5432/petrole_test"
-)
 
+def _validated_test_database_url() -> str:
+    """Retourne une URL PostgreSQL explicitement dédiée aux tests.
 
-def _test_database_url() -> str:
-    """Lit la variable d'environnement HYDRO_DATABASE_URL definie par le compose."""
-
-    import os
-
-    return os.environ.get("HYDRO_DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
-
-
-@lru_cache(maxsize=1)
-def _postgres_engine() -> Engine:
-    """Moteur PostgreSQL partage par tous les tests de la session.
-
-    Le cache LRU garantit un seul moteur par session pytest, ce qui est
-    suffisant tant que les tests ne s'executent pas en parallele sur le meme
-    processus. Pour ``pytest-xdist``, chaque worker aura sa propre instance.
+    Aucun repli vers la base de développement n'est autorisé. Cette garde rend
+    impossible une exécution accidentelle de pytest contre la recette ou la
+    production.
     """
 
-    return create_engine(_test_database_url(), pool_pre_ping=True)
+    raw_url = os.environ.get(TEST_DATABASE_ENV)
+    if not raw_url:
+        raise RuntimeError(
+            f"{TEST_DATABASE_ENV} est obligatoire. Lancez la suite avec "
+            "deployment/docker-compose.test.yml."
+        )
+
+    url = make_url(raw_url)
+    if not url.drivername.startswith("postgresql"):
+        raise RuntimeError("Les tests de persistance exigent PostgreSQL/PostGIS.")
+    if not (url.database or "").endswith("_test"):
+        raise RuntimeError(
+            "La base de test doit avoir un nom se terminant par '_test' ; "
+            f"valeur reçue : {url.database!r}."
+        )
+    return raw_url
 
 
-def _truncate_all_tables(session: Session) -> None:
-    """Nettoie les tables entre les tests sans detruire le schema.
+def _assert_database_at_alembic_head(engine: Engine, database_url: str) -> None:
+    """Vérifie que la base a été préparée par Alembic jusqu'à la tête courante."""
 
-    TRUNCATE ... CASCADE est plus rapide que DROP/CREATE et preserve les
-    sequences et index crees par Alembic.
-    """
+    config = Config(str(REPO_ROOT / "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
+    scripts = ScriptDirectory.from_config(config)
+    expected_heads = set(scripts.get_heads())
+    with engine.connect() as connection:
+        current_heads = set(MigrationContext.configure(connection).get_current_heads())
 
-    session.execute(text("SET session_replication_role = 'replica'"))
-    try:
-        for row in session.execute(
-            text(
-                "SELECT tablename FROM pg_tables "
-                "WHERE schemaname = 'public' AND tableowner = current_user"
-            )
-        ):
-            session.execute(text(f'TRUNCATE TABLE "{row[0]}" CASCADE'))
-    finally:
-        session.execute(text("SET session_replication_role = 'origin'"))
-    session.commit()
+    if current_heads != expected_heads:
+        raise RuntimeError(
+            "Schéma PostgreSQL de test non migré. "
+            f"Révisions présentes={sorted(current_heads)}, "
+            f"attendues={sorted(expected_heads)}. Exécutez migrate-test."
+        )
+
+
+@pytest.fixture(scope="session")
+def test_database_url() -> str:
+    return _validated_test_database_url()
+
+
+@pytest.fixture(scope="session")
+def pg_engine(test_database_url: str) -> Generator[Engine, None, None]:
+    """Moteur PostgreSQL partagé par la session pytest."""
+
+    engine = application_database_engine(test_database_url)
+    _assert_database_at_alembic_head(engine, test_database_url)
+    yield engine
+    engine.dispose()
+    application_database_engine.cache_clear()
+    session_factory.cache_clear()
 
 
 @pytest.fixture
-def pg_session() -> Generator[Session, None, None]:
-    """Session PostgreSQL nettoyee avant chaque test.
+def pg_connection(pg_engine: Engine) -> Generator[Connection, None, None]:
+    """Connexion isolée par une transaction externe annulée après le test."""
 
-    Toutes les tables sont tronquees au debut du test (pas a la fin, afin
-    qu'un echec laisse l'etat visible pour le diagnostic). La session est
-    fermee apres le test.
+    connection = pg_engine.connect()
+    transaction = connection.begin()
+    try:
+        yield connection
+    finally:
+        if transaction.is_active:
+            transaction.rollback()
+        connection.close()
+
+
+@pytest.fixture
+def pg_session_factory(pg_connection: Connection) -> sessionmaker[Session]:
+    """Fabrique de sessions utilisant un SAVEPOINT par cycle applicatif.
+
+    ``join_transaction_mode='create_savepoint'`` est le mécanisme SQLAlchemy 2
+    prévu pour tester du code qui appelle ``commit()`` tout en conservant une
+    transaction externe annulable à la fin du test.
     """
 
-    engine = _postgres_engine()
-    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
-    with factory() as session:
-        _truncate_all_tables(session)
+    return sessionmaker(
+        bind=pg_connection,
+        autoflush=False,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+
+
+@pytest.fixture
+def pg_session(pg_session_factory: sessionmaker[Session]) -> Generator[Session, None, None]:
+    with pg_session_factory() as session:
         yield session
         session.rollback()
 
 
 @pytest.fixture
-def api_client(pg_session: Session) -> Generator[TestClient, None, None]:
-    """Client de test FastAPI branche sur PostgreSQL via l'override de session.
+def api_client_factory(
+    pg_session_factory: sessionmaker[Session],
+    test_database_url: str,
+    tmp_path: Path,
+) -> Callable[..., Iterator[TestClient]]:
+    """Construit une application dont chaque requête ouvre sa propre session."""
 
-    Usage dans les tests :
+    @contextmanager
+    def factory(**settings_overrides: Any) -> Iterator[TestClient]:
+        settings_values: dict[str, Any] = {
+            "environment": "test",
+            "database_url": test_database_url,
+            "background_jobs_enabled": False,
+            "object_storage_backend": "filesystem",
+            "object_storage_directory": tmp_path / "objects",
+        }
+        settings_values.update(settings_overrides)
+        application = create_application(Settings(**settings_values))
 
-        def test_exemple(api_client):
-            response = api_client.post("/api/v1/organizations", json={...})
-            assert response.status_code == 201
-    """
+        def session_override() -> Generator[Session, None, None]:
+            with pg_session_factory() as session:
+                try:
+                    yield session
+                    session.commit()
+                except Exception:
+                    session.rollback()
+                    raise
 
-    application = create_application(
-        Settings(
-            environment="test",
-            database_url=_test_database_url(),
-            background_jobs_enabled=False,
-        )
-    )
+        application.dependency_overrides[get_session] = session_override
+        try:
+            with TestClient(application) as client:
+                yield client
+        finally:
+            application.dependency_overrides.clear()
 
-    def session_override():
-        """Branche la session PostgreSQL de test a la place du moteur par defaut."""
+    return factory
 
-        yield pg_session
 
-    application.dependency_overrides[get_session] = session_override
-    with TestClient(application) as client:
+@pytest.fixture
+def api_client(api_client_factory) -> Generator[TestClient, None, None]:
+    with api_client_factory() as client:
         yield client
 
-    # Nettoyer les overrides pour eviter les fuites entre tests.
-    application.dependency_overrides.clear()
+
+# Alias historique conservé pour les tests de ressources, sans moteur local.
+@pytest.fixture
+def client(api_client: TestClient) -> TestClient:
+    return api_client
 
 
-__all__ = ["api_client", "pg_session"]
+# Le nom historique représente désormais une connexion transactionnelle, pas
+# un moteur autonome susceptible de supprimer le schéma partagé.
+@pytest.fixture
+def database_engine(pg_connection: Connection) -> Connection:
+    return pg_connection
+
+
+@pytest.fixture
+def committed_database(pg_engine: Engine) -> Generator[None, None, None]:
+    """Base nettoyée pour les scénarios nécessitant plusieurs connexions réelles."""
+
+    reset_public_tables(pg_engine)
+    try:
+        yield
+    finally:
+        reset_public_tables(pg_engine)
+
+
+@pytest.fixture
+def committed_session_factory(
+    committed_database: None,
+    pg_engine: Engine,
+) -> sessionmaker[Session]:
+    del committed_database
+    return sessionmaker(
+        bind=pg_engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+
+
+@pytest.fixture
+def committed_api_client_factory(
+    committed_database: None,
+    test_database_url: str,
+    tmp_path: Path,
+) -> Callable[..., Iterator[TestClient]]:
+    """Client utilisant le cycle de sessions réel pour les tests du worker."""
+
+    del committed_database
+
+    @contextmanager
+    def factory(**settings_overrides: Any) -> Iterator[TestClient]:
+        settings_values: dict[str, Any] = {
+            "environment": "test",
+            "database_url": test_database_url,
+            "background_jobs_enabled": True,
+            "object_storage_backend": "filesystem",
+            "object_storage_directory": tmp_path / "objects-committed",
+        }
+        settings_values.update(settings_overrides)
+        application = create_application(Settings(**settings_values))
+        with TestClient(application) as client:
+            yield client
+
+    return factory
+
+
+__all__ = [
+    "api_client",
+    "api_client_factory",
+    "client",
+    "committed_api_client_factory",
+    "committed_database",
+    "committed_session_factory",
+    "database_engine",
+    "pg_connection",
+    "pg_engine",
+    "pg_session",
+    "pg_session_factory",
+    "test_database_url",
+]

@@ -1,6 +1,7 @@
 """Modèles SQLAlchemy exposés à Alembic et aux services."""
 
 from hydro_api.models.catalog import CatalogItem
+from hydro_api.models.constraints import align_calculation_status_constraint
 from hydro_api.models.core import (
     AuditEvent,
     BackgroundJob,
@@ -31,6 +32,10 @@ from hydro_api.models.governance import (
     StandardReference,
 )
 from hydro_api.models.network import AssetInstance, NetworkEdge, NetworkNode
+
+# La contrainte de statut est dérivée de l'énumération publique afin d'éviter
+# toute divergence entre le contrat API, les métadonnées et les migrations.
+align_calculation_status_constraint(CalculationRun.__table__)
 
 __all__ = [
     "AssetInstance",

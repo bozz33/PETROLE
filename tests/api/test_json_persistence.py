@@ -27,11 +27,20 @@ def _audit_event(details: dict) -> AuditEvent:
 def test_postgresql_refuse_un_nan_non_normalise(
     pg_session_factory: sessionmaker[Session],
 ) -> None:
-    """Le sérialiseur SQLAlchemy bloque toute fuite non conforme à la RFC 8259."""
+    """Le sérialiseur SQLAlchemy bloque toute fuite non conforme à la RFC 8259.
+
+    Avec psycopg3, le type JSONB traverse l'adaptateur ``Jsonb`` du pilote,
+    qui appelle lui-même ``json.dumps`` (et lève ``ValueError`` pour un NaN).
+    Suivant la version de SQLAlchemy et la configuration du dialecte, cette
+    erreur peut remonter soit comme ``StatementError`` (SQLAlchemy encapsule),
+    soit comme ``ValueError`` (psycopg3 la laisse passer hors d'un contexte
+    DBAPI strict). Les deux prouvent que le NaN est refusé avant PostgreSQL,
+    ce qui est le contrat vérifié ici.
+    """
 
     with pg_session_factory() as session:
         session.add(_audit_event({"residual": float("nan")}))
-        with pytest.raises(StatementError):
+        with pytest.raises((StatementError, ValueError)):
             session.flush()
         session.rollback()
 

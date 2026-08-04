@@ -6,48 +6,22 @@ from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, func, select
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, sessionmaker
 from tests.factories import brut_leger, modele_pompe
 
-from hydro_api.application import create_application
-from hydro_api.config import Settings
-from hydro_api.database.session import get_session
 from hydro_api.models import AuditEvent, CatalogItem
 
 
 @pytest.fixture
-def catalog_api() -> Generator[tuple[TestClient, Engine], None, None]:
-    """Fournit une API ouverte et une base SQLite transactionnelle."""
+def catalog_api(
+    api_client_factory,
+    pg_session_factory: sessionmaker[Session],
+) -> Generator[tuple[TestClient, sessionmaker[Session]], None, None]:
+    """API catalogue isolée par la transaction PostgreSQL du test."""
 
-    engine = create_engine(
-        "postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
-    )
-    application = create_application(
-        Settings(
-            environment="test",
-            database_url="postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
-            background_jobs_enabled=False,
-        )
-    )
-
-    def session_override():
-        with Session(engine, expire_on_commit=False) as session:
-            try:
-                yield session
-                session.commit()
-            except Exception:
-                session.rollback()
-                raise
-
-    application.dependency_overrides[get_session] = session_override
-    try:
-        with TestClient(application) as client:
-            yield client, engine
-    finally:
-        Base.metadata.drop_all(engine)
-        engine.dispose()
+    with api_client_factory() as client:
+        yield client, pg_session_factory
 
 
 def create_organization(client: TestClient) -> dict:
@@ -62,7 +36,7 @@ def create_organization(client: TestClient) -> dict:
 
 
 def test_catalogue_produits_et_pompes_versionne(catalog_api) -> None:
-    client, engine = catalog_api
+    client, session_factory = catalog_api
     organization = create_organization(client)
 
     fluid_response = client.post(
@@ -126,7 +100,7 @@ def test_catalogue_produits_et_pompes_versionne(catalog_api) -> None:
     assert version["parent_id"] == pump["id"]
     assert version["status"] == "draft"
 
-    with Session(engine) as session:
+    with session_factory() as session:
         item_count = session.scalar(select(func.count()).select_from(CatalogItem))
         audit_actions = set(session.scalars(select(AuditEvent.action)).all())
     assert item_count == 3

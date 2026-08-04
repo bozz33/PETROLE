@@ -1073,6 +1073,12 @@ def execute_calculation(
     # conservant chaque occurrence pour un diagnostic scientifique exploitable.
     result_normalization = normalize_json_numbers(result_payload)
     result_payload = result_normalization.value
+    # Statut effectif du calcul. Un résultat déclaré convergé mais contenant
+    # une valeur non finie est une incohérence numérique (ADR-DATA-JSON-001) :
+    # ni approuvable ni éligible à la décision. Comme SimulationResult est
+    # immuable (frozen), le statut corrigé est porté par cette variable locale
+    # puis recopié dans result_payload et calculation.status.
+    effective_status = result.status
     if result_normalization.has_non_finite:
         result_payload["data_quality"] = {
             "non_finite_values": [
@@ -1080,13 +1086,11 @@ def execute_calculation(
                 for item in result_normalization.occurrences
             ]
         }
-        # Un résultat déclaré convergent mais contenant une valeur non finie
-        # est une incohérence numérique : il ne peut être approuvable.
-        if result.status.value == "SIM_CONVERGED":
-            result.status = SimulationStatus.SIM_NUMERIC_ERROR
-            result_payload["status"] = "SIM_NUMERIC_ERROR"
+        if effective_status == SimulationStatus.CONVERGED:
+            effective_status = SimulationStatus.NUMERIC_ERROR
             result_payload["approvable"] = False
             result_payload["decision_eligible"] = False
+    result_payload["status"] = effective_status.value
 
     evaluations = evaluate_calculation_rules(session, calculation, result_payload)
     result_payload["rule_evaluations"] = [
@@ -1120,7 +1124,7 @@ def execute_calculation(
     # Le champ historique reste conservateur pour les consommateurs existants.
     result_payload["approvable"] = decision_eligible
     calculation.engine_version = result.engine_version
-    calculation.status = result.status.value
+    calculation.status = effective_status.value
     calculation.result_payload = result_payload
     diagnostics_payload = result.diagnostics.as_dict()
     diagnostics_normalization = normalize_json_numbers(diagnostics_payload, path="$.diagnostics")

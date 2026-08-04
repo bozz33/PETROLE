@@ -12,8 +12,15 @@ VPS_COMPOSE_ARGUMENTS+=(
     -f "${VPS_REPOSITORY_ROOT}/deployment/docker-compose.qualification.yml"
 )
 
+TEST_COMPOSE=(
+    docker compose
+    -f "${VPS_REPOSITORY_ROOT}/deployment/docker-compose.test.yml"
+    --profile tests
+)
+
 nettoyer_qualification() {
     compose_vps --profile qualification stop qualification-api >/dev/null 2>&1 || true
+    "${TEST_COMPOSE[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
 }
 trap nettoyer_qualification EXIT
 
@@ -32,16 +39,31 @@ domaine="$(valeur_environnement HYDRO_DOMAIN)"
 
 compose_vps --profile qualification build qualification-api qualification-web
 compose_vps --profile qualification run --rm --no-deps qualification-api \
-    ruff format --check apps packages tests
+    python deployment/scripts/check_test_database_policy.py \
+    | tee "${preuves}/politique-postgresql.txt"
 compose_vps --profile qualification run --rm --no-deps qualification-api \
-    ruff check apps packages tests
+    ruff format --check apps packages tests deployment/scripts/check_test_database_policy.py
+compose_vps --profile qualification run --rm --no-deps qualification-api \
+    ruff check apps packages tests deployment/scripts/check_test_database_policy.py
 compose_vps --profile qualification run --rm --no-deps qualification-api \
     mypy packages apps/api
-compose_vps --profile qualification run --rm --no-deps qualification-api \
-    pytest -m 'not slow' \
-    --cov=packages --cov=apps/api --cov-report=term -q
-compose_vps --profile qualification run --rm --no-deps qualification-api \
-    pytest -m slow -q -s
+
+# Les tests de persistance utilisent une base PostgreSQL/PostGIS jetable,
+# distincte de l'environnement déployé et créée exclusivement par Alembic.
+"${TEST_COMPOSE[@]}" down --volumes --remove-orphans
+"${TEST_COMPOSE[@]}" build migrate-test tests
+"${TEST_COMPOSE[@]}" up --detach postgres-test
+"${TEST_COMPOSE[@]}" run --rm --no-deps migrate-test \
+    | tee "${preuves}/migrations-test.txt"
+"${TEST_COMPOSE[@]}" run --rm --no-deps tests \
+    pytest -m 'not slow' -p no:cacheprovider \
+    --cov=packages --cov=apps/api --cov-report=term --cov-report=xml:/workspace/var/validation-vps/${horodatage}/coverage.xml -q \
+    | tee "${preuves}/tests-postgresql.txt"
+"${TEST_COMPOSE[@]}" run --rm --no-deps tests \
+    pytest -m slow -p no:cacheprovider -q -s \
+    | tee "${preuves}/tests-lents.txt"
+"${TEST_COMPOSE[@]}" down --volumes --remove-orphans
+
 compose_vps --profile qualification run --rm --no-deps qualification-api \
     python -m hydro_validation.cli \
     --report "/workspace/var/validation-vps/${horodatage}/rapport-scientifique.md" \
@@ -122,6 +144,13 @@ fi
 curl --fail --silent --show-error --max-time 10 \
     "https://${domaine}/api/v1/health/ready" >"${preuves}/ready.json"
 git rev-parse HEAD >"${preuves}/commit.txt"
+git status --porcelain >"${preuves}/working-tree.txt"
+if [[ -s "${preuves}/working-tree.txt" ]]; then
+    echo "La qualification exige un arbre Git propre." >&2
+    cat "${preuves}/working-tree.txt" >&2
+    exit 1
+fi
+
 echo "Qualification VPS terminée : ${preuves}"
 if [[ "${code_zap}" -eq 2 ]]; then
     echo "OWASP ZAP a produit des avertissements à examiner dans zap.html."

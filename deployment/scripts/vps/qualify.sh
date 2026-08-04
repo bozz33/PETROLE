@@ -55,9 +55,19 @@ compose_vps --profile qualification run --rm --no-deps qualification-api \
 "${TEST_COMPOSE[@]}" up --detach postgres-test
 "${TEST_COMPOSE[@]}" run --rm --no-deps migrate-test \
     | tee "${preuves}/migrations-test.txt"
+"${TEST_COMPOSE[@]}" run --rm --no-deps migrate-test \
+    alembic -c /workspace/alembic.ini current --verbose \
+    | tee "${preuves}/alembic-current.txt"
+"${TEST_COMPOSE[@]}" run --rm --no-deps migrate-test \
+    alembic -c /workspace/alembic.ini check \
+    | tee "${preuves}/alembic-check.txt"
 "${TEST_COMPOSE[@]}" run --rm --no-deps tests \
     pytest -m 'not slow' -p no:cacheprovider \
-    --cov=packages --cov=apps/api --cov-report=term --cov-report=xml:/workspace/var/validation-vps/${horodatage}/coverage.xml -q \
+    --cov=packages \
+    --cov=apps/api \
+    --cov-report=term \
+    --cov-report="xml:/workspace/var/validation-vps/${horodatage}/coverage.xml" \
+    -q \
     | tee "${preuves}/tests-postgresql.txt"
 "${TEST_COMPOSE[@]}" run --rm --no-deps tests \
     pytest -m slow -p no:cacheprovider -q -s \

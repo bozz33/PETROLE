@@ -9,12 +9,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
 from tests.factories import entree_canonique, pipeline, station_serie
 
 from hydro_api.application import create_application
 from hydro_api.config import Settings
-from hydro_api.database.base import Base
 from hydro_api.database.session import get_session
 from hydro_api.models import AuditEvent, CalculationRun, GeneratedReport, StoredFile
 
@@ -22,11 +20,8 @@ from hydro_api.models import AuditEvent, CalculationRun, GeneratedReport, Stored
 @pytest.fixture
 def database_engine():
     engine = create_engine(
-        "sqlite+pysqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
+        "postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
     )
-    Base.metadata.create_all(engine)
     try:
         yield engine
     finally:
@@ -39,7 +34,7 @@ def client(database_engine, tmp_path) -> Generator[TestClient, None, None]:
     application = create_application(
         Settings(
             environment="test",
-            database_url="sqlite+pysqlite://",
+            database_url="postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
             background_jobs_enabled=False,
             object_storage_backend="filesystem",
             object_storage_directory=tmp_path / "objects",

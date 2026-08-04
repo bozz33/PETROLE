@@ -10,11 +10,9 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr, ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
 
 from hydro_api.application import create_application
 from hydro_api.config import Settings
-from hydro_api.database.base import Base
 from hydro_api.database.session import get_session
 from hydro_api.models import Organization, OrganizationMembership, Site, UserAccount
 from hydro_api.services.auth import hash_password
@@ -29,15 +27,12 @@ def secured_api(tmp_path) -> Generator[tuple[TestClient, object], None, None]:
     """Fournit une API SQLite dont toutes les routes métier exigent un jeton."""
 
     engine = create_engine(
-        "sqlite+pysqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
+        "postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
     )
-    Base.metadata.create_all(engine)
     application = create_application(
         Settings(
             environment="test",
-            database_url="sqlite+pysqlite://",
+            database_url="postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
             authentication_required=True,
             background_jobs_enabled=False,
             jwt_secret=SecretStr(SECRET_TEST),

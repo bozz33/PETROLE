@@ -10,11 +10,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
 
 from hydro_api.application import create_application
 from hydro_api.config import Settings
-from hydro_api.database.base import Base
 from hydro_api.database.session import get_session
 from hydro_api.services.data_import import _start_import_hash
 from hydro_shared.hashing import canonical_json, sha256_of
@@ -23,15 +21,12 @@ from hydro_shared.hashing import canonical_json, sha256_of
 @pytest.fixture
 def import_client(tmp_path) -> Generator[TestClient, None, None]:
     engine = create_engine(
-        "sqlite+pysqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
+        "postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
     )
-    Base.metadata.create_all(engine)
     application = create_application(
         Settings(
             environment="test",
-            database_url="sqlite+pysqlite://",
+            database_url="postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
             background_jobs_enabled=False,
             object_storage_backend="filesystem",
             object_storage_directory=tmp_path / "objects",

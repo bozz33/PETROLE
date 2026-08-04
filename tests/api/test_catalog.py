@@ -9,12 +9,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
 from tests.factories import brut_leger, modele_pompe
 
 from hydro_api.application import create_application
 from hydro_api.config import Settings
-from hydro_api.database.base import Base
 from hydro_api.database.session import get_session
 from hydro_api.models import AuditEvent, CatalogItem
 
@@ -24,15 +22,12 @@ def catalog_api() -> Generator[tuple[TestClient, Engine], None, None]:
     """Fournit une API ouverte et une base SQLite transactionnelle."""
 
     engine = create_engine(
-        "sqlite+pysqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
+        "postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
     )
-    Base.metadata.create_all(engine)
     application = create_application(
         Settings(
             environment="test",
-            database_url="sqlite+pysqlite://",
+            database_url="postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
             background_jobs_enabled=False,
         )
     )

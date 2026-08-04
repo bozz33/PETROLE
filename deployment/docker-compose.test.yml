@@ -1,0 +1,79 @@
+# Compose de test PostgreSQL/PostGIS jetable (ADR-TEST-DB-001).
+#
+# PostgreSQL valide le JSON strict (RFC 8259), interdit NaN/Infinity et garantit
+# que les tests s'exécutent sur le même moteur que la production. La base est
+# stockée en tmpfs (mémoire volatile) pour des performances reproductibles sans
+# persistance entre les campagnes.
+#
+# Usage : docker compose -f docker-compose.test.yml run --rm tests
+services:
+  postgres-test:
+    image: postgis/postgis:16-3.5
+    environment:
+      POSTGRES_DB: petrole_test
+      POSTGRES_USER: petrole_test
+      POSTGRES_PASSWORD: test-only-password
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U petrole_test -d petrole_test"
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      - test
+
+  migrate-test:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.api
+      target: development
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      HYDRO_DATABASE_URL: "postgresql+psycopg://petrole_test:test-only-password@postgres-test/petrole_test"
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    networks:
+      - test
+
+  # Exécute les tests après la migration.
+  tests:
+    profiles: [tests]
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.api
+      target: development
+    command:
+      [
+        "pytest",
+        "-m", "not slow",
+        "-p", "no:cacheprovider",
+        "-q"
+      ]
+    environment:
+      HYDRO_DATABASE_URL: "postgresql+psycopg://petrole_test:test-only-password@postgres-test/petrole_test"
+      HYDRO_ENVIRONMENT: test
+      HOME: /tmp
+      MPLCONFIGDIR: /tmp/matplotlib
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+    user: "${QUALIFICATION_UID:-1000}:${QUALIFICATION_GID:-1000}"
+    depends_on:
+      migrate-test:
+        condition: service_completed_successfully
+    networks:
+      - test
+
+networks:
+  test:

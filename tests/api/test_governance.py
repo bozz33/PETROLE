@@ -2,53 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
 from tests.factories import entree_canonique
 
 from hydro_api.application import create_application
 from hydro_api.config import Settings
-from hydro_api.database.base import Base
-from hydro_api.database.session import get_session
 
-
-@pytest.fixture
-def governance_api() -> Generator[TestClient, None, None]:
-    engine = create_engine(
-        "sqlite+pysqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    application = create_application(
-        Settings(
-            environment="test",
-            database_url="sqlite+pysqlite://",
-            background_jobs_enabled=False,
-        )
-    )
-
-    def session_override():
-        with Session(engine, expire_on_commit=False) as session:
-            try:
-                yield session
-                session.commit()
-            except Exception:
-                session.rollback()
-                raise
-
-    application.dependency_overrides[get_session] = session_override
-    try:
-        with TestClient(application) as client:
-            yield client
-    finally:
-        Base.metadata.drop_all(engine)
-        engine.dispose()
 
 
 def create_organization(client: TestClient) -> dict:
@@ -94,8 +55,8 @@ def create_rule_set(client: TestClient, organization_id: str, standard_id: str) 
     return response.json()
 
 
-def test_cycle_normatif_et_evaluation_d_un_calcul(governance_api) -> None:
-    client = governance_api
+def test_cycle_normatif_et_evaluation_d_un_calcul(api_client) -> None:
+    client = api_client
     organization = create_organization(client)
     standard = create_standard(client, organization["id"])
 
@@ -239,8 +200,8 @@ def test_cycle_normatif_et_evaluation_d_un_calcul(governance_api) -> None:
     assert repeated.json()[0]["id"] == evaluations[0]["id"]
 
 
-def test_schema_openapi_expose_gouvernance(governance_api) -> None:
-    paths = governance_api.get("/api/v1/openapi.json").json()["paths"]
+def test_schema_openapi_expose_gouvernance(api_client) -> None:
+    paths = api_client.get("/api/v1/openapi.json").json()["paths"]
 
     assert "/api/v1/standards" in paths
     assert "/api/v1/rule-sets" in paths

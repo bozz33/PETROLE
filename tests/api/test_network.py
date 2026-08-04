@@ -6,49 +6,11 @@ from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
 from tests.factories import brut_leger, entree_canonique, modele_pompe
 
 from hydro_api.application import create_application
 from hydro_api.config import Settings
-from hydro_api.database.base import Base
 from hydro_api.database.session import get_session
-
-
-@pytest.fixture
-def network_api() -> Generator[TestClient, None, None]:
-    engine = create_engine(
-        "sqlite+pysqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    application = create_application(
-        Settings(
-            environment="test",
-            database_url="sqlite+pysqlite://",
-            background_jobs_enabled=False,
-        )
-    )
-
-    def session_override():
-        with Session(engine, expire_on_commit=False) as session:
-            try:
-                yield session
-                session.commit()
-            except Exception:
-                session.rollback()
-                raise
-
-    application.dependency_overrides[get_session] = session_override
-    try:
-        with TestClient(application) as client:
-            yield client
-    finally:
-        Base.metadata.drop_all(engine)
-        engine.dispose()
 
 
 def create_model(client: TestClient) -> tuple[dict, dict]:
@@ -164,8 +126,8 @@ def create_approved_pump(client: TestClient, organization_id: str) -> dict:
     return approval.json()
 
 
-def test_reseau_lineaire_valide_et_immuable_apres_approbation(network_api) -> None:
-    client = network_api
+def test_reseau_lineaire_valide_et_immuable_apres_approbation(api_client) -> None:
+    client = api_client
     organization, model = create_model(client)
     original_hash = model["content_hash"]
     source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
@@ -222,8 +184,8 @@ def test_reseau_lineaire_valide_et_immuable_apres_approbation(network_api) -> No
     assert "immuable" in mutation.json()["detail"]
 
 
-def test_reseau_refuse_profil_incomplet_et_pompe_sur_troncon(network_api) -> None:
-    client = network_api
+def test_reseau_refuse_profil_incomplet_et_pompe_sur_troncon(api_client) -> None:
+    client = api_client
     organization, model = create_model(client)
     source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
     terminal = create_node(client, model["id"], code="DST", kind="terminal", elevation_m=90.0)
@@ -271,8 +233,8 @@ def test_reseau_refuse_profil_incomplet_et_pompe_sur_troncon(network_api) -> Non
     assert "station" in invalid_asset.json()["detail"]
 
 
-def test_approbation_refuse_un_reseau_normalise_invalide(network_api) -> None:
-    client = network_api
+def test_approbation_refuse_un_reseau_normalise_invalide(api_client) -> None:
+    client = api_client
     _, model = create_model(client)
     create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
 
@@ -283,8 +245,8 @@ def test_approbation_refuse_un_reseau_normalise_invalide(network_api) -> None:
     assert "NET_NODE_COUNT" in approval.json()["detail"]
 
 
-def test_clone_reseau_remappe_les_references_sans_modifier_la_source(network_api) -> None:
-    client = network_api
+def test_clone_reseau_remappe_les_references_sans_modifier_la_source(api_client) -> None:
+    client = api_client
     _, model = create_model(client)
     source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
     terminal = create_node(client, model["id"], code="DST", kind="terminal", elevation_m=90.0)
@@ -330,8 +292,8 @@ def test_clone_reseau_remappe_les_references_sans_modifier_la_source(network_api
     assert client.get(f"/api/v1/nodes/{source['id']}").json()["elevation_m"] == 100.0
 
 
-def test_calcul_assemble_automatiquement_le_reseau_normalise(network_api) -> None:
-    client = network_api
+def test_calcul_assemble_automatiquement_le_reseau_normalise(api_client) -> None:
+    client = api_client
     _, model = create_model(client)
     source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
     terminal = create_node(client, model["id"], code="DST", kind="terminal", elevation_m=90.0)
@@ -366,8 +328,8 @@ def test_calcul_assemble_automatiquement_le_reseau_normalise(network_api) -> Non
     assert result.json()["result"]["flow_m3_s"] > 0
 
 
-def test_compilation_conserve_injections_et_soutirages_normalises(network_api) -> None:
-    client = network_api
+def test_compilation_conserve_injections_et_soutirages_normalises(api_client) -> None:
+    client = api_client
     _, model = create_model(client)
     source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
     injection = create_node(
@@ -402,8 +364,8 @@ def test_compilation_conserve_injections_et_soutirages_normalises(network_api) -
     assert compiled[1]["flow_m3_s"] == -0.01
 
 
-def test_validation_refuse_noeud_ignore_et_debit_intermediaire_invalide(network_api) -> None:
-    client = network_api
+def test_validation_refuse_noeud_ignore_et_debit_intermediaire_invalide(api_client) -> None:
+    client = api_client
     _, model = create_model(client)
     source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
     tank = create_node(client, model["id"], code="TK-01", kind="tank", elevation_m=95.0)
@@ -427,8 +389,8 @@ def test_validation_refuse_noeud_ignore_et_debit_intermediaire_invalide(network_
     assert {"NET_NODE_UNSUPPORTED", "NET_NODE_FLOW"} <= codes
 
 
-def test_validation_exige_un_materiau_approuve(network_api) -> None:
-    client = network_api
+def test_validation_exige_un_materiau_approuve(api_client) -> None:
+    client = api_client
     organization, model = create_model(client)
     source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
     terminal = create_node(client, model["id"], code="DST", kind="terminal", elevation_m=90.0)
@@ -462,8 +424,8 @@ def test_validation_exige_un_materiau_approuve(network_api) -> None:
     assert valid.json()["valid"] is True
 
 
-def test_suppressions_reseau_refusent_les_cascades_implicites(network_api) -> None:
-    client = network_api
+def test_suppressions_reseau_refusent_les_cascades_implicites(api_client) -> None:
+    client = api_client
     organization, model = create_model(client)
     source = create_node(client, model["id"], code="SRC", kind="source", elevation_m=100.0)
     terminal = create_node(client, model["id"], code="DST", kind="terminal", elevation_m=90.0)
@@ -508,8 +470,8 @@ def test_suppressions_reseau_refusent_les_cascades_implicites(network_api) -> No
     assert client.delete(f"/api/v1/nodes/{terminal['id']}").status_code == 204
 
 
-def test_schema_openapi_expose_reseau_normalise(network_api) -> None:
-    paths = network_api.get("/api/v1/openapi.json").json()["paths"]
+def test_schema_openapi_expose_reseau_normalise(api_client) -> None:
+    paths = api_client.get("/api/v1/openapi.json").json()["paths"]
 
     assert "/api/v1/models/{model_id}/nodes" in paths
     assert "/api/v1/models/{model_id}/edges" in paths

@@ -1,5 +1,6 @@
 # ADR-011 — Contrat JSON numérique strict
 
+- **Identifiant stable :** `ADR-DATA-JSON-001`
 - **Statut :** accepté
 - **Date :** 2026-08-04
 - **Décision :** architecture et qualité des données
@@ -33,7 +34,7 @@ Une valeur non finie avait atteint la persistance d'un résultat de calcul et tr
 - Les résultats sont portables entre l'API, les rapports et PostgreSQL.
 - Les anomalies numériques restent traçables sans produire de JSON invalide.
 - Les résultats incomplets ne peuvent pas être approuvés silencieusement.
-- Les schémas de base et OpenAPI doivent inclure `SIM_NUMERIC_ERROR`.
+- Les schémas de base et OpenAPI incluent `SIM_NUMERIC_ERROR`.
 - Les tests unitaires couvrent le normaliseur et les tests d'intégration couvrent la persistance PostgreSQL.
 
 ## Implémentation de référence
@@ -41,7 +42,12 @@ Une valeur non finie avait atteint la persistance d'un résultat de calcul et tr
 - `packages/shared/hydro_shared/json_safety.py`
 - `apps/api/hydro_api/services/core.py`
 - `apps/api/hydro_api/database/session.py`
+- `apps/api/hydro_api/models/constraints.py`
 - `packages/shared/hydro_shared/codes.py`
+- `database/migrations/versions/8b1f2d6c4e90_ajoute_erreur_numerique_calcul.py`
+- `tests/unit/test_json_safety.py`
+- `tests/unit/test_model_constraints.py`
+- `tests/api/test_json_persistence.py`
 
 ## Références officielles
 

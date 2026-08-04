@@ -8,12 +8,9 @@ from collections.abc import Generator
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr, ValidationError
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
-from hydro_api.application import create_application
 from hydro_api.config import Settings
-from hydro_api.database.session import get_session
 from hydro_api.models import Organization, OrganizationMembership, Site, UserAccount
 from hydro_api.services.auth import hash_password
 
@@ -23,40 +20,17 @@ MOT_DE_PASSE_LECTEUR = "MotDePasse-Lecteur-2026!"
 
 
 @pytest.fixture
-def secured_api(tmp_path) -> Generator[tuple[TestClient, object], None, None]:
-    """Fournit une API SQLite dont toutes les routes métier exigent un jeton."""
+def secured_api(
+    api_client_factory,
+    pg_session_factory: sessionmaker[Session],
+) -> Generator[tuple[TestClient, sessionmaker[Session]], None, None]:
+    """API authentifiée isolée par la transaction PostgreSQL du test."""
 
-    engine = create_engine(
-        "postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
-    )
-    application = create_application(
-        Settings(
-            environment="test",
-            database_url="postgresql+psycopg://hydro:hydro_dev@postgres:5432/hydro",
-            authentication_required=True,
-            background_jobs_enabled=False,
-            jwt_secret=SecretStr(SECRET_TEST),
-            object_storage_backend="filesystem",
-            object_storage_directory=tmp_path / "objects",
-        )
-    )
-
-    def session_override():
-        with Session(engine, expire_on_commit=False) as session:
-            try:
-                yield session
-                session.commit()
-            except Exception:
-                session.rollback()
-                raise
-
-    application.dependency_overrides[get_session] = session_override
-    try:
-        with TestClient(application) as client:
-            yield client, engine
-    finally:
-        Base.metadata.drop_all(engine)
-        engine.dispose()
+    with api_client_factory(
+        authentication_required=True,
+        jwt_secret=SecretStr(SECRET_TEST),
+    ) as client:
+        yield client, pg_session_factory
 
 
 def _bootstrap(client: TestClient) -> dict:
@@ -190,14 +164,13 @@ def test_connexion_rotation_et_revocation_des_jetons(secured_api) -> None:
     )
     assert revoked.status_code == 401
 
-    # Le jeton émis pendant l'initialisation reste distinct de la session testée.
     assert initial["refresh_token"] != tokens["refresh_token"]
 
 
 def test_roles_cloisonnement_et_protection_du_dernier_administrateur(
     secured_api,
 ) -> None:
-    client, engine = secured_api
+    client, session_factory = secured_api
     tokens = _bootstrap(client)
     admin_headers = _headers(tokens["access_token"])
     organization_id = tokens["user"]["memberships"][0]["organization_id"]
@@ -296,29 +269,20 @@ def test_roles_cloisonnement_et_protection_du_dernier_administrateur(
     )
     assert updated_responsibles.status_code == 200, updated_responsibles.text
     assert updated_responsibles.json()["responsible_user_ids"] == [member.json()["id"]]
-    assert (
-        client.post(
-            f"/api/v1/projects/{project_id}/activate",
-            headers=engineer_headers,
-        ).status_code
-        == 403
-    )
-    assert (
-        client.post(
-            f"/api/v1/projects/{project_id}/archive",
-            headers=engineer_headers,
-        ).status_code
-        == 403
-    )
-    assert (
-        client.post(
-            f"/api/v1/projects/{project_id}/activate",
-            headers=admin_headers,
-        ).status_code
-        == 200
-    )
+    assert client.post(
+        f"/api/v1/projects/{project_id}/activate",
+        headers=engineer_headers,
+    ).status_code == 403
+    assert client.post(
+        f"/api/v1/projects/{project_id}/archive",
+        headers=engineer_headers,
+    ).status_code == 403
+    assert client.post(
+        f"/api/v1/projects/{project_id}/activate",
+        headers=admin_headers,
+    ).status_code == 200
 
-    with Session(engine) as session:
+    with session_factory() as session:
         other_organization = Organization(
             name="Transport Sud",
             slug="transport-sud",
@@ -364,7 +328,7 @@ def test_roles_cloisonnement_et_protection_du_dernier_administrateur(
 
 
 def test_sites_et_coherence_avec_les_projets(secured_api) -> None:
-    client, engine = secured_api
+    client, session_factory = secured_api
     tokens = _bootstrap(client)
     headers = _headers(tokens["access_token"])
     organization_id = tokens["user"]["memberships"][0]["organization_id"]
@@ -399,7 +363,7 @@ def test_sites_et_coherence_avec_les_projets(secured_api) -> None:
     assert project.status_code == 201, project.text
     assert project.json()["site_id"] == site.json()["id"]
 
-    with Session(engine) as session:
+    with session_factory() as session:
         other_organization = Organization(
             name="Organisation secondaire",
             slug="organisation-secondaire",

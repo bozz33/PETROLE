@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import sys
 from collections.abc import Callable, Generator, Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -146,7 +146,7 @@ def api_client_factory(
     pg_session_factory: sessionmaker[Session],
     test_database_url: str,
     tmp_path: Path,
-) -> Callable[..., Iterator[TestClient]]:
+) -> Callable[..., AbstractContextManager[TestClient]]:
     """Construit une application dont chaque requête ouvre sa propre session."""
 
     @contextmanager
@@ -186,16 +186,17 @@ def api_client(api_client_factory) -> Generator[TestClient, None, None]:
         yield client
 
 
-# Alias historique conservé pour les tests de ressources, sans moteur local.
 @pytest.fixture
 def client(api_client: TestClient) -> TestClient:
+    """Alias historique du client partagé, sans moteur local."""
+
     return api_client
 
 
-# Le nom historique représente désormais une connexion transactionnelle, pas
-# un moteur autonome susceptible de supprimer le schéma partagé.
 @pytest.fixture
 def database_engine(pg_connection: Connection) -> Connection:
+    """Alias historique représentant la connexion transactionnelle du test."""
+
     return pg_connection
 
 
@@ -228,7 +229,7 @@ def committed_api_client_factory(
     committed_database: None,
     test_database_url: str,
     tmp_path: Path,
-) -> Callable[..., Iterator[TestClient]]:
+) -> Callable[..., AbstractContextManager[TestClient]]:
     """Client utilisant le cycle de sessions réel pour les tests du worker."""
 
     del committed_database

@@ -31,22 +31,17 @@ def reset_public_tables(engine: Engine) -> None:
         )
 
     table_names = [
-        name
-        for name in inspect(engine).get_table_names(schema="public")
-        if name != _ALEMBIC_TABLE
+        name for name in inspect(engine).get_table_names(schema="public") if name != _ALEMBIC_TABLE
     ]
     if not table_names:
         return
 
     preparer = engine.dialect.identifier_preparer
     qualified = ", ".join(
-        f"{preparer.quote_schema('public')}.{preparer.quote(name)}"
-        for name in sorted(table_names)
+        f"{preparer.quote_schema('public')}.{preparer.quote(name)}" for name in sorted(table_names)
     )
     with engine.begin() as connection:
-        connection.execute(
-            text(f"TRUNCATE TABLE {qualified} RESTART IDENTITY CASCADE")
-        )
+        connection.execute(text(f"TRUNCATE TABLE {qualified} RESTART IDENTITY CASCADE"))
 
 
 __all__ = ["reset_public_tables"]

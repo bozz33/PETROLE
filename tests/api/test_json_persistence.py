@@ -46,8 +46,7 @@ def test_postgresql_persiste_une_valeur_non_finie_comme_null_apres_normalisation
         {
             "payload": normalized.value,
             "non_finite_values": [
-                {"path": item.path, "kind": item.kind.value}
-                for item in normalized.occurrences
+                {"path": item.path, "kind": item.kind.value} for item in normalized.occurrences
             ],
         }
     )

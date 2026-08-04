@@ -269,18 +269,27 @@ def test_roles_cloisonnement_et_protection_du_dernier_administrateur(
     )
     assert updated_responsibles.status_code == 200, updated_responsibles.text
     assert updated_responsibles.json()["responsible_user_ids"] == [member.json()["id"]]
-    assert client.post(
-        f"/api/v1/projects/{project_id}/activate",
-        headers=engineer_headers,
-    ).status_code == 403
-    assert client.post(
-        f"/api/v1/projects/{project_id}/archive",
-        headers=engineer_headers,
-    ).status_code == 403
-    assert client.post(
-        f"/api/v1/projects/{project_id}/activate",
-        headers=admin_headers,
-    ).status_code == 200
+    assert (
+        client.post(
+            f"/api/v1/projects/{project_id}/activate",
+            headers=engineer_headers,
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            f"/api/v1/projects/{project_id}/archive",
+            headers=engineer_headers,
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            f"/api/v1/projects/{project_id}/activate",
+            headers=admin_headers,
+        ).status_code
+        == 200
+    )
 
     with session_factory() as session:
         other_organization = Organization(

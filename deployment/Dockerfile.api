@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM python:3.11-slim AS base
+FROM python:3.14-slim AS base
 
 # Le venv créé par ``ensurepip`` suit l'image Python et peut embarquer des bibliothèques
 # vendues obsolètes. Ces versions corrigent les composants vendus signalés par les scans

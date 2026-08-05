@@ -1,0 +1,29 @@
+# Override de production : les services applicatifs restent internes au réseau
+# Docker. Seul Caddy (défini dans docker-compose.vps.yml) publie les ports
+# publics 80/443. Cela évite tout conflit de port avec la pile de développement
+# ou un PostgreSQL natif sur l'hôte, et respecte le principe VPS : rien d'autre
+# que SSH/HTTP/HTTPS n'est exposé publiquement.
+#
+# Utilisation :
+#   docker compose --env-file deployment/.env.vps \
+#     -f deployment/docker-compose.yml \
+#     -f deployment/docker-compose.vps.yml \
+#     -f deployment/docker-compose.prod-internal.yml ...
+#
+# Cet override met les publications de ports à une chaîne vide, ce qui revient
+# à ne publier aucun port hôte pour ces services (ils restent joinables par leur
+# nom sur le réseau interne `application`).
+services:
+  api:
+    ports: !reset []
+  worker:
+    ports: !reset []
+  # Le frontend est servi au nginx natif de l'hôte (qui termine TLS) sur la
+  # boucle locale uniquement. Aucun port public n'est publié par la pile Docker.
+  web:
+    ports: !override
+      - "127.0.0.1:15174:80"
+  postgres:
+    ports: !reset []
+  minio:
+    ports: !reset []

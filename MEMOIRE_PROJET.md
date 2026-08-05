@@ -257,11 +257,75 @@ Note honnête sur Trivy : les images **de développement** (`hydro-platform-api`
 et n'est utilisée qu'en développement. Seules les images **production** (`runtime` pour
 l'API, `nginx` pour le web) ont été scannées propres.
 
-Reste pour lever `v0.1.0-rc.1` : configurer un domaine public + TLS (Caddy), puis
+Reste pour lever `v0.1.0-rc.1` : configurer un domaine public + TLS, puis
 exécuter Playwright, OWASP ZAP et le contrôle HTTPS public, et réaliser la sauvegarde
 et la restauration réelles sur l'infrastructure cible. Les commits correctifs
 (`8206b1f`, `2766d44`, `ba94693`, `8c52b87`) sont locaux à `release/mvp-rc1` et
 restent à pousser vers `origin` après revue.
+
+## Déploiement public et qualification complète du 5 août 2026
+
+Le domaine `petrole.distesage.com` est désormais déployé publiquement et qualifié.
+
+### Résolution du conflit de terminaison TLS
+
+Le VPS héberge un nginx natif servant déjà trois sites (`app.blocksdevs.com`,
+`gesty.site`, `salonducinemaufeminin.net`) sur les ports 80/443, et un PostgreSQL
+natif sur `127.0.0.1:5432`. Le conteneur Caddy prévu par `docker-compose.vps.yml`
+ne pouvait donc pas binder ces ports. Décision d'architecture documentée par le
+commit `162633b` : utiliser le **nginx natif comme terminaison TLS**, avec un
+certificat Let's Encrypt géré par certbot, et reverse-proxyer vers le conteneur
+`petrole-web` publié uniquement sur `127.0.0.1:15174` via l'override
+`deployment/docker-compose.prod-internal.yml`. C'est cohérent avec les autres
+sites du serveur et respecte la règle VPS (seuls 443 public + SSH exposés).
+
+### Configuration DNS et TLS
+
+- enregistrement `A petrole.distesage.com → 62.171.133.156` créé via l'API
+  Cloudflare (DNS only, pour le challenge HTTP-01), token en méthode legacy ;
+- certificat Let's Encrypt émis pour `petrole.distesage.com` via certbot,
+  valide jusqu'au 2026-11-02, renouvellement automatique ;
+- vhost nginx `/etc/nginx/sites-available/petrole.distesage.com` (hors dépôt,
+  configuration hôte) avec redirection HTTP→HTTPS et headers de sécurité
+  alignés sur le Caddyfile PETROLE.
+
+### Campagne de qualification complète (commit 162633b)
+
+`https://petrole.distesage.com` est public et `GET /api/v1/health/ready` retourne
+`{"status":"ready","database":"ready","object_storage":"ready"}`. Dernières étapes
+exécutées et archivées sous `var/validation-vps/qualification-run/` :
+
+| Contrôle | Résultat |
+|---|---|
+| HTTPS public `ready` | HTTP 200, TLS Let's Encrypt valide |
+| Playwright (bureau + mobile) | **31 tests réussis**, 3 ignorés de contexte |
+| OWASP ZAP baseline | **0 FAIL**, 60 PASS (7 warnings attendus pour une SPA) |
+| Sauvegarde PostgreSQL | dump 102 Ko, 239 entrées TOC, SHA `77554c…` |
+| Restauration PostgreSQL (base jetable) | **35 tables**, tête Alembic `8b1f2d6c4e90` |
+
+### Commandes de gestion du déploiement production
+
+```bash
+# Pile production (nginx hôte + conteneurs internes)
+COMPOSE_PROJECT_NAME=petrole \
+  docker compose --env-file deployment/.env.vps \
+  -f deployment/docker-compose.yml \
+  -f deployment/docker-compose.vps.yml \
+  -f deployment/docker-compose.prod-internal.yml up --detach
+
+# Redémarrage après changement de code
+COMPOSE_PROJECT_NAME=petrole \
+  docker compose ... restart api worker web
+
+# Renouvellement TLS (automatique via certbot timer)
+certbot renew --nginx
+```
+
+Toutes les portes de sortie de la définition de fin du MVP (§15.2 du cahier des
+charges) sont désormais vertes sur ce serveur, à l'exception de l'essai utilisateur
+par un ingénieur métier (décision externe). La limite « certification industrielle
+non démontrée » reste inchangée : un MVP logiciel qualifié n'est pas une
+autorisation d'exploiter un site réel.
 
 ## Requalification backend du 3 août 2026
 

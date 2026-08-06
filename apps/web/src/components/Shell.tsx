@@ -20,6 +20,7 @@ import {
   Sun,
   type LucideIcon,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import {
   type FormEvent,
   type PropsWithChildren,
@@ -30,8 +31,10 @@ import {
 } from "react";
 
 import { useAuth } from "../auth";
+import { apiRequest } from "../api";
 import { InternalLink, useNavigation } from "../routing";
 import { useTheme } from "../theme";
+import type { Health } from "../types";
 
 interface NavigationItem {
   to: string;
@@ -163,6 +166,11 @@ export function Shell({ children }: PropsWithChildren) {
   const metadata = PAGE_TITLES[path] ?? PAGE_TITLES["/"];
   const { user, localBypass, logout } = useAuth();
   const { resolvedTheme, toggleTheme } = useTheme();
+  const healthQuery = useQuery({
+    queryKey: ["health"],
+    queryFn: () => apiRequest<Health>("/health"),
+    staleTime: 60_000,
+  });
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -281,6 +289,17 @@ export function Shell({ children }: PropsWithChildren) {
             {localBypass ? "Environnement local" : user?.full_name}
             <small>{localBypass ? "Services de développement actifs" : user?.email}</small>
           </span>
+          <small
+            title={
+              healthQuery.data
+                ? `Réf. ${healthQuery.data.build.ref}; construit ${healthQuery.data.build.build_date}; moteur ${healthQuery.data.build.scientific_engine_version}; migration ${healthQuery.data.build.database_migration_version}`
+                : "Métadonnées de build indisponibles"
+            }
+          >
+            {healthQuery.data
+              ? `v${healthQuery.data.build.application_version} · ${healthQuery.data.build.git_sha.slice(0, 12)}`
+              : "Version indisponible"}
+          </small>
         </div>
       </aside>
 

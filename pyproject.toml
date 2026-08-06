@@ -79,6 +79,9 @@ packages = [
     "apps/api/hydro_api",
 ]
 
+[tool.hatch.build.targets.wheel.force-include]
+"apps/api/hydro_api/scientific_validation_proof.json" = "hydro_api/scientific_validation_proof.json"
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]

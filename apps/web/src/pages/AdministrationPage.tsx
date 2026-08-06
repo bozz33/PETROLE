@@ -11,6 +11,7 @@ import {
 } from "../components/Shell";
 import type {
   AuditEvent,
+  Health,
   Organization,
   OrganizationMember,
   OrganizationRole,
@@ -80,6 +81,10 @@ export function AdministrationPage() {
     queryKey: ["organizations"],
     queryFn: () => apiRequest<Page<Organization>>("/organizations?limit=200&offset=0"),
   });
+  const healthQuery = useQuery({
+    queryKey: ["health"],
+    queryFn: () => apiRequest<Health>("/health"),
+  });
   const membersQuery = useQuery({
     queryKey: ["members", organizationId],
     queryFn: () =>
@@ -122,6 +127,7 @@ export function AdministrationPage() {
   });
 
   const organizations = organizationsQuery.data?.items ?? [];
+  const singleOrganization = healthQuery.data?.deployment.mode === "single_org";
   const members = membersQuery.data ?? [];
   const standards = standardsQuery.data?.items ?? [];
   const activeStandards = standards.filter((standard) => standard.status === "active");
@@ -330,6 +336,7 @@ export function AdministrationPage() {
   };
 
   const error =
+    healthQuery.error ??
     organizationsQuery.error ??
     membersQuery.error ??
     standardsQuery.error ??
@@ -362,24 +369,48 @@ export function AdministrationPage() {
       ) : null}
 
       <Panel
-        title="Périmètre administratif"
-        description="Toutes les opérations ci-dessous restent isolées dans l'organisation choisie."
+        title={singleOrganization ? "Exploitant" : "Périmètre administratif"}
+        description={
+          singleOrganization
+            ? "Espace de travail unique de cette instance. Les données restent isolées côté serveur."
+            : "Toutes les opérations ci-dessous restent isolées dans l'organisation choisie."
+        }
       >
-        <label className="single-field">
-          Organisation
-          <select
-            value={organizationId}
-            onChange={(event) => setOrganizationId(event.target.value)}
-          >
-            <option value="">Sélectionner</option>
-            {organizations.map((organization) => (
-              <option key={organization.id} value={organization.id}>
-                {organization.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {singleOrganization ? (
+          <div className="resource-summary">
+            <div><span>Exploitant</span><strong>{organizations[0]?.name ?? "Non initialisé"}</strong></div>
+            <div><span>Isolation</span><strong>Données isolées</strong></div>
+          </div>
+        ) : (
+          <label className="single-field">
+            Organisation
+            <select
+              value={organizationId}
+              onChange={(event) => setOrganizationId(event.target.value)}
+            >
+              <option value="">Sélectionner</option>
+              {organizations.map((organization) => (
+                <option key={organization.id} value={organization.id}>
+                  {organization.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </Panel>
+
+      {healthQuery.data ? (
+        <Panel title="Version de l'instance" description="Identité de build visible pour support et traçabilité.">
+          <div className="resource-summary">
+            <div><span>Application</span><strong>v{healthQuery.data.build.application_version}</strong></div>
+            <div><span>SHA Git</span><strong className="mono hash">{healthQuery.data.build.git_sha}</strong></div>
+            <div><span>Référence</span><strong>{healthQuery.data.build.ref}</strong></div>
+            <div><span>Build</span><strong>{healthQuery.data.build.build_date}</strong></div>
+            <div><span>Moteur</span><strong>{healthQuery.data.build.scientific_engine_version}</strong></div>
+            <div><span>Migration</span><strong className="mono">{healthQuery.data.build.database_migration_version}</strong></div>
+          </div>
+        </Panel>
+      ) : null}
 
       <div className="content-grid equal">
         <Panel title="Membres et rôles" description="Comptes autorisés dans l'organisation.">

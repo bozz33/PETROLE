@@ -20,6 +20,7 @@ from hydro_api.routers.catalog import router as catalog_router
 from hydro_api.routers.data import router as data_router
 from hydro_api.routers.governance import router as governance_router
 from hydro_api.routers.health import router as health_router
+from hydro_api.routers.health import version_router
 from hydro_api.routers.network import router as network_router
 from hydro_api.routers.operations import router as operations_router
 from hydro_api.routers.reports import router as reports_router
@@ -202,6 +203,7 @@ def create_application(settings: Settings | None = None) -> FastAPI:
 
     protected_dependencies = [Depends(authorize_application_request)]
     application.include_router(health_router, prefix="/api/v1")
+    application.include_router(version_router, prefix="/api/v1")
     application.include_router(auth_router, prefix="/api/v1")
     application.include_router(
         catalog_router,

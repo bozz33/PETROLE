@@ -48,6 +48,16 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 FROM base AS runtime
 
+ARG HYDRO_BUILD_GIT_SHA=unknown
+ARG HYDRO_BUILD_REF=unknown
+ARG HYDRO_BUILD_DATE=unknown
+ARG HYDRO_DATABASE_MIGRATION_VERSION=8b1f2d6c4e90
+
+ENV HYDRO_BUILD_GIT_SHA=${HYDRO_BUILD_GIT_SHA} \
+    HYDRO_BUILD_REF=${HYDRO_BUILD_REF} \
+    HYDRO_BUILD_DATE=${HYDRO_BUILD_DATE} \
+    HYDRO_DATABASE_MIGRATION_VERSION=${HYDRO_DATABASE_MIGRATION_VERSION}
+
 COPY --from=build /tmp/wheels /tmp/wheels
 RUN pip install /tmp/wheels/* \
     # setuptools n'est requis que pour construire/installer le paquet. Le retirer de l'image

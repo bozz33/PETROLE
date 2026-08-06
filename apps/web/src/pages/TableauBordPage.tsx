@@ -1,20 +1,22 @@
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { EChartsOption } from "echarts";
 
 import { apiRequest } from "@/api";
-import { EChart } from "@/components/charts/EChart";
 import { EmptyState, ErrorNotice, Panel, StatusBadge } from "@/components/Shell";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { InternalLink } from "@/routing";
-import { useTheme } from "@/theme";
-import type { Health, Organization, Page, Project, Readiness } from "@/types";
+import type {
+  Health,
+  Organization,
+  Page,
+  Project,
+  Readiness,
+  ScientificValidation,
+} from "@/types";
 import { formatDate } from "@/types";
 
 export function TableauBordPage() {
-  const { resolvedTheme } = useTheme();
   const healthQuery = useQuery({
     queryKey: ["health"],
     queryFn: () => apiRequest<Health>("/health"),
@@ -33,78 +35,30 @@ export function TableauBordPage() {
     queryKey: ["projects"],
     queryFn: () => apiRequest<Page<Project>>("/projects?limit=200&offset=0"),
   });
+  const validationQuery = useQuery({
+    queryKey: ["scientific-validation"],
+    queryFn: () => apiRequest<ScientificValidation>("/health/validation"),
+  });
 
   const organizations = organizationsQuery.data?.items ?? [];
   const projects = projectsQuery.data?.items ?? [];
   const activeProjects = projects.filter((project) => project.status === "active").length;
   const draftProjects = projects.filter((project) => project.status === "draft").length;
   const archivedProjects = projects.filter((project) => project.status === "archived").length;
+  const singleOrganization = healthQuery.data?.deployment.mode === "single_org";
+  const organization = organizations[0];
   const loading =
     healthQuery.isLoading ||
     readinessQuery.isLoading ||
     organizationsQuery.isLoading ||
-    projectsQuery.isLoading;
+    projectsQuery.isLoading ||
+    validationQuery.isLoading;
   const error =
     healthQuery.error ??
     readinessQuery.error ??
     organizationsQuery.error ??
-    projectsQuery.error;
-
-  const activityOption = useMemo<EChartsOption>(() => {
-    const dark = resolvedTheme === "dark";
-    const text = dark ? "#9AAEB5" : "#60747C";
-    const grid = dark ? "#24414A" : "#D8E1E4";
-    const line = dark ? "#2A92A2" : "#0F4C5C";
-
-    return {
-      animationDuration: 650,
-      backgroundColor: "transparent",
-      grid: { left: 42, right: 18, top: 22, bottom: 34 },
-      tooltip: {
-        trigger: "axis",
-        backgroundColor: dark ? "#0D252D" : "#FFFFFF",
-        borderColor: grid,
-        textStyle: { color: dark ? "#E8F1F3" : "#102A33" },
-      },
-      xAxis: {
-        type: "category",
-        boundaryGap: false,
-        data: ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"],
-        axisLine: { lineStyle: { color: grid } },
-        axisTick: { show: false },
-        axisLabel: { color: text },
-      },
-      yAxis: {
-        type: "value",
-        axisLabel: { color: text, formatter: "{value}k" },
-        splitLine: { lineStyle: { color: grid, type: "dashed" } },
-      },
-      series: [
-        {
-          name: "Calculs exécutés",
-          type: "line",
-          smooth: true,
-          symbolSize: 7,
-          data: [7.2, 8.5, 7.9, 10.7, 9.8, 12.4, 11.3],
-          lineStyle: { width: 3, color: line },
-          itemStyle: { color: line, borderColor: dark ? "#0D252D" : "#FFFFFF", borderWidth: 2 },
-          areaStyle: {
-            color: {
-              type: "linear",
-              x: 0,
-              y: 0,
-              x2: 0,
-              y2: 1,
-              colorStops: [
-                { offset: 0, color: dark ? "rgba(42,146,162,.34)" : "rgba(15,76,92,.24)" },
-                { offset: 1, color: "rgba(15,76,92,0)" },
-              ],
-            },
-          },
-        },
-      ],
-    };
-  }, [resolvedTheme]);
+    projectsQuery.error ??
+    validationQuery.error;
 
   if (error) {
     return <ErrorNotice error={error} />;
@@ -114,24 +68,24 @@ export function TableauBordPage() {
     <div className="stack">
       <section className="metrics-grid" aria-label="Indicateurs principaux">
         <Metric
-          label="Disponibilité plateforme"
-          value={loading ? "…" : readinessQuery.data?.status === "ready" ? "100 %" : "À vérifier"}
+          label="État plateforme"
+          value={loading ? "…" : readinessQuery.data?.status === "ready" ? "Opérationnel" : "À vérifier"}
           detail={
             readinessQuery.data
-              ? "Base et stockage objet accessibles"
+              ? "Base prête · stockage prêt"
               : healthQuery.data?.version
                 ? `Version ${healthQuery.data.version}`
                 : "Vérification en cours"
           }
-          trend="Services opérationnels"
+          trend="État actuel"
           tone="green"
           icon="availability"
         />
         <Metric
-          label="Organisations"
-          value={loading ? "…" : String(organizations.length)}
-          detail="Espaces de données isolés"
-          trend="Multi-tenant actif"
+          label={singleOrganization ? "Exploitant" : "Organisations"}
+          value={loading ? "…" : singleOrganization ? (organization?.name ?? "Non initialisé") : String(organizations.length)}
+          detail={singleOrganization ? "Données isolées" : "Espaces de données isolés"}
+          trend={singleOrganization ? "Espace de travail" : "Isolation logique"}
           tone="blue"
           icon="organizations"
         />
@@ -145,31 +99,31 @@ export function TableauBordPage() {
         />
         <Metric
           label="Validation scientifique"
-          value="14 / 14"
-          detail="Cas analytiques rapides"
-          trend="Dossier de preuve disponible"
+          value={
+            validationQuery.data
+              ? `${validationQuery.data.passed} / ${validationQuery.data.total}`
+              : "Non publiée"
+          }
+          detail={
+            validationQuery.data
+              ? `Qualification ${validationQuery.data.executed_at.slice(0, 10)}`
+              : "Aucune preuve publiée avec cette image"
+          }
+          trend={
+            validationQuery.data
+              ? `Preuve ${validationQuery.data.proof_hash.slice(0, 12)}`
+              : "Validation requise"
+          }
           tone="purple"
           icon="validation"
         />
       </section>
 
       <div className="dashboard-grid">
-        <Panel
-          title="Activité hydraulique"
-          description="Évolution indicative des exécutions sur les sept derniers jours."
-          action={
-            <div className="chart-toolbar">
-              <select aria-label="Période du graphique" defaultValue="7">
-                <option value="7">7 derniers jours</option>
-                <option value="30">30 derniers jours</option>
-              </select>
-            </div>
-          }
-        >
-          <EChart
-            option={activityOption}
-            className="h-[270px]"
-            ariaLabel="Activité hydraulique sur sept jours"
+        <Panel title="Activité hydraulique" description="Historique d'exécution du moteur.">
+          <EmptyState
+            title="Historique non connecté"
+            detail="Aucune donnée de démonstration n'est affichée. Connectez l'agrégation des calculs avant d'afficher une série."
           />
         </Panel>
 
@@ -180,7 +134,11 @@ export function TableauBordPage() {
               <DistributionItem tone="a" label="Projets actifs" value={activeProjects} />
               <DistributionItem tone="b" label="Brouillons" value={draftProjects} />
               <DistributionItem tone="c" label="Archivés" value={archivedProjects} />
-              <DistributionItem tone="d" label="Organisations" value={organizations.length} />
+              <DistributionItem
+                tone="d"
+                label={singleOrganization ? "Espace de travail" : "Organisations"}
+                value={singleOrganization ? Number(Boolean(organization)) : organizations.length}
+              />
             </div>
           </div>
         </Panel>
@@ -228,7 +186,7 @@ export function TableauBordPage() {
         ) : (
           <EmptyState
             title="Aucun projet"
-            detail="Créez une organisation et son premier projet pour commencer la modélisation."
+            detail="Créez le premier projet pour commencer la modélisation."
           />
         )}
       </Panel>

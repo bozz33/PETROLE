@@ -11,6 +11,7 @@ import {
 } from "../components/Shell";
 import type {
   Comparison,
+  Calculation,
   ModelVersion,
   Optimization,
   Page,
@@ -23,7 +24,7 @@ export function DecisionPage() {
   const [projectId, setProjectId] = useState("");
   const [modelId, setModelId] = useState("");
   const [scenarioId, setScenarioId] = useState("");
-  const [calculationIds, setCalculationIds] = useState("");
+  const [calculationIds, setCalculationIds] = useState<string[]>([]);
   const [objective, setObjective] = useState("min_energy");
   const [speedOptions, setSpeedOptions] = useState("0.8, 1.0");
   const [comparison, setComparison] = useState<Comparison | null>(null);
@@ -49,10 +50,19 @@ export function DecisionPage() {
       ),
     enabled: Boolean(modelId),
   });
+  const calculationsQuery = useQuery({
+    queryKey: ["calculations", scenarioId],
+    queryFn: () =>
+      apiRequest<Page<Calculation>>(
+        "/scenarios/" + scenarioId + "/calculations?limit=200&offset=0",
+      ),
+    enabled: Boolean(scenarioId),
+  });
 
   const projects = projectsQuery.data?.items ?? [];
   const models = modelsQuery.data?.items ?? [];
   const scenarios = scenariosQuery.data?.items ?? [];
+  const calculations = calculationsQuery.data?.items ?? [];
 
   useEffect(() => {
     if (!projects.some((project) => project.id === projectId)) {
@@ -72,18 +82,17 @@ export function DecisionPage() {
     }
   }, [scenarioId, scenarios]);
 
+  useEffect(() => {
+    setCalculationIds((selected) => selected.filter((id) => calculations.some((item) => item.id === id)));
+  }, [calculations]);
+
   const comparisonMutation = useMutation({
-    mutationFn: () => {
-      const identifiers = calculationIds
-        .split(/[\s,;]+/)
-        .map((value) => value.trim())
-        .filter(Boolean);
-      return apiRequest<Comparison>("/projects/" + projectId + "/comparisons", {
+    mutationFn: () =>
+      apiRequest<Comparison>("/projects/" + projectId + "/comparisons", {
         method: "POST",
         headers: { "Idempotency-Key": crypto.randomUUID() },
-        body: jsonBody({ calculation_ids: identifiers }),
-      });
-    },
+        body: jsonBody({ calculation_ids: calculationIds }),
+      }),
     onSuccess: setComparison,
   });
 
@@ -112,6 +121,7 @@ export function DecisionPage() {
     projectsQuery.error ??
     modelsQuery.error ??
     scenariosQuery.error ??
+    calculationsQuery.error ??
     comparisonMutation.error ??
     optimizationMutation.error;
 
@@ -173,18 +183,26 @@ export function DecisionPage() {
               comparisonMutation.mutate();
             }}
           >
-            <label>
-              Identifiants des calculs
-              <textarea
-                rows={6}
-                className="mono"
-                value={calculationIds}
-                onChange={(event) => setCalculationIds(event.target.value)}
-                placeholder="Un UUID par ligne, deux calculs minimum."
-                required
-              />
-            </label>
-            <button className="button button-primary" disabled={!projectId || comparisonMutation.isPending}>
+            <fieldset className="selection-fieldset">
+              <legend>Calculs convergés du scénario sélectionné</legend>
+              {calculations.length ? calculations.map((calculation) => (
+                <label className="selection-option" key={calculation.id}>
+                  <input
+                    type="checkbox"
+                    checked={calculationIds.includes(calculation.id)}
+                    onChange={() =>
+                      setCalculationIds((selected) =>
+                        selected.includes(calculation.id)
+                          ? selected.filter((id) => id !== calculation.id)
+                          : [...selected, calculation.id],
+                      )
+                    }
+                  />
+                  <span><strong>{calculation.engine}</strong><small>{calculation.status} · {calculation.created_at}</small></span>
+                </label>
+              )) : <p className="field-help">Exécutez au moins deux calculs avant comparaison.</p>}
+            </fieldset>
+            <button className="button button-primary" disabled={!projectId || calculationIds.length < 2 || comparisonMutation.isPending}>
               Comparer et archiver
             </button>
           </form>
@@ -208,7 +226,7 @@ export function DecisionPage() {
               </table>
             </div>
           ) : (
-            <EmptyState title="Aucune comparaison" detail="Collez les UUID produits dans la page Calcul." />
+            <EmptyState title="Aucune comparaison" detail="Sélectionnez au moins deux calculs convergés pour créer un classement." />
           )}
         </Panel>
 

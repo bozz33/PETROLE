@@ -9,6 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from uuid import UUID
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -42,6 +43,14 @@ class Settings(BaseSettings):
     s3_access_key: str = "hydro"
     s3_secret_key: SecretStr = SecretStr("hydro_dev_storage")
     s3_region: str = "us-east-1"
+    deployment_mode: Literal["single_org", "multi_org", "saas"] = "multi_org"
+    default_organization_id: UUID | None = None
+    default_organization_name: str = "PETROLE"
+    default_organization_slug: str = "petrole"
+    build_git_sha: str = "unknown"
+    build_ref: str = "unknown"
+    build_date: str = "unknown"
+    database_migration_version: str = "8b1f2d6c4e90"
 
     @model_validator(mode="after")
     def validate_production_security(self) -> Settings:

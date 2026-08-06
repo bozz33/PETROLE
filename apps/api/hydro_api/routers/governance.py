@@ -6,8 +6,13 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Request, status
 
+from hydro_api.deployment import (
+    bind_default_organization,
+    is_single_organization,
+    require_default_organization_id,
+)
 from hydro_api.errors import ResourceConflictError
 from hydro_api.schemas import (
     AuditEventRead,
@@ -38,9 +43,11 @@ EvaluationStatus = Literal["compliant", "non_compliant", "not_applicable", "erro
 )
 def create_standard(
     data: StandardCreate,
+    request: Request,
     session: DatabaseSession,
     access: ApplicationAccess,
 ) -> StandardRead:
+    data = bind_default_organization(request, session, data)
     return StandardRead.model_validate(
         governance.create_standard(session, data, actor_id=access.user_id)
     )
@@ -53,6 +60,7 @@ def create_standard(
 )
 def list_standards(
     organization_id: uuid.UUID,
+    request: Request,
     session: DatabaseSession,
     access: ApplicationAccess,
     item_status: Annotated[StandardStatus | None, Query(alias="status")] = None,
@@ -60,6 +68,8 @@ def list_standards(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[StandardRead]:
     del access
+    if is_single_organization(request.app.state.settings):
+        organization_id = require_default_organization_id(request, session)
     items, total = governance.list_standards(
         session,
         organization_id,
@@ -128,9 +138,11 @@ def approve_standard(
 )
 def create_rule_set(
     data: RuleSetCreate,
+    request: Request,
     session: DatabaseSession,
     access: ApplicationAccess,
 ) -> RuleSetRead:
+    data = bind_default_organization(request, session, data)
     item = governance.create_rule_set(session, data, actor_id=access.user_id)
     return RuleSetRead.model_validate(governance.serialize_rule_set(session, item))
 
@@ -142,6 +154,7 @@ def create_rule_set(
 )
 def list_rule_sets(
     organization_id: uuid.UUID,
+    request: Request,
     session: DatabaseSession,
     access: ApplicationAccess,
     item_status: Annotated[RuleSetStatus | None, Query(alias="status")] = None,
@@ -150,6 +163,8 @@ def list_rule_sets(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[RuleSetRead]:
     del access
+    if is_single_organization(request.app.state.settings):
+        organization_id = require_default_organization_id(request, session)
     items, total = governance.list_rule_sets(
         session,
         organization_id,
@@ -251,6 +266,7 @@ def approve_rule_set(
 )
 def list_evaluations(
     organization_id: uuid.UUID,
+    request: Request,
     session: DatabaseSession,
     access: ApplicationAccess,
     calculation_id: uuid.UUID | None = None,
@@ -260,6 +276,8 @@ def list_evaluations(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[RuleEvaluationRead]:
     del access
+    if is_single_organization(request.app.state.settings):
+        organization_id = require_default_organization_id(request, session)
     items, total = governance.list_rule_evaluations(
         session,
         organization_id,
@@ -308,6 +326,7 @@ def evaluate_calculation(
 )
 def list_audit_events(
     organization_id: uuid.UUID,
+    request: Request,
     session: DatabaseSession,
     access: ApplicationAccess,
     action: Annotated[str | None, Query(min_length=1, max_length=100)] = None,
@@ -320,6 +339,8 @@ def list_audit_events(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[AuditEventRead]:
     del access
+    if is_single_organization(request.app.state.settings):
+        organization_id = require_default_organization_id(request, session)
     items, total = governance.list_audit_events(
         session,
         organization_id,

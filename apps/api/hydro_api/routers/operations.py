@@ -5,10 +5,15 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Query, status
+from fastapi import APIRouter, Depends, Header, Query, Request, status
 from sqlalchemy.orm import Session
 
 from hydro_api.database.session import get_session
+from hydro_api.deployment import (
+    bind_default_organization,
+    is_single_organization,
+    require_default_organization_id,
+)
 from hydro_api.schemas import Page
 from hydro_api.schemas.operations import (
     ComparisonCreate,
@@ -44,7 +49,8 @@ IdempotencyKey = Annotated[
     status_code=status.HTTP_201_CREATED,
     summary="Créer un réservoir et son barémage",
 )
-def create_tank(data: TankCreate, session: DatabaseSession):
+def create_tank(data: TankCreate, request: Request, session: DatabaseSession):
+    data = bind_default_organization(request, session, data)
     return operations.tank_payload(operations.create_tank(session, data))
 
 
@@ -55,11 +61,14 @@ def create_tank(data: TankCreate, session: DatabaseSession):
 )
 def list_tanks(
     organization_id: uuid.UUID,
+    request: Request,
     session: DatabaseSession,
     site_id: uuid.UUID | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
+    if is_single_organization(request.app.state.settings):
+        organization_id = require_default_organization_id(request, session)
     items, total = operations.list_tanks(
         session,
         organization_id=organization_id,

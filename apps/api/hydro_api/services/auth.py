@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from hydro_api.config import Settings
 from hydro_api.database.base import utc_now
+from hydro_api.deployment import is_single_organization
 from hydro_api.errors import ResourceConflictError, ResourceNotFoundError
 from hydro_api.models import (
     AuditEvent,
@@ -143,12 +144,21 @@ def bootstrap(
         raise ResourceConflictError(
             "L'initialisation est déjà terminée. Utilisez un compte administrateur."
         )
-    organization = Organization(
-        name=data.organization_name,
-        slug=data.organization_slug,
-        default_locale="fr",
-        default_unit_system="SI",
-    )
+    if is_single_organization(settings):
+        organization = Organization(
+            id=settings.default_organization_id,
+            name=settings.default_organization_name,
+            slug=settings.default_organization_slug,
+            default_locale="fr",
+            default_unit_system="SI",
+        )
+    else:
+        organization = Organization(
+            name=data.organization_name,
+            slug=data.organization_slug,
+            default_locale="fr",
+            default_unit_system="SI",
+        )
     user = UserAccount(
         email=normalize_email(str(data.email)),
         full_name=data.full_name.strip(),

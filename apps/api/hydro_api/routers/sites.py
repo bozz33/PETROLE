@@ -5,10 +5,15 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from hydro_api.database.session import get_session
+from hydro_api.deployment import (
+    bind_default_organization,
+    is_single_organization,
+    require_default_organization_id,
+)
 from hydro_api.schemas import Page
 from hydro_api.schemas.sites import SiteCreate, SiteRead, SiteUpdate
 from hydro_api.services import sites
@@ -23,7 +28,8 @@ DatabaseSession = Annotated[Session, Depends(get_session, scope="function")]
     status_code=status.HTTP_201_CREATED,
     summary="Créer un site",
 )
-def create_site(data: SiteCreate, session: DatabaseSession):
+def create_site(data: SiteCreate, request: Request, session: DatabaseSession):
+    data = bind_default_organization(request, session, data)
     return sites.create_site(session, data)
 
 
@@ -34,10 +40,13 @@ def create_site(data: SiteCreate, session: DatabaseSession):
 )
 def list_sites(
     organization_id: uuid.UUID,
+    request: Request,
     session: DatabaseSession,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
+    if is_single_organization(request.app.state.settings):
+        organization_id = require_default_organization_id(request, session)
     items, total = sites.list_sites(
         session,
         organization_id=organization_id,

@@ -38,6 +38,20 @@ uniquement lorsqu'une réinitialisation explicite des données locales est souha
 Cette commande utilise l'étage « runtime » : code copié dans l'image, processus
 non privilégié et rechargement désactivé.
 
+## Instance mono-organisation et traçabilité de release
+
+Le Compose de production active par défaut `HYDRO_DEPLOYMENT_MODE=single_org`.
+Le premier bootstrap crée l'exploitant défini par
+`HYDRO_DEFAULT_ORGANIZATION_NAME` et `HYDRO_DEFAULT_ORGANIZATION_SLUG`; un
+`HYDRO_DEFAULT_ORGANIZATION_ID` peut être fixé pour une instance déjà initialisée.
+Les colonnes d'organisation restent en base, mais les créations et listes API sont
+liées côté serveur à cet espace unique.
+
+La CI de release doit renseigner `HYDRO_BUILD_GIT_SHA`, `HYDRO_BUILD_REF` et
+`HYDRO_BUILD_DATE` lors de la construction de l'image. L'API publie ces valeurs,
+la version du moteur et la migration attendue dans `/api/v1/health` et
+`/api/v1/version`. Une image avec `unknown` ne doit pas être promue en production.
+
 ## Sauvegarde et restauration locales
 
 La sauvegarde cohérente regroupe PostgreSQL et le stockage objet dans un dossier horodaté. L'API,

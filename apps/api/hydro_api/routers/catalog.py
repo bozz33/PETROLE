@@ -5,8 +5,13 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Request, status
 
+from hydro_api.deployment import (
+    bind_default_organization,
+    is_single_organization,
+    require_default_organization_id,
+)
 from hydro_api.schemas.catalog import (
     CatalogItemCreate,
     CatalogItemRead,
@@ -32,11 +37,13 @@ router = APIRouter(prefix="/catalog", tags=["catalogue technique"])
 def create_item(
     collection: CatalogCollection,
     data: CatalogItemCreate,
+    request: Request,
     session: DatabaseSession,
     access: ApplicationAccess,
 ) -> CatalogItemRead:
     """Valide les propriétés scientifiques avant toute persistance."""
 
+    data = bind_default_organization(request, session, data)
     item = catalog.create_catalog_item(
         session,
         catalog.kind_from_collection(collection),
@@ -53,6 +60,7 @@ def create_item(
 )
 def list_items(
     collection: CatalogCollection,
+    request: Request,
     session: DatabaseSession,
     access: ApplicationAccess,
     organization_id: Annotated[uuid.UUID, Query()],
@@ -63,6 +71,8 @@ def list_items(
     """Retourne seulement les versions appartenant à l'organisation demandée."""
 
     del access
+    if is_single_organization(request.app.state.settings):
+        organization_id = require_default_organization_id(request, session)
     items, total = catalog.list_catalog_items(
         session,
         organization_id=organization_id,

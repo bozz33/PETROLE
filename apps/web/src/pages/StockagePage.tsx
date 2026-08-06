@@ -187,7 +187,7 @@ export function StockagePage() {
     <div className="stack">
       {error ? <ErrorNotice error={error} /> : null}
       {tankMutation.isSuccess ? (
-        <SuccessNotice>Le réservoir et son barémage ont été enregistrés.</SuccessNotice>
+        <SuccessNotice>Le bac d'étude et son barémage théorique ont été enregistrés.</SuccessNotice>
       ) : null}
 
       <Panel
@@ -246,7 +246,7 @@ export function StockagePage() {
         )}
 
         <details className="editor-details" open={!tanks.length && Boolean(organizationId)}>
-          <summary>Ajouter un bac avec barémage linéaire</summary>
+          <summary>Créer un bac d'étude avec barémage théorique</summary>
           <form
             className="compact-form"
             onSubmit={(event) => {
@@ -264,8 +264,12 @@ export function StockagePage() {
               <label>Altitude du fond (m)<input name="elevation_m" type="number" step="any" defaultValue="0" /></label>
               <label>Produits compatibles<input name="compatible_fluid_ids" placeholder="diesel, kerosene" /></label>
             </div>
+            <p className="field-help">
+              Ce barémage linéaire est réservé aux études et tests. Importez une table de jaugeage
+              certifiée avant toute utilisation opérationnelle.
+            </p>
             <button className="button button-primary" disabled={!organizationId || tankMutation.isPending}>
-              Enregistrer le bac
+              Créer le bac d'étude
             </button>
           </form>
         </details>

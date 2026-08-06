@@ -21,6 +21,11 @@ from sqlalchemy.orm import Session
 
 from hydro_api.config import Settings
 from hydro_api.database.session import get_session
+from hydro_api.deployment import (
+    bind_default_organization,
+    is_single_organization,
+    require_default_organization_id,
+)
 from hydro_api.schemas.data import (
     DatasetCreate,
     DatasetImportRead,
@@ -64,10 +69,13 @@ SettingsDependency = Annotated[Settings, Depends(_settings)]
 async def upload_file(
     organization_id: Annotated[uuid.UUID, Form()],
     file: Annotated[UploadFile, File()],
+    request: Request,
     session: DatabaseSession,
     storage: ObjectStorageDependency,
     settings: SettingsDependency,
 ):
+    if is_single_organization(request.app.state.settings):
+        organization_id = require_default_organization_id(request, session)
     content = await file.read(settings.max_upload_size_bytes + 1)
     return data_import.store_file(
         session,
@@ -120,7 +128,8 @@ def download_file(
     status_code=status.HTTP_201_CREATED,
     summary="Créer un jeu de données",
 )
-def create_dataset(data: DatasetCreate, session: DatabaseSession):
+def create_dataset(data: DatasetCreate, request: Request, session: DatabaseSession):
+    data = bind_default_organization(request, session, data)
     return data_import.create_dataset(session, data)
 
 

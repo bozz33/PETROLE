@@ -600,6 +600,33 @@ export interface Health {
   service: string;
   version: string;
   environment: string;
+  build: BuildMetadata;
+  deployment: DeploymentMetadata;
+}
+
+export interface BuildMetadata {
+  application_version: string;
+  git_sha: string;
+  ref: string;
+  build_date: string;
+  scientific_engine_version: string;
+  database_migration_version: string;
+}
+
+export interface DeploymentMetadata {
+  mode: "single_org" | "multi_org" | "saas";
+  organization_label: string;
+}
+
+export interface ScientificValidation {
+  suite: string;
+  passed: number;
+  total: number;
+  proof_hash: string;
+  engine_version: string;
+  executed_at: string;
+  environment: string;
+  source: string;
 }
 
 export interface Readiness {

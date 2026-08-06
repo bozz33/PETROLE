@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from hydro_api.config import Settings
 from hydro_api.database.session import get_session
+from hydro_api.deployment import is_single_organization, require_default_organization_id
 from hydro_api.models import (
     AssetInstance,
     CalculationRun,
@@ -287,9 +288,24 @@ async def authorize_application_request(
 ) -> AccessContext:
     """Vérifie le rôle sur l'organisation résolue depuis la requête ou la ressource."""
 
+    settings = _settings(request)
+    if is_single_organization(settings):
+        organization_id = require_default_organization_id(request, session)
+        resource_organization_id = _organization_for_resource(session, request.path_params)
+        if (
+            resource_organization_id is not None
+            and resource_organization_id != organization_id
+        ):
+            # Une réponse neutre évite de confirmer l'existence d'une ressource
+            # appartenant à un autre espace, même pour un compte multi-rôle.
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Ressource introuvable dans l'espace de travail courant.",
+            )
+    else:
+        organization_id = await _organization_from_request(request, session)
     if context.local_bypass:
         return context
-    organization_id = await _organization_from_request(request, session)
     if organization_id is None:
         return context
     role = context.roles.get(organization_id)

@@ -9,6 +9,12 @@ from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from hydro_api.database.session import get_session
+from hydro_api.deployment import (
+    bind_default_organization,
+    is_single_organization,
+    require_default_organization_id,
+)
+from hydro_api.errors import ResourceConflictError
 from hydro_api.schemas import (
     ApprovalResponse,
     CalculationCreate,
@@ -62,6 +68,10 @@ def create_organization(
     request: Request,
     session: DatabaseSession,
 ):
+    if is_single_organization(request.app.state.settings):
+        raise ResourceConflictError(
+            "La création d'organisation est désactivée en mode single_org."
+        )
     access = request.state.access_context
     return core.create_organization(session, data, actor_id=access.user_id)
 
@@ -78,7 +88,11 @@ def list_organizations(
     offset: Offset = 0,
 ):
     access = request.state.access_context
-    allowed_ids = None if access.local_bypass else access.organization_ids
+    settings = request.app.state.settings
+    if is_single_organization(settings):
+        allowed_ids = (require_default_organization_id(request, session),)
+    else:
+        allowed_ids = None if access.local_bypass else access.organization_ids
     items, total = core.list_organizations(
         session,
         limit=limit,
@@ -116,7 +130,8 @@ def update_organization(
     status_code=status.HTTP_201_CREATED,
     summary="Créer un projet",
 )
-def create_project(data: ProjectCreate, session: DatabaseSession):
+def create_project(data: ProjectCreate, request: Request, session: DatabaseSession):
+    data = bind_default_organization(request, session, data)
     return core.create_project(session, data)
 
 
@@ -134,7 +149,12 @@ def list_projects(
     offset: Offset = 0,
 ):
     access = request.state.access_context
-    allowed_ids = None if access.local_bypass else access.organization_ids
+    settings = request.app.state.settings
+    if is_single_organization(settings):
+        organization_id = require_default_organization_id(request, session)
+        allowed_ids = (organization_id,)
+    else:
+        allowed_ids = None if access.local_bypass else access.organization_ids
     items, total = core.list_projects(
         session,
         organization_id=organization_id,

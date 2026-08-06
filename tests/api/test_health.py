@@ -40,7 +40,49 @@ def test_sante_api() -> None:
         "service": "hydro-api",
         "version": "0.1.0",
         "environment": "test",
+        "build": {
+            "application_version": "0.1.0",
+            "git_sha": "unknown",
+            "ref": "unknown",
+            "build_date": "unknown",
+            "scientific_engine_version": "hydroliquid-long-distance-0.1.0",
+            "database_migration_version": "8b1f2d6c4e90",
+        },
+        "deployment": {
+            "mode": "multi_org",
+            "organization_label": "Organisations",
+        },
     }
+
+
+def test_version_expose_identite_build_et_moteur() -> None:
+    """La version de build est disponible sans dépendre de PostgreSQL."""
+
+    application = create_application(
+        Settings(
+            environment="test",
+            background_jobs_enabled=False,
+            build_git_sha="a1b2c3d4e5f6",
+            build_ref="v0.1.0-rc.1",
+            build_date="2026-08-06T10:00:00Z",
+        )
+    )
+    with TestClient(application) as client:
+        response = client.get("/api/v1/version")
+        scientific_validation = client.get("/api/v1/health/validation")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "application_version": "0.1.0",
+        "git_sha": "a1b2c3d4e5f6",
+        "ref": "v0.1.0-rc.1",
+        "build_date": "2026-08-06T10:00:00Z",
+        "scientific_engine_version": "hydroliquid-long-distance-0.1.0",
+        "database_migration_version": "8b1f2d6c4e90",
+    }
+    assert scientific_validation.status_code == 200
+    assert scientific_validation.json()["passed"] == 41
+    assert scientific_validation.json()["total"] == 41
 
 
 def test_racine_api_expose_sonde_neutre() -> None:
@@ -115,6 +157,8 @@ def test_schema_openapi_versionne() -> None:
     assert schema["info"]["version"] == "0.1.0"
     assert "/api/v1/health" in schema["paths"]
     assert "/api/v1/health/ready" in schema["paths"]
+    assert "/api/v1/health/validation" in schema["paths"]
+    assert "/api/v1/version" in schema["paths"]
 
 
 def test_correlation_alimente_automatiquement_le_journal_audit(pg_session) -> None:

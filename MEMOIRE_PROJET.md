@@ -1,6 +1,6 @@
 # Mémoire du projet PETROLE
 
-Dernière mise à jour : 5 août 2026.
+Dernière mise à jour : 6 août 2026.
 
 Ce fichier sert de point de reprise entre deux sessions de développement. Il décrit l'état
 constaté du dépôt, les preuves disponibles et les prochaines actions. Toute nouvelle session
@@ -326,6 +326,35 @@ charges) sont désormais vertes sur ce serveur, à l'exception de l'essai utilis
 par un ingénieur métier (décision externe). La limite « certification industrielle
 non démontrée » reste inchangée : un MVP logiciel qualifié n'est pas une
 autorisation d'exploiter un site réel.
+
+## Release Candidate v0.1.0-rc.1 — 6 août 2026
+
+Tag annoté `v0.1.0-rc.1` (commit `f71a176`) créé et poussé sur `origin`.
+Cette RC ajoute à la qualification complète un **typage des payloads
+scientifiques** dans l'OpenAPI public : les champs réellement consommés par les
+moteurs (courbes de pompe H/Q/η/P/NPSHr, propriétés de fluide, conditions aux
+limites, configuration des stations, options du solveur, surcharges
+d'équipements), auparavant enfouis dans des `dict[str, Any]` opaques, sont
+désormais documentés et validés par 15 sous-schémas `*Input`
+(`apps/api/hydro_api/schemas/scientific.py`).
+
+L'OpenAPI public passe de 108 à **125 schémas** et expose ces contrats avec
+leurs descriptions et bornes physiques sur `https://petrole.distesage.com/docs`.
+
+Campagne finale vérifiée avant le tag :
+
+| Contrôle | Résultat |
+|---|---|
+| Tests pytest (`not slow`) | **517 réussis** (+18 nouveaux tests de schémas) |
+| Tests `slow` (performance) | **3 réussis** |
+| Validation scientifique | **41/41** |
+| ruff format / lint / mypy | verts (132 / 96 fichiers) |
+| OpenAPI public | **125 schémas** (payloads scientifiques typés) |
+| Trivy image API prod (rebuilt) | **0 HIGH/CRITICAL** |
+| HTTPS public `ready` | HTTP 200 |
+
+Commit du typage : `f71a176`. Les 9 commits de la série RC (`8206b1f` →
+`f71a176`) sont désormais poussés sur `origin/release/mvp-rc1`.
 
 ## Requalification backend du 3 août 2026
 

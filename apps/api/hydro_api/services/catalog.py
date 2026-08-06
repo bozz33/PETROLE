@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -69,6 +70,21 @@ def _canonical_payload(
     return candidate
 
 
+def _payload_as_dict(payload: Any) -> dict[str, Any]:
+    """Normalise un payload scientifique (typé ou libre) en dictionnaire.
+
+    Les schémas Pydantic ``FluidInput``/``PumpModelInput`` documentent les
+    champs réels consommés par le moteur ; ils sont sérialisés ici en dict
+    avant la canonisation stricte réalisée par :func:`_canonical_payload`.
+    """
+
+    if isinstance(payload, BaseModel):
+        # ``exclude_none=False`` : le moteur distingue None de l'absence (ex.
+        # tolérances du solveur). Les valeurs par défaut sont conservées.
+        return payload.model_dump()
+    return dict(payload)
+
+
 def _fingerprint(item: CatalogItem) -> str:
     """Calcule l'empreinte fonctionnelle, indépendante des dates SQL."""
 
@@ -113,7 +129,7 @@ def create_catalog_item(
         name=data.name,
         version_number=1,
         status="draft",
-        payload=_canonical_payload(kind, data.code, data.name, data.payload),
+        payload=_canonical_payload(kind, data.code, data.name, _payload_as_dict(data.payload)),
         source=data.source,
         content_hash="",
     )
@@ -239,7 +255,7 @@ def create_catalog_version(
         name=name,
         version_number=int(latest or 0) + 1,
         status="draft",
-        payload=_canonical_payload(parent.kind, parent.code, name, payload),
+        payload=_canonical_payload(parent.kind, parent.code, name, _payload_as_dict(payload)),
         source=source,
         content_hash="",
     )

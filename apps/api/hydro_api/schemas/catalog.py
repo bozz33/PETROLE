@@ -8,6 +8,14 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from hydro_api.schemas.scientific import FluidInput, PumpModelInput
+
+#: Contenu technique d'un élément de catalogue. La nature exacte dépend du
+#: ``kind`` fourni dans le chemin de la requête : ``fluid`` → FluidInput,
+#: ``pump`` → PumpModelInput. La branche ``dict`` accepte les familles moins
+#: structurées (matériau, vanne, accessoire) et préserve la rétro-compatibilité.
+CatalogPayload = FluidInput | PumpModelInput | dict[str, Any]
+
 
 class CatalogItemCreate(BaseModel):
     """Première version d'un produit, équipement ou matériau."""
@@ -15,7 +23,7 @@ class CatalogItemCreate(BaseModel):
     organization_id: uuid.UUID
     code: str = Field(min_length=1, max_length=80, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     name: str = Field(min_length=1, max_length=200)
-    payload: dict[str, Any]
+    payload: CatalogPayload
     source: str | None = Field(default=None, max_length=10_000)
 
     @field_validator("code")
@@ -30,7 +38,7 @@ class CatalogItemUpdate(BaseModel):
     """Modification autorisée tant que la version reste en brouillon."""
 
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    payload: dict[str, Any] | None = None
+    payload: CatalogPayload | None = None
     source: str | None = Field(default=None, max_length=10_000)
     status: str | None = Field(default=None, pattern=r"^(draft|archived)$")
 
@@ -39,7 +47,7 @@ class CatalogItemVersionCreate(BaseModel):
     """Nouvelle version dérivée, avec surcharge facultative du contenu."""
 
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    payload: dict[str, Any] | None = None
+    payload: CatalogPayload | None = None
     source: str | None = Field(default=None, max_length=10_000)
 
 

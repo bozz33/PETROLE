@@ -6,9 +6,17 @@ import uuid
 from datetime import datetime
 from typing import Any, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from hydro_api.schemas.scientific import ScenarioPayloadInput, payload_to_dict
 
 T = TypeVar("T")
+
+#: Contenu scientifique d'un scénario (conditions aux limites, surcharges,
+#: options du solveur). La branche ``dict`` préserve la rétro-compatibilité des
+#: scénarios déjà persistés ou partiellement renseignés. La valeur par défaut
+#: est définie au niveau du champ (``Field(default_factory=dict)``).
+ScenarioPayload = ScenarioPayloadInput | dict[str, Any]
 
 
 class Page(BaseModel, Generic[T]):
@@ -150,7 +158,14 @@ class ScenarioCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     parent_id: uuid.UUID | None = None
     description: str | None = Field(default=None, max_length=10_000)
-    payload: dict[str, Any] = Field(default_factory=dict)
+    payload: ScenarioPayload = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def normalize_payload(self) -> ScenarioCreate:
+        """Aplatit le payload typé en dictionnaire avant persistance."""
+
+        self.payload = payload_to_dict(self.payload)
+        return self
 
 
 class ScenarioCloneCreate(BaseModel):
@@ -162,7 +177,13 @@ class ScenarioCloneCreate(BaseModel):
 class ScenarioUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=10_000)
-    payload: dict[str, Any] | None = None
+    payload: ScenarioPayload | None = None
+
+    @model_validator(mode="after")
+    def normalize_payload(self) -> ScenarioUpdate:
+        if self.payload is not None:
+            self.payload = payload_to_dict(self.payload)
+        return self
 
 
 class ScenarioRead(BaseModel):

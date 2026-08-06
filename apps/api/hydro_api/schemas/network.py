@@ -9,6 +9,35 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from hydro_api.schemas.scientific import (
+    EdgeGeometryInput,
+    InjectionNodePayloadInput,
+    OfftakeNodePayloadInput,
+    PumpAssetInput,
+    StationConfigurationInput,
+    TerminalNodePayloadInput,
+    ValveAssetInput,
+    payload_to_dict,
+)
+
+#: Type union du payload d'un nœud. La dernière branche ``dict`` accepte un
+#: dictionnaire libre (y compris vide) pour les kinds sans configuration typée
+#: (``source``, ``junction``) et préserve la rétro-compatibilité des données
+#: déjà persistées. La valeur par défaut est définie au niveau du champ.
+NodePayload = (
+    StationConfigurationInput
+    | InjectionNodePayloadInput
+    | OfftakeNodePayloadInput
+    | TerminalNodePayloadInput
+    | dict[str, Any]
+)
+
+#: Compléments géométriques optionnels d'un tronçon, ou dictionnaire libre.
+EdgePayload = EdgeGeometryInput | dict[str, Any]
+
+#: Configuration d'un équipement posé sur le réseau, ou dictionnaire libre.
+AssetPayload = PumpAssetInput | ValveAssetInput | dict[str, Any]
+
 
 class ProfilePointInput(BaseModel):
     """Point altimétrique local à un tronçon."""
@@ -35,12 +64,19 @@ class NetworkNodeCreate(BaseModel):
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     status: Literal["available", "maintenance", "unavailable"] = "available"
-    payload: dict[str, Any] = Field(default_factory=dict)
+    payload: NodePayload = Field(default_factory=dict)
 
     @field_validator("code")
     @classmethod
     def normalize_code(cls, value: str) -> str:
         return value.upper()
+
+    @model_validator(mode="after")
+    def normalize_payload(self) -> NetworkNodeCreate:
+        """Aplatit le payload typé en dictionnaire avant persistance."""
+
+        self.payload = payload_to_dict(self.payload)
+        return self
 
 
 class NetworkNodeUpdate(BaseModel):
@@ -54,7 +90,13 @@ class NetworkNodeUpdate(BaseModel):
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     status: Literal["available", "maintenance", "unavailable"] | None = None
-    payload: dict[str, Any] | None = None
+    payload: NodePayload | None = None
+
+    @model_validator(mode="after")
+    def normalize_payload(self) -> NetworkNodeUpdate:
+        if self.payload is not None:
+            self.payload = payload_to_dict(self.payload)
+        return self
 
 
 class NetworkNodeRead(BaseModel):
@@ -92,7 +134,7 @@ class NetworkEdgeCreate(BaseModel):
     status: Literal["available", "maintenance", "unavailable"] = "available"
     profile: list[ProfilePointInput] = Field(min_length=2)
     fittings: list[dict[str, Any]] = Field(default_factory=list)
-    payload: dict[str, Any] = Field(default_factory=dict)
+    payload: EdgePayload = Field(default_factory=dict)
 
     @field_validator("code")
     @classmethod
@@ -115,6 +157,7 @@ class NetworkEdgeCreate(BaseModel):
             )
         if self.from_node_id == self.to_node_id:
             raise ValueError("Un tronçon doit relier deux nœuds différents.")
+        self.payload = payload_to_dict(self.payload)
         return self
 
 
@@ -133,7 +176,13 @@ class NetworkEdgeUpdate(BaseModel):
     status: Literal["available", "maintenance", "unavailable"] | None = None
     profile: list[ProfilePointInput] | None = Field(default=None, min_length=2)
     fittings: list[dict[str, Any]] | None = None
-    payload: dict[str, Any] | None = None
+    payload: EdgePayload | None = None
+
+    @model_validator(mode="after")
+    def normalize_payload(self) -> NetworkEdgeUpdate:
+        if self.payload is not None:
+            self.payload = payload_to_dict(self.payload)
+        return self
 
 
 class NetworkEdgeRead(BaseModel):
@@ -171,7 +220,7 @@ class AssetInstanceCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     role: Literal["main", "standby", "auxiliary", "isolation", "control", "measurement"]
     status: Literal["available", "maintenance", "unavailable", "bypassed"] = "available"
-    payload: dict[str, Any] = Field(default_factory=dict)
+    payload: AssetPayload = Field(default_factory=dict)
 
     @field_validator("code")
     @classmethod
@@ -179,9 +228,10 @@ class AssetInstanceCreate(BaseModel):
         return value.upper()
 
     @model_validator(mode="after")
-    def validate_location(self) -> Self:
+    def validate_location(self) -> AssetInstanceCreate:
         if (self.node_id is None) == (self.edge_id is None):
             raise ValueError("L'équipement doit être placé sur un seul nœud ou un seul tronçon.")
+        self.payload = payload_to_dict(self.payload)
         return self
 
 
@@ -193,7 +243,13 @@ class AssetInstanceUpdate(BaseModel):
         None
     )
     status: Literal["available", "maintenance", "unavailable", "bypassed"] | None = None
-    payload: dict[str, Any] | None = None
+    payload: AssetPayload | None = None
+
+    @model_validator(mode="after")
+    def normalize_payload(self) -> AssetInstanceUpdate:
+        if self.payload is not None:
+            self.payload = payload_to_dict(self.payload)
+        return self
 
 
 class AssetInstanceRead(BaseModel):

@@ -437,7 +437,7 @@ restreinte aux ressources réellement acceptées par l'API.
 | Suite backend Docker (`-m "not slow"`) | **520 tests réussis** en 75,36 s |
 | Validation scientifique | **41/41**, empreinte `6973bd97…` reproductible |
 | ruff format / lint / mypy | verts (198 / 97 fichiers) |
-| Tests unitaires web | **10 réussis** |
+| Tests unitaires web | **23 réussis** |
 | Playwright bureau et mobile | **33 réussis** |
 | TypeScript et build Vite | sans erreur |
 
@@ -454,15 +454,35 @@ puis mises en service sur `petrole.distesage.com`. La production sert donc exact
  "scientific_engine_version":"hydroliquid-0.1.0","deployment":{"mode":"single_org"}}
 ```
 
-`main` a été poussée sur `origin` (`01982a5`).
+`main` a été poussée sur `origin`. Dernier état déployé et publié : `666141d`.
+
+### Formulaires industriels structurés
+
+Les fiches produit, pompe et bac ne se saisissent plus en JSON brut :
+
+- **produit** — catégorie, conditions de référence, masse volumique, viscosité, pression
+  de vapeur, dilatation, identifiant CoolProp, origine et lot ; tables
+  température–propriété éditées point par point avec pression, incertitude, méthode
+  d'essai et qualité ;
+- **pompe** — courbe H(Q) et séries optionnelles η(Q), P(Q), NPSHr(Q), vitesse de
+  référence, interpolation, puissance moteur, marge de NPSH, rapports de vitesse, débit
+  minimal continu ; débits en m³/h et puissances en kW ;
+- **bac** — type, altitude du fond, état, volume mort, produit et produits compatibles,
+  cinq seuils d'exploitation, table de barémage éditable. L'origine de la table est
+  explicite : théorique pour les études, ou jaugeage certifié. Le mode théorique affiche
+  sa limite (ne remplace pas une table ISO 7507, exclu des mouvements commerciaux).
+
+Les règles appliquées par les moteurs sont vérifiées avant l'envoi : source de masse
+volumique obligatoire, tables strictement croissantes, séries de même longueur, seuils
+ordonnés, niveau courant dans le domaine barémé. La saisie JSON reste accessible en mode
+expert pour les produits et les pompes.
 
 ### Limites restantes
 
 - le parcours complet projet → fluide → pompes → réseau → scénario → calcul →
   comparaison → rapport n'a pas encore été déroulé sur une instance réelle : la base de
   production ne contient aucun projet ;
-- les bibliothèques techniques (fluides, pompes, vannes, matériaux) se saisissent
-  toujours en JSON brut ;
+- les fiches vanne, matériau et accessoire se saisissent toujours en JSON brut ;
 - aucune politique PostgreSQL de sécurité au niveau des lignes n'est en place ;
 - aucune donnée constructeur, table de jaugeage certifiée ni conformité clause par
   clause n'est établie ;

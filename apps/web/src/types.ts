@@ -823,3 +823,71 @@ export interface TankDraft {
   /** Trace l'origine de la table : elle n'est pas transmise au backend. */
   strapping_origin: "theoretical" | "certified";
 }
+
+export type ValveType =
+  | "gate"
+  | "globe"
+  | "ball"
+  | "butterfly"
+  | "check"
+  | "control"
+  | "plug"
+  | "needle"
+  | "other";
+
+export type FailPosition = "fail_open" | "fail_close" | "fail_last" | "not_applicable";
+
+export type AccessoryType =
+  | "elbow"
+  | "tee"
+  | "reducer"
+  | "expander"
+  | "filter"
+  | "check_valve"
+  | "entrance"
+  | "exit"
+  | "custom";
+
+/** Fiche d'une vanne du catalogue, alignée sur `ValveInput`. */
+export interface ValvePayload {
+  valve_type: ValveType;
+  nominal_diameter_m: number | null;
+  k_coefficient: number | null;
+  cv: number | null;
+  kv: number | null;
+  opening_ratio: number;
+  opening_time_s: number | null;
+  closing_time_s: number | null;
+  fail_position: FailPosition;
+  pressure_class: string | null;
+  manufacturer: string | null;
+  data_source: string | null;
+}
+
+/** Fiche d'un matériau de conduite, alignée sur `MaterialInput`. */
+export interface MaterialPayload {
+  roughness_m: number | null;
+  mawp_pa: number | null;
+  material_family: string | null;
+  specification: string | null;
+  grade: string | null;
+  smys_pa: number | null;
+  ultimate_strength_pa: number | null;
+  density_kg_m3: number | null;
+  outer_diameter_m: number | null;
+  wall_thickness_m: number | null;
+  corrosion_allowance_m: number | null;
+  design_temperature_k: number | null;
+  standard_reference: string | null;
+  data_source: string | null;
+}
+
+/** Fiche d'un accessoire de ligne, alignée sur `AccessoryInput`. */
+export interface AccessoryPayload {
+  accessory_type: AccessoryType;
+  k_coefficient: number | null;
+  nominal_diameter_m: number | null;
+  equivalent_length_m: number | null;
+  manufacturer: string | null;
+  data_source: string | null;
+}

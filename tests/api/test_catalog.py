@@ -139,3 +139,88 @@ def test_schema_openapi_expose_catalogue(catalog_api) -> None:
     assert "/api/v1/catalog/{collection}" in paths
     assert "/api/v1/catalog/items/{catalog_item_id}/versions" in paths
     assert "/api/v1/catalog/items/{catalog_item_id}/approve" in paths
+
+
+def test_familles_documentaires_conservent_leurs_champs_propres(catalog_api) -> None:
+    """Vanne, matériau et accessoire gardent leurs champs après validation.
+
+    Ces trois familles ont des schémas dont tous les champs sont facultatifs :
+    une union les rendrait interchangeables et Pydantic pourrait retenir le
+    mauvais modèle, effaçant silencieusement les champs de l'autre.
+    """
+
+    client, _ = catalog_api
+    organization = create_organization(client)
+
+    valve = client.post(
+        "/api/v1/catalog/valves",
+        json={
+            "organization_id": organization["id"],
+            "code": "VN-001",
+            "name": "Vanne principale",
+            "payload": {
+                "valve_type": "ball",
+                "nominal_diameter_m": 0.5,
+                "k_coefficient": 0.2,
+                "cv": 1200.0,
+                "opening_time_s": 30.0,
+                "fail_position": "fail_close",
+                "pressure_class": "ANSI 300",
+            },
+        },
+    )
+    assert valve.status_code == 201, valve.text
+    valve_payload = valve.json()["payload"]
+    assert valve_payload["valve_type"] == "ball"
+    assert valve_payload["fail_position"] == "fail_close"
+    assert valve_payload["cv"] == 1200.0
+
+    material = client.post(
+        "/api/v1/catalog/materials",
+        json={
+            "organization_id": organization["id"],
+            "code": "MAT-001",
+            "name": "Acier API 5L X52",
+            "payload": {
+                "roughness_m": 4.5e-5,
+                "mawp_pa": 8.0e6,
+                "specification": "API 5L",
+                "grade": "X52",
+                "smys_pa": 3.59e8,
+                "corrosion_allowance_m": 0.003,
+            },
+        },
+    )
+    assert material.status_code == 201, material.text
+    material_payload = material.json()["payload"]
+    assert material_payload["grade"] == "X52"
+    assert material_payload["smys_pa"] == 3.59e8
+
+    accessory = client.post(
+        "/api/v1/catalog/accessories",
+        json={
+            "organization_id": organization["id"],
+            "code": "ACC-001",
+            "name": "Coude 90°",
+            "payload": {"accessory_type": "elbow", "k_coefficient": 0.3},
+        },
+    )
+    assert accessory.status_code == 201, accessory.text
+    assert accessory.json()["payload"]["accessory_type"] == "elbow"
+
+
+def test_famille_documentaire_refuse_une_valeur_physique_invalide(catalog_api) -> None:
+    client, _ = catalog_api
+    organization = create_organization(client)
+
+    response = client.post(
+        "/api/v1/catalog/valves",
+        json={
+            "organization_id": organization["id"],
+            "code": "VN-002",
+            "name": "Vanne incohérente",
+            "payload": {"valve_type": "ball", "k_coefficient": -1.0},
+        },
+    )
+
+    assert response.status_code == 422, response.text

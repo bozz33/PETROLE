@@ -15,14 +15,28 @@ import {
   FluidForm,
   validateFluid,
 } from "../components/catalog/FluidForm";
+import {
+  AccessoryForm,
+  defaultAccessoryPayload,
+  defaultMaterialPayload,
+  defaultValvePayload,
+  MaterialForm,
+  validateAccessory,
+  validateMaterial,
+  validateValve,
+  ValveForm,
+} from "../components/catalog/EquipmentForms";
 import { defaultPumpPayload, PumpForm, validatePump } from "../components/catalog/PumpForm";
 import { EXAMPLE_CATALOG_PAYLOADS } from "../samples";
 import type {
+  AccessoryPayload,
   CatalogCollection,
   CatalogItem,
   FluidPayload,
+  MaterialPayload,
   Page,
   PumpPayload,
+  ValvePayload,
 } from "../types";
 import { formatDate } from "../types";
 
@@ -48,15 +62,38 @@ export function BibliothequesPage() {
   const [payload, setPayload] = useState(examplePayload("fluids"));
   const [fluid, setFluid] = useState<FluidPayload>(defaultFluidPayload);
   const [pump, setPump] = useState<PumpPayload>(defaultPumpPayload);
+  const [valve, setValve] = useState<ValvePayload>(defaultValvePayload);
+  const [material, setMaterial] = useState<MaterialPayload>(defaultMaterialPayload);
+  const [accessory, setAccessory] = useState<AccessoryPayload>(defaultAccessoryPayload);
   const [expertMode, setExpertMode] = useState(false);
 
-  const structuredCollection = collection === "fluids" || collection === "pumps";
-  const useStructuredForm = structuredCollection && !expertMode;
-  const structuredProblems = useStructuredForm
-    ? collection === "fluids"
-      ? validateFluid(fluid)
-      : validatePump(pump)
-    : [];
+  // Toutes les familles disposent désormais d'une fiche guidée ; la saisie JSON
+  // reste accessible en mode expert.
+  const useStructuredForm = !expertMode;
+  const structuredPayload = (): Record<string, unknown> => {
+    if (collection === "fluids") return fluid as unknown as Record<string, unknown>;
+    if (collection === "pumps") return pump as unknown as Record<string, unknown>;
+    if (collection === "valves") return valve as unknown as Record<string, unknown>;
+    if (collection === "materials") return material as unknown as Record<string, unknown>;
+    return accessory as unknown as Record<string, unknown>;
+  };
+  const structuredProblems = useStructuredForm ? validateCollection() : [];
+
+  function validateCollection(): string[] {
+    if (collection === "fluids") return validateFluid(fluid);
+    if (collection === "pumps") return validatePump(pump);
+    if (collection === "valves") return validateValve(valve);
+    if (collection === "materials") return validateMaterial(material);
+    return validateAccessory(accessory);
+  }
+
+  function resetStructured(): void {
+    setFluid(defaultFluidPayload());
+    setPump(defaultPumpPayload());
+    setValve(defaultValvePayload());
+    setMaterial(defaultMaterialPayload());
+    setAccessory(defaultAccessoryPayload());
+  }
 
   const itemsQuery = useQuery({
     queryKey: ["catalog", organizationId, collection],
@@ -82,7 +119,7 @@ export function BibliothequesPage() {
           code,
           name,
           payload: useStructuredForm
-            ? ((collection === "fluids" ? fluid : pump) as unknown as Record<string, unknown>)
+            ? structuredPayload()
             : (JSON.parse(payload) as Record<string, unknown>),
           source: source || null,
         }),
@@ -92,8 +129,7 @@ export function BibliothequesPage() {
       setName("");
       setSource("");
       setPayload(examplePayload(collection));
-      setFluid(defaultFluidPayload());
-      setPump(defaultPumpPayload());
+      resetStructured();
       await queryClient.invalidateQueries({
         queryKey: ["catalog", organizationId, collection],
       });
@@ -262,24 +298,30 @@ export function BibliothequesPage() {
               placeholder="Analyse laboratoire, courbe constructeur ou fiche technique"
             />
           </label>
-          {structuredCollection ? (
-            <div className="button-row">
-              <button
-                type="button"
-                className="button button-ghost"
-                onClick={() => setExpertMode((current) => !current)}
-              >
-                {expertMode ? "Revenir au formulaire guidé" : "Passer en saisie JSON experte"}
-              </button>
-            </div>
-          ) : null}
+          <div className="button-row">
+            <button
+              type="button"
+              className="button button-ghost"
+              onClick={() => setExpertMode((current) => !current)}
+            >
+              {expertMode ? "Revenir au formulaire guidé" : "Passer en saisie JSON experte"}
+            </button>
+          </div>
 
           {useStructuredForm ? (
-            collection === "fluids" ? (
-              <FluidForm value={fluid} onChange={setFluid} />
-            ) : (
-              <PumpForm value={pump} onChange={setPump} />
-            )
+            <StructuredCatalogForm
+              collection={collection}
+              fluid={fluid}
+              onFluidChange={setFluid}
+              pump={pump}
+              onPumpChange={setPump}
+              valve={valve}
+              onValveChange={setValve}
+              material={material}
+              onMaterialChange={setMaterial}
+              accessory={accessory}
+              onAccessoryChange={setAccessory}
+            />
           ) : (
             <label>
               Propriétés techniques en unités SI
@@ -315,15 +357,7 @@ export function BibliothequesPage() {
               Enregistrer le brouillon
             </button>
             {useStructuredForm ? (
-              <button
-                className="button button-ghost"
-                type="button"
-                onClick={() =>
-                  collection === "fluids"
-                    ? setFluid(defaultFluidPayload())
-                    : setPump(defaultPumpPayload())
-                }
-              >
+              <button className="button button-ghost" type="button" onClick={resetStructured}>
                 Réinitialiser la fiche
               </button>
             ) : (
@@ -340,4 +374,34 @@ export function BibliothequesPage() {
       </Panel>
     </div>
   );
+}
+
+interface StructuredCatalogFormProps {
+  collection: CatalogCollection;
+  fluid: FluidPayload;
+  onFluidChange: (value: FluidPayload) => void;
+  pump: PumpPayload;
+  onPumpChange: (value: PumpPayload) => void;
+  valve: ValvePayload;
+  onValveChange: (value: ValvePayload) => void;
+  material: MaterialPayload;
+  onMaterialChange: (value: MaterialPayload) => void;
+  accessory: AccessoryPayload;
+  onAccessoryChange: (value: AccessoryPayload) => void;
+}
+
+/** Sélectionne la fiche guidée correspondant à la famille du catalogue. */
+function StructuredCatalogForm(props: StructuredCatalogFormProps) {
+  switch (props.collection) {
+    case "fluids":
+      return <FluidForm value={props.fluid} onChange={props.onFluidChange} />;
+    case "pumps":
+      return <PumpForm value={props.pump} onChange={props.onPumpChange} />;
+    case "valves":
+      return <ValveForm value={props.valve} onChange={props.onValveChange} />;
+    case "materials":
+      return <MaterialForm value={props.material} onChange={props.onMaterialChange} />;
+    default:
+      return <AccessoryForm value={props.accessory} onChange={props.onAccessoryChange} />;
+  }
 }

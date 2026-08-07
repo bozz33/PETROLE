@@ -18,6 +18,7 @@ from hydro_api.schemas.catalog import (
     CatalogItemUpdate,
     CatalogItemVersionCreate,
 )
+from hydro_api.schemas.scientific import AccessoryInput, MaterialInput, ValveInput
 from hydro_domain.serialization import fluid_from_dict, pump_model_from_dict
 from hydro_shared.hashing import sha256_of
 
@@ -49,6 +50,14 @@ def _validate_positive(payload: dict[str, Any], field: str) -> None:
         raise ValueError(f"Le champ {field} doit être positif ou nul.")
 
 
+#: Schémas appliqués aux familles dont le contenu est surtout documentaire.
+TYPED_FAMILIES: dict[str, type[BaseModel]] = {
+    "valve": ValveInput,
+    "material": MaterialInput,
+    "accessory": AccessoryInput,
+}
+
+
 def _canonical_payload(
     kind: str,
     code: str,
@@ -62,11 +71,13 @@ def _canonical_payload(
         return fluid_from_dict(candidate, "catalog.fluid").as_dict()
     if kind == "pump":
         return pump_model_from_dict(candidate, "catalog.pump").as_dict()
-    if kind in {"valve", "accessory"}:
-        _validate_positive(candidate, "k_coefficient")
-    if kind == "material":
-        _validate_positive(candidate, "roughness_m")
-        _validate_positive(candidate, "mawp_pa")
+    # Les familles documentaires sont validées ici, où le ``kind`` est connu :
+    # une union de schémas les rendrait interchangeables et perdrait les champs
+    # propres à chacune.
+    typed_family = TYPED_FAMILIES.get(kind)
+    if typed_family is not None:
+        validated = typed_family.model_validate(payload).model_dump()
+        return {**validated, "id": code, "name": name}
     return candidate
 
 

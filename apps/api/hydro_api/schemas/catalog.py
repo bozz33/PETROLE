@@ -12,8 +12,14 @@ from hydro_api.schemas.scientific import FluidInput, PumpModelInput
 
 #: Contenu technique d'un élément de catalogue. La nature exacte dépend du
 #: ``kind`` fourni dans le chemin de la requête : ``fluid`` → FluidInput,
-#: ``pump`` → PumpModelInput. La branche ``dict`` accepte les familles moins
-#: structurées (matériau, vanne, accessoire) et préserve la rétro-compatibilité.
+#: ``pump`` → PumpModelInput.
+#:
+#: Les familles vanne, matériau et accessoire transitent volontairement par la
+#: branche ``dict`` : leurs modèles n'ont que des champs facultatifs, si bien
+#: qu'une union les rendrait interchangeables et ferait perdre silencieusement
+#: les champs propres à l'une lorsque Pydantic choisirait l'autre. Leur
+#: validation typée est appliquée par le service, qui connaît le ``kind``
+#: (``ValveInput``, ``MaterialInput``, ``AccessoryInput``).
 CatalogPayload = FluidInput | PumpModelInput | dict[str, Any]
 
 

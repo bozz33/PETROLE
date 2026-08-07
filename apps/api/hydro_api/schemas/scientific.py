@@ -335,15 +335,141 @@ class ValveAssetInput(BaseModel):
     )
 
 
+#: Types de vannes couramment rencontrés sur une ligne liquide (D09 § 6).
+ValveTypeLiteral = Literal[
+    "gate",
+    "globe",
+    "ball",
+    "butterfly",
+    "check",
+    "control",
+    "plug",
+    "needle",
+    "other",
+]
+
+#: Position de repli d'une vanne motorisée en cas de perte d'énergie.
+FailPositionLiteral = Literal["fail_open", "fail_close", "fail_last", "not_applicable"]
+
+#: Familles d'accessoires dont la perte singulière est prise en compte.
+AccessoryTypeLiteral = Literal[
+    "elbow",
+    "tee",
+    "reducer",
+    "expander",
+    "filter",
+    "check_valve",
+    "entrance",
+    "exit",
+    "custom",
+]
+
+
+class ValveInput(BaseModel):
+    """Fiche d'une vanne du catalogue technique.
+
+    Seul ``k_coefficient`` est consommé par le calcul hydraulique : les autres
+    champs documentent l'équipement et servent aux rapports et à l'exploitation.
+    """
+
+    valve_type: ValveTypeLiteral = Field(
+        default="gate", description="Type de vanne selon la nomenclature du dictionnaire."
+    )
+    nominal_diameter_m: float | None = Field(
+        default=None, gt=0, description="Diamètre nominal (m)."
+    )
+    k_coefficient: float | None = Field(
+        default=None,
+        ge=0,
+        description="Coefficient de perte singulière utilisé par le calcul hydraulique.",
+    )
+    cv: float | None = Field(default=None, ge=0, description="Coefficient de débit Cv (US).")
+    kv: float | None = Field(default=None, ge=0, description="Coefficient de débit Kv (SI).")
+    opening_ratio: float = Field(
+        default=1.0, ge=0, le=1.0, description="Taux d'ouverture nominal (0 = fermé, 1 = ouvert)."
+    )
+    opening_time_s: float | None = Field(default=None, ge=0, description="Temps d'ouverture (s).")
+    closing_time_s: float | None = Field(default=None, ge=0, description="Temps de fermeture (s).")
+    fail_position: FailPositionLiteral = Field(
+        default="not_applicable", description="Position de repli en cas de perte d'énergie."
+    )
+    pressure_class: str | None = Field(
+        default=None, max_length=50, description="Classe de pression, par exemple ANSI 300."
+    )
+    manufacturer: str | None = Field(default=None, max_length=200)
+    data_source: str | None = Field(default=None, max_length=10_000)
+
+
+class MaterialInput(BaseModel):
+    """Fiche d'un matériau de conduite du catalogue technique.
+
+    ``roughness_m`` alimente le calcul de perte de charge et ``mawp_pa`` le
+    contrôle de pression maximale ; les autres champs sont documentaires.
+    """
+
+    roughness_m: float | None = Field(
+        default=None, ge=0, description="Rugosité absolue utilisée par le modèle de frottement."
+    )
+    mawp_pa: float | None = Field(
+        default=None, ge=0, description="Pression maximale admissible en service (Pa)."
+    )
+    material_family: str | None = Field(
+        default=None, max_length=120, description="Famille, par exemple acier au carbone."
+    )
+    specification: str | None = Field(
+        default=None, max_length=120, description="Spécification, par exemple API 5L."
+    )
+    grade: str | None = Field(default=None, max_length=60, description="Grade, par exemple X52.")
+    smys_pa: float | None = Field(
+        default=None, ge=0, description="Limite d'élasticité minimale spécifiée (Pa)."
+    )
+    ultimate_strength_pa: float | None = Field(
+        default=None, ge=0, description="Résistance ultime à la traction (Pa)."
+    )
+    density_kg_m3: float | None = Field(default=None, ge=0)
+    outer_diameter_m: float | None = Field(default=None, gt=0)
+    wall_thickness_m: float | None = Field(default=None, gt=0)
+    corrosion_allowance_m: float | None = Field(default=None, ge=0)
+    design_temperature_k: float | None = Field(default=None, gt=0)
+    standard_reference: str | None = Field(
+        default=None,
+        max_length=200,
+        description="Référence normative documentaire ; n'établit aucune conformité.",
+    )
+    data_source: str | None = Field(default=None, max_length=10_000)
+
+
+class AccessoryInput(BaseModel):
+    """Fiche d'un accessoire de ligne du catalogue technique.
+
+    ``k_coefficient`` est la seule grandeur consommée par le calcul hydraulique.
+    """
+
+    accessory_type: AccessoryTypeLiteral = Field(default="elbow")
+    k_coefficient: float | None = Field(
+        default=None, ge=0, description="Coefficient de perte singulière."
+    )
+    nominal_diameter_m: float | None = Field(default=None, gt=0)
+    equivalent_length_m: float | None = Field(
+        default=None, ge=0, description="Longueur équivalente, si la source l'exprime ainsi."
+    )
+    manufacturer: str | None = Field(default=None, max_length=200)
+    data_source: str | None = Field(default=None, max_length=10_000)
+
+
 __all__ = [
+    "AccessoryInput",
+    "AccessoryTypeLiteral",
     "ArrangementLiteral",
     "EdgeGeometryInput",
     "EquipmentStatusLiteral",
+    "FailPositionLiteral",
     "FluidCategoryLiteral",
     "FluidInput",
     "FrictionModelLiteral",
     "InjectionNodePayloadInput",
     "InterpolationLiteral",
+    "MaterialInput",
     "ObjectiveLiteral",
     "OfftakeNodePayloadInput",
     "PropertyPointInput",
@@ -361,5 +487,7 @@ __all__ = [
     "StationOverrideInput",
     "TerminalNodePayloadInput",
     "ValveAssetInput",
+    "ValveInput",
+    "ValveTypeLiteral",
     "payload_to_dict",
 ]

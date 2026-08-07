@@ -40,8 +40,34 @@ class ValidationSuiteResult:
     def failed_count(self) -> int:
         return len(self.cases) - self.passed_count
 
+    def scientific_payload(self) -> dict[str, Any]:
+        """Retourne le contenu scientifique reproductible du dossier de preuve.
+
+        Sont exclus l'horodatage, les durées et les caractéristiques de la machine
+        (interpréteur, système, dépendances). Deux exécutions du même code sur le
+        même dossier de cas produisent donc la même empreinte, ce qui permet de
+        vérifier automatiquement l'attestation publiée par l'API.
+        """
+
+        return {
+            "schema_version": VALIDATION_SCHEMA_VERSION,
+            "passed": self.passed,
+            "passed_count": self.passed_count,
+            "failed_count": self.failed_count,
+            "versions": {
+                key: self.environment.get(key)
+                for key in (
+                    "platform_version",
+                    "engine_version",
+                    "input_schema_version",
+                    "result_schema_version",
+                )
+            },
+            "cases": [case.scientific_payload() for case in self.cases],
+        }
+
     def evidence_payload(self) -> dict[str, Any]:
-        """Retourne le contenu stable utilisé pour calculer l'empreinte."""
+        """Retourne le dossier complet, exécution et environnement compris."""
 
         return {
             "schema_version": VALIDATION_SCHEMA_VERSION,
@@ -55,20 +81,50 @@ class ValidationSuiteResult:
             "cases": [case.as_dict() for case in self.cases],
         }
 
-    @property
-    def sha256(self) -> str:
+    @staticmethod
+    def _digest(payload: dict[str, Any]) -> str:
         encoded = json.dumps(
-            self.evidence_payload(),
+            payload,
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
+    @property
+    def proof_hash(self) -> str:
+        """Empreinte reproductible des résultats scientifiques."""
+
+        return self._digest(self.scientific_payload())
+
+    @property
+    def sha256(self) -> str:
+        """Empreinte de cette exécution précise, horodatage et machine compris."""
+
+        return self._digest(self.evidence_payload())
+
     def as_dict(self) -> dict[str, Any]:
         payload = self.evidence_payload()
+        payload["proof_hash"] = self.proof_hash
         payload["sha256"] = self.sha256
         return payload
+
+    def attestation(self, source: str) -> dict[str, Any]:
+        """Construit l'attestation publiable par l'API à partir de cette exécution."""
+
+        return {
+            "suite": "scientific-validation",
+            "passed": self.passed_count,
+            "total": len(self.cases),
+            "proof_hash": self.proof_hash,
+            "engine_version": str(self.environment.get("engine_version", "inconnu")),
+            "executed_at": self.finished_at,
+            "environment": (
+                f"python-{self.environment.get('python', 'inconnu')} "
+                f"({self.environment.get('os', 'inconnu')})"
+            ),
+            "source": source,
+        }
 
 
 def select_cases(patterns: Iterable[str] | None = None) -> tuple[ValidationCase, ...]:
@@ -140,7 +196,8 @@ def render_markdown(result: ValidationSuiteResult) -> str:
         f"- Début UTC : {result.started_at}",
         f"- Fin UTC : {result.finished_at}",
         f"- Durée : {result.duration_s:.6f} s",
-        f"- Empreinte SHA-256 : {result.sha256}",
+        f"- Empreinte reproductible des résultats : {result.proof_hash}",
+        f"- Empreinte SHA-256 de l'exécution : {result.sha256}",
         "",
         "## Environnement",
         "",

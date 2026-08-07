@@ -25,6 +25,17 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--report", type=Path, help="Chemin du rapport Markdown.")
     parser.add_argument("--json", type=Path, dest="json_path", help="Chemin de la preuve JSON.")
+    parser.add_argument(
+        "--attestation",
+        type=Path,
+        dest="attestation_path",
+        help="Chemin de l'attestation publiée par l'API.",
+    )
+    parser.add_argument(
+        "--attestation-source",
+        default="packages/validation (exécution hydro-validate)",
+        help="Référence documentaire citée par l'attestation.",
+    )
     parser.add_argument("--list", action="store_true", help="Liste les cas sans les exécuter.")
     return parser
 
@@ -55,13 +66,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             encoding="utf-8",
         )
 
+    if args.attestation_path:
+        args.attestation_path.parent.mkdir(parents=True, exist_ok=True)
+        args.attestation_path.write_text(
+            json.dumps(
+                result.attestation(args.attestation_source),
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
     verdict = "VALIDÉ" if result.passed else "ÉCHEC"
     print(f"Validation {verdict} : {result.passed_count}/{len(result.cases)} cas réussis.")
-    print(f"Empreinte SHA-256 : {result.sha256}")
+    print(f"Empreinte reproductible : {result.proof_hash}")
+    print(f"Empreinte d'exécution : {result.sha256}")
     if args.report:
         print(f"Rapport Markdown : {args.report}")
     if args.json_path:
         print(f"Preuve JSON : {args.json_path}")
+    if args.attestation_path:
+        print(f"Attestation publiée : {args.attestation_path}")
     return 0 if result.passed else 1
 
 

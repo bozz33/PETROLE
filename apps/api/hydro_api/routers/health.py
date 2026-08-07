@@ -16,7 +16,7 @@ from hydro_api import __version__
 from hydro_api.config import Settings
 from hydro_api.database.session import get_session
 from hydro_api.storage import object_storage_for
-from hydroliquid.long_distance import LongDistanceLiquidEngine
+from hydro_shared.versioning import ENGINE_VERSION
 
 router = APIRouter(prefix="/health", tags=["santé"])
 version_router = APIRouter(tags=["santé"])
@@ -31,8 +31,8 @@ class HealthResponse(BaseModel):
     service: str
     version: str
     environment: str
-    build: "BuildMetadata"
-    deployment: "DeploymentMetadata"
+    build: BuildMetadata
+    deployment: DeploymentMetadata
 
 
 class BuildMetadata(BaseModel):
@@ -90,9 +90,7 @@ def build_metadata(settings: Settings) -> BuildMetadata:
         git_sha=settings.build_git_sha,
         ref=settings.build_ref,
         build_date=settings.build_date,
-        scientific_engine_version=(
-            f"{LongDistanceLiquidEngine.name}-{LongDistanceLiquidEngine.version}"
-        ),
+        scientific_engine_version=ENGINE_VERSION,
         database_migration_version=settings.database_migration_version,
     )
 
@@ -100,8 +98,8 @@ def build_metadata(settings: Settings) -> BuildMetadata:
 def published_scientific_validation() -> ScientificValidationResponse:
     """Lit attestation de qualification versionnée avec le paquet API."""
 
-    content = files("hydro_api").joinpath("scientific_validation_proof.json").read_text(
-        encoding="utf-8"
+    content = (
+        files("hydro_api").joinpath("scientific_validation_proof.json").read_text(encoding="utf-8")
     )
     return ScientificValidationResponse.model_validate(json.loads(content))
 

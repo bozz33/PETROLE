@@ -73,6 +73,7 @@ def _observation(
     absolute: float = 0.0,
     relative: float = 0.0,
     detail: str | None = None,
+    reproducible: bool = True,
 ) -> ValidationObservation:
     return ValidationObservation(
         name=name,
@@ -82,6 +83,7 @@ def _observation(
         absolute_tolerance=absolute,
         relative_tolerance=relative,
         detail=detail,
+        reproducible=reproducible,
     )
 
 
@@ -853,6 +855,7 @@ def _v020() -> tuple[ValidationObservation, ...]:
             0.0,
             unit="s",
             absolute=10.0,
+            reproducible=False,
         ),
     )
 

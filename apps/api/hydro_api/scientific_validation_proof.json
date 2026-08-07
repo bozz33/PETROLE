@@ -2,9 +2,9 @@
   "suite": "scientific-validation",
   "passed": 41,
   "total": 41,
-  "proof_hash": "b476c957ada65949331d87398677f8b0cd1509784c38ed5509c45105d046dbd9",
-  "engine_version": "hydroliquid-long-distance-0.1.0",
-  "executed_at": "2026-08-03T00:00:00Z",
-  "environment": "docker-python-3.11",
-  "source": "docs/validation/qualification_backend_mvp_20260803.md"
+  "proof_hash": "6973bd97cbbdbd38d64d95dbbedf44bd630e10cacf380a0cc2fda6651ff98e3a",
+  "engine_version": "hydroliquid-0.1.0",
+  "executed_at": "2026-08-07T07:30:51.486912+00:00",
+  "environment": "python-3.11.15 (Linux 6.8.0-136-generic)",
+  "source": "docs/validation/qualification_backend_mvp_20260807.md"
 }

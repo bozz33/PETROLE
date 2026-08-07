@@ -69,9 +69,7 @@ def create_organization(
     session: DatabaseSession,
 ):
     if is_single_organization(request.app.state.settings):
-        raise ResourceConflictError(
-            "La création d'organisation est désactivée en mode single_org."
-        )
+        raise ResourceConflictError("La création d'organisation est désactivée en mode single_org.")
     access = request.state.access_context
     return core.create_organization(session, data, actor_id=access.user_id)
 
@@ -89,6 +87,7 @@ def list_organizations(
 ):
     access = request.state.access_context
     settings = request.app.state.settings
+    allowed_ids: tuple[uuid.UUID, ...] | None
     if is_single_organization(settings):
         allowed_ids = (require_default_organization_id(request, session),)
     else:
@@ -150,18 +149,19 @@ def list_projects(
 ):
     access = request.state.access_context
     settings = request.app.state.settings
+    project_allowed_ids: tuple[uuid.UUID, ...] | None
     if is_single_organization(settings):
         organization_id = require_default_organization_id(request, session)
-        allowed_ids = (organization_id,)
+        project_allowed_ids = (organization_id,)
     else:
-        allowed_ids = None if access.local_bypass else access.organization_ids
+        project_allowed_ids = None if access.local_bypass else access.organization_ids
     items, total = core.list_projects(
         session,
         organization_id=organization_id,
         include_archived=include_archived,
         limit=limit,
         offset=offset,
-        allowed_organization_ids=allowed_ids,
+        allowed_organization_ids=project_allowed_ids,
     )
     return Page(items=items, total=total, limit=limit, offset=offset)
 

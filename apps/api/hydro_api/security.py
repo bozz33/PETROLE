@@ -289,13 +289,11 @@ async def authorize_application_request(
     """Vérifie le rôle sur l'organisation résolue depuis la requête ou la ressource."""
 
     settings = _settings(request)
+    organization_id: uuid.UUID | None
     if is_single_organization(settings):
         organization_id = require_default_organization_id(request, session)
         resource_organization_id = _organization_for_resource(session, request.path_params)
-        if (
-            resource_organization_id is not None
-            and resource_organization_id != organization_id
-        ):
+        if resource_organization_id is not None and resource_organization_id != organization_id:
             # Une réponse neutre évite de confirmer l'existence d'une ressource
             # appartenant à un autre espace, même pour un compte multi-rôle.
             raise HTTPException(

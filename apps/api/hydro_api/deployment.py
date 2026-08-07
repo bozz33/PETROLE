@@ -65,9 +65,7 @@ def require_default_organization_id(request: Request, session: Session) -> uuid.
 
     organization_id = resolve_default_organization_id(session, request.app.state.settings)
     if organization_id is None:
-        raise ResourceConflictError(
-            "Initialisez d'abord l'organisation unique de cette instance."
-        )
+        raise ResourceConflictError("Initialisez d'abord l'organisation unique de cette instance.")
     return organization_id
 
 

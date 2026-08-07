@@ -45,7 +45,7 @@ def test_sante_api() -> None:
             "git_sha": "unknown",
             "ref": "unknown",
             "build_date": "unknown",
-            "scientific_engine_version": "hydroliquid-long-distance-0.1.0",
+            "scientific_engine_version": "hydroliquid-0.1.0",
             "database_migration_version": "8b1f2d6c4e90",
         },
         "deployment": {
@@ -77,7 +77,7 @@ def test_version_expose_identite_build_et_moteur() -> None:
         "git_sha": "a1b2c3d4e5f6",
         "ref": "v0.1.0-rc.1",
         "build_date": "2026-08-06T10:00:00Z",
-        "scientific_engine_version": "hydroliquid-long-distance-0.1.0",
+        "scientific_engine_version": "hydroliquid-0.1.0",
         "database_migration_version": "8b1f2d6c4e90",
     }
     assert scientific_validation.status_code == 200

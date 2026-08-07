@@ -19,6 +19,10 @@ class ValidationObservation:
     absolute_tolerance: float = 0.0
     relative_tolerance: float = 0.0
     detail: str | None = None
+    #: Faux pour une mesure dépendante de la machine, par exemple un temps de calcul.
+    #: La valeur observée est alors exclue de l'empreinte reproductible : seul son
+    #: verdict de conformité à la limite est retenu.
+    reproducible: bool = True
 
     @property
     def absolute_error(self) -> float:
@@ -58,7 +62,18 @@ class ValidationObservation:
             "relative_error": self.relative_error,
             "passed": self.passed,
             "detail": self.detail,
+            "reproducible": self.reproducible,
         }
+
+    def scientific_payload(self) -> dict[str, Any]:
+        """Contenu retenu dans l'empreinte reproductible du dossier de preuve."""
+
+        payload = self.as_dict()
+        if self.reproducible:
+            return payload
+        for key in ("actual", "absolute_error", "relative_error"):
+            payload.pop(key)
+        return payload
 
 
 ValidationExecutor = Callable[[], tuple[ValidationObservation, ...]]
@@ -94,6 +109,23 @@ class ValidationCaseResult:
             and bool(self.observations)
             and all(observation.passed for observation in self.observations)
         )
+
+    def scientific_payload(self) -> dict[str, Any]:
+        """Contenu scientifique reproductible, sans mesure de temps d'exécution.
+
+        La durée dépend de la machine : l'exclure rend l'empreinte du dossier de
+        preuve comparable entre deux exécutions du même code.
+        """
+
+        return {
+            "case_id": self.case_id,
+            "title": self.title,
+            "category": self.category,
+            "reference": self.reference,
+            "passed": self.passed,
+            "error": self.error,
+            "observations": [observation.scientific_payload() for observation in self.observations],
+        }
 
     def as_dict(self) -> dict[str, Any]:
         return {

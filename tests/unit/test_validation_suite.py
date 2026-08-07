@@ -6,6 +6,8 @@ import json
 
 import pytest
 
+from hydro_api.routers.health import published_scientific_validation
+from hydro_shared.versioning import ENGINE_VERSION
 from hydro_validation.cli import main
 from hydro_validation.runner import render_markdown, run_validation_suite, select_cases
 
@@ -19,6 +21,38 @@ def test_all_registered_validation_cases_pass() -> None:
     assert result.passed_count == 41
     assert result.failed_count == 0
     assert len(result.sha256) == 64
+    assert len(result.proof_hash) == 64
+
+
+@pytest.mark.scientific
+def test_empreinte_des_resultats_est_reproductible() -> None:
+    """Deux exécutions du même code produisent la même empreinte de résultats."""
+
+    premiere = run_validation_suite()
+    seconde = run_validation_suite()
+
+    assert premiere.proof_hash == seconde.proof_hash
+    # L'empreinte d'exécution intègre l'horodatage : elle ne peut pas coïncider.
+    assert premiere.sha256 != seconde.sha256
+
+
+@pytest.mark.scientific
+def test_attestation_publiee_correspond_a_une_execution_reelle() -> None:
+    """L'attestation servie par l'API doit refléter la suite réellement exécutée.
+
+    Ce contrôle interdit toute valeur figée à la main dans le fichier publié avec
+    l'image : un écart de comptage, de moteur ou d'empreinte fait échouer la
+    qualification avant la mise en production.
+    """
+
+    publiee = published_scientific_validation()
+    result = run_validation_suite()
+
+    assert publiee.suite == "scientific-validation"
+    assert publiee.passed == result.passed_count
+    assert publiee.total == len(result.cases)
+    assert publiee.proof_hash == result.proof_hash
+    assert publiee.engine_version == ENGINE_VERSION
 
 
 def test_case_selection_accepts_shell_patterns() -> None:

@@ -1,12 +1,25 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { apiRequest, downloadApiFile, jsonBody } from "../api";
 import { EmptyState, ErrorNotice, Panel, StatusBadge, SuccessNotice } from "../components/Shell";
-import type { Calculation, CalculationResult, Report } from "../types";
+import type {
+  Calculation,
+  CalculationResult,
+  Comparison,
+  ModelVersion,
+  Page,
+  Project,
+  Report,
+  Scenario,
+  Transfer,
+} from "../types";
 import { formatDate } from "../types";
 
 export function RapportsPage() {
+  const [projectId, setProjectId] = useState("");
+  const [modelId, setModelId] = useState("");
+  const [scenarioId, setScenarioId] = useState("");
   const [calculationId, setCalculationId] = useState("");
   const [calculation, setCalculation] = useState<Calculation | null>(null);
   const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
@@ -16,11 +29,82 @@ export function RapportsPage() {
   const [operationalType, setOperationalType] = useState("project_sheet");
   const [sourceId, setSourceId] = useState("");
 
+  const projectsQuery = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => apiRequest<Page<Project>>("/projects?limit=200&offset=0"),
+  });
+  const modelsQuery = useQuery({
+    queryKey: ["models", projectId],
+    queryFn: () =>
+      apiRequest<Page<ModelVersion>>("/projects/" + projectId + "/models?limit=200&offset=0"),
+    enabled: Boolean(projectId),
+  });
+  const scenariosQuery = useQuery({
+    queryKey: ["scenarios", modelId],
+    queryFn: () =>
+      apiRequest<Page<Scenario>>("/models/" + modelId + "/scenarios?limit=200&offset=0"),
+    enabled: Boolean(modelId),
+  });
+  const calculationsQuery = useQuery({
+    queryKey: ["calculations", scenarioId],
+    queryFn: () =>
+      apiRequest<Page<Calculation>>(
+        "/scenarios/" + scenarioId + "/calculations?limit=200&offset=0",
+      ),
+    enabled: Boolean(scenarioId),
+  });
+
+  const projects = projectsQuery.data?.items ?? [];
+  const organizationId =
+    projects.find((project) => project.id === projectId)?.organization_id ?? "";
+  const models = modelsQuery.data?.items ?? [];
+  const scenarios = scenariosQuery.data?.items ?? [];
+  const calculations = calculationsQuery.data?.items ?? [];
+
+  useEffect(() => {
+    if (!projects.some((project) => project.id === projectId)) {
+      setProjectId(projects[0]?.id ?? "");
+    }
+  }, [projectId, projects]);
+
+  useEffect(() => {
+    if (!models.some((model) => model.id === modelId)) {
+      setModelId(models[0]?.id ?? "");
+    }
+  }, [modelId, models]);
+
+  useEffect(() => {
+    if (!scenarios.some((scenario) => scenario.id === scenarioId)) {
+      setScenarioId(scenarios[0]?.id ?? "");
+    }
+  }, [scenarioId, scenarios]);
+
+  useEffect(() => {
+    if (!calculations.some((item) => item.id === calculationId)) {
+      setCalculationId(calculations[0]?.id ?? "");
+    }
+  }, [calculationId, calculations]);
+
+  const comparisonsQuery = useQuery({
+    queryKey: ["comparisons", projectId],
+    queryFn: () =>
+      apiRequest<Page<Comparison>>("/projects/" + projectId + "/comparisons?limit=200&offset=0"),
+    enabled: Boolean(projectId) && operationalType === "scenario_comparison",
+  });
+  const transfersQuery = useQuery({
+    queryKey: ["transfers", organizationId],
+    queryFn: () =>
+      apiRequest<Page<Transfer>>(
+        "/organizations/" + organizationId + "/transfers?limit=200&offset=0",
+      ),
+    enabled:
+      Boolean(organizationId) &&
+      (operationalType === "transfer_simulation" || operationalType === "material_balance"),
+  });
+
   const lookupMutation = useMutation({
     mutationFn: async () => {
-      const selectedCalculation = await apiRequest<Calculation>(
-        "/calculations/" + calculationId.trim(),
-      );
+      const selectedCalculation = await apiRequest<Calculation>("/calculations/" + calculationId);
       const selectedResult = await apiRequest<CalculationResult>(
         "/calculations/" + selectedCalculation.id + "/results",
       );
@@ -73,7 +157,26 @@ export function RapportsPage() {
     onSuccess: setHydraulicReport,
   });
 
+  const sourceOptions = buildSourceOptions(operationalType, {
+    projects,
+    calculations,
+    comparisons: comparisonsQuery.data?.items ?? [],
+    transfers: transfersQuery.data?.items ?? [],
+  });
+
+  useEffect(() => {
+    if (!sourceOptions.some((option) => option.id === sourceId)) {
+      setSourceId(sourceOptions[0]?.id ?? "");
+    }
+  }, [sourceId, sourceOptions]);
+
   const error =
+    projectsQuery.error ??
+    comparisonsQuery.error ??
+    transfersQuery.error ??
+    modelsQuery.error ??
+    scenariosQuery.error ??
+    calculationsQuery.error ??
     lookupMutation.error ??
     reportMutation.error ??
     operationalMutation.error ??
@@ -102,16 +205,65 @@ export function RapportsPage() {
           }}
         >
           <label>
-            Identifiant du calcul
-            <input
-              className="mono"
+            Projet
+            <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+              <option value="">Sélectionner</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.code} — {project.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Version de modèle
+            <select
+              value={modelId}
+              onChange={(event) => setModelId(event.target.value)}
+              disabled={!projectId}
+            >
+              <option value="">Sélectionner</option>
+              {models.map((model) => (
+                <option key={model.id} value={model.id}>
+                  V{model.version_number} — {model.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Scénario
+            <select
+              value={scenarioId}
+              onChange={(event) => setScenarioId(event.target.value)}
+              disabled={!modelId}
+            >
+              <option value="">Sélectionner</option>
+              {scenarios.map((scenario) => (
+                <option key={scenario.id} value={scenario.id}>
+                  {scenario.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Calcul
+            <select
               value={calculationId}
               onChange={(event) => setCalculationId(event.target.value)}
-              placeholder="UUID du calcul"
-              required
-            />
+              disabled={!scenarioId}
+            >
+              <option value="">Sélectionner</option>
+              {calculations.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {formatDate(item.created_at)} — {item.status} ({item.id.slice(0, 8)})
+                </option>
+              ))}
+            </select>
           </label>
-          <button className="button button-secondary" disabled={lookupMutation.isPending}>
+          <button
+            className="button button-secondary"
+            disabled={!calculationId || lookupMutation.isPending}
+          >
             Vérifier
           </button>
         </form>
@@ -276,14 +428,22 @@ export function RapportsPage() {
             </select>
           </label>
           <label>
-            Identifiant de la source
-            <input
-              className="mono"
+            {SOURCE_LABELS[operationalType] ?? "Source"}
+            <select
               value={sourceId}
               onChange={(event) => setSourceId(event.target.value)}
-              placeholder="UUID du projet, calcul, transfert ou comparaison"
               required
-            />
+            >
+              <option value="">Sélectionner</option>
+              {sourceOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {sourceOptions.length ? null : (
+              <small>Aucune source disponible pour ce modèle de rapport.</small>
+            )}
           </label>
           <button className="button button-primary" disabled={operationalMutation.isPending}>
             {operationalMutation.isPending ? "Génération…" : "Générer et archiver"}
@@ -323,4 +483,56 @@ function Guarantee({ title, detail }: { title: string; detail: string }) {
       </div>
     </article>
   );
+}
+
+/** Intitulé du sélecteur de source, par modèle de rapport. */
+const SOURCE_LABELS: Record<string, string> = {
+  project_sheet: "Projet",
+  scenario_comparison: "Comparaison",
+  station_pumps: "Calcul",
+  transfer_simulation: "Transfert",
+  material_balance: "Transfert",
+};
+
+interface SourceOption {
+  id: string;
+  label: string;
+}
+
+/** Associe chaque modèle de rapport aux ressources réellement acceptées par l'API. */
+export function buildSourceOptions(
+  reportType: string,
+  data: {
+    projects: Project[];
+    calculations: Calculation[];
+    comparisons: Comparison[];
+    transfers: Transfer[];
+  },
+): SourceOption[] {
+  if (reportType === "project_sheet") {
+    return data.projects.map((project) => ({
+      id: project.id,
+      label: project.code + " — " + project.name,
+    }));
+  }
+  if (reportType === "scenario_comparison") {
+    return data.comparisons.map((comparison) => ({
+      id: comparison.id,
+      label:
+        formatDate(comparison.created_at) +
+        " — " +
+        String(comparison.calculation_ids.length) +
+        " calculs",
+    }));
+  }
+  if (reportType === "station_pumps") {
+    return data.calculations.map((calculation) => ({
+      id: calculation.id,
+      label: formatDate(calculation.created_at) + " — " + calculation.status,
+    }));
+  }
+  return data.transfers.map((transfer) => ({
+    id: transfer.id,
+    label: formatDate(transfer.created_at) + " — " + transfer.status,
+  }));
 }

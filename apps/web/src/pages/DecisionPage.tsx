@@ -10,6 +10,7 @@ import {
   SuccessNotice,
 } from "../components/Shell";
 import type {
+  AssetInstance,
   Comparison,
   Calculation,
   ModelVersion,
@@ -27,6 +28,18 @@ export function DecisionPage() {
   const [calculationIds, setCalculationIds] = useState<string[]>([]);
   const [objective, setObjective] = useState("min_energy");
   const [speedOptions, setSpeedOptions] = useState("0.8, 1.0");
+  const [referenceDurationH, setReferenceDurationH] = useState("1");
+  const [energyPricePerKwh, setEnergyPricePerKwh] = useState("");
+  const [minimumFlowM3H, setMinimumFlowM3H] = useState("");
+  const [maximumFlowM3H, setMaximumFlowM3H] = useState("");
+  const [minimumPressureBar, setMinimumPressureBar] = useState("");
+  const [maximumPressureBar, setMaximumPressureBar] = useState("");
+  const [maximumActivePumps, setMaximumActivePumps] = useState("");
+  const [requiredPumpIds, setRequiredPumpIds] = useState<string[]>([]);
+  const [forbiddenPumpIds, setForbiddenPumpIds] = useState<string[]>([]);
+  const [allowViolations, setAllowViolations] = useState(false);
+  const [maximumConfigurations, setMaximumConfigurations] = useState("100000");
+  const [maximumEvaluations, setMaximumEvaluations] = useState("");
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [optimization, setOptimization] = useState<Optimization | null>(null);
 
@@ -50,6 +63,12 @@ export function DecisionPage() {
       ),
     enabled: Boolean(modelId),
   });
+  const assetsQuery = useQuery({
+    queryKey: ["assets", modelId],
+    queryFn: () =>
+      apiRequest<Page<AssetInstance>>("/models/" + modelId + "/assets?limit=2000&offset=0"),
+    enabled: Boolean(modelId),
+  });
   const calculationsQuery = useQuery({
     queryKey: ["calculations", scenarioId],
     queryFn: () =>
@@ -63,6 +82,9 @@ export function DecisionPage() {
   const models = modelsQuery.data?.items ?? [];
   const scenarios = scenariosQuery.data?.items ?? [];
   const calculations = calculationsQuery.data?.items ?? [];
+  const pumps = (assetsQuery.data?.items ?? []).filter(
+    (asset) => asset.role === "main" || asset.role === "standby",
+  );
 
   useEffect(() => {
     if (!projects.some((project) => project.id === projectId)) {
@@ -109,8 +131,20 @@ export function DecisionPage() {
               .split(/[\s,;]+/)
               .map(Number)
               .filter((value) => Number.isFinite(value) && value > 0),
-            reference_duration_s: 3_600,
-            constraints: {},
+            reference_duration_s: (optionalNumber(referenceDurationH) ?? 1) * 3_600,
+            energy_price_per_kwh: optionalNumber(energyPricePerKwh),
+            maximum_configurations: optionalNumber(maximumConfigurations) ?? 100_000,
+            maximum_evaluations: optionalNumber(maximumEvaluations),
+            constraints: {
+              minimum_flow_m3_s: divide(optionalNumber(minimumFlowM3H), 3_600),
+              maximum_flow_m3_s: divide(optionalNumber(maximumFlowM3H), 3_600),
+              minimum_pressure_pa: multiply(optionalNumber(minimumPressureBar), 100_000),
+              maximum_pressure_pa: multiply(optionalNumber(maximumPressureBar), 100_000),
+              maximum_active_pumps: optionalNumber(maximumActivePumps),
+              required_pump_ids: requiredPumpIds,
+              forbidden_pump_ids: forbiddenPumpIds,
+              allow_violations: allowViolations,
+            },
           }),
         },
       ),
@@ -122,6 +156,7 @@ export function DecisionPage() {
     modelsQuery.error ??
     scenariosQuery.error ??
     calculationsQuery.error ??
+    assetsQuery.error ??
     comparisonMutation.error ??
     optimizationMutation.error;
 
@@ -253,7 +288,169 @@ export function DecisionPage() {
             <label>
               Rapports de vitesse
               <input value={speedOptions} onChange={(event) => setSpeedOptions(event.target.value)} />
+              <small>Valeurs séparées par une virgule, par exemple 0,8 et 1,0.</small>
             </label>
+            <div className="form-grid">
+              <label>
+                Durée de référence (h)
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={referenceDurationH}
+                  onChange={(event) => setReferenceDurationH(event.target.value)}
+                />
+              </label>
+              <label>
+                Prix de l'énergie (€/kWh)
+                <input
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={energyPricePerKwh}
+                  onChange={(event) => setEnergyPricePerKwh(event.target.value)}
+                />
+              </label>
+            </div>
+
+            <fieldset className="field-group">
+              <legend>Contraintes d'exploitation</legend>
+              <div className="form-grid">
+                <label>
+                  Débit minimal (m³/h)
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={minimumFlowM3H}
+                    onChange={(event) => setMinimumFlowM3H(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Débit maximal (m³/h)
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={maximumFlowM3H}
+                    onChange={(event) => setMaximumFlowM3H(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Pression minimale (bar abs.)
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={minimumPressureBar}
+                    onChange={(event) => setMinimumPressureBar(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Pression maximale (bar abs.)
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={maximumPressureBar}
+                    onChange={(event) => setMaximumPressureBar(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Pompes actives au maximum
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={maximumActivePumps}
+                    onChange={(event) => setMaximumActivePumps(event.target.value)}
+                  />
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={allowViolations}
+                    onChange={(event) => setAllowViolations(event.target.checked)}
+                  />
+                  Conserver les configurations en violation
+                </label>
+              </div>
+            </fieldset>
+
+            {pumps.length ? (
+              <fieldset className="field-group">
+                <legend>Pompes imposées ou exclues</legend>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Pompe</th>
+                        <th>Obligatoire</th>
+                        <th>Interdite</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pumps.map((pump) => (
+                        <tr key={pump.id}>
+                          <td>
+                            <strong>{pump.code}</strong>
+                            <small>{pump.role === "standby" ? "Secours" : "Principale"}</small>
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={requiredPumpIds.includes(pump.code)}
+                              onChange={() => {
+                                setRequiredPumpIds((current) => toggle(current, pump.code));
+                                setForbiddenPumpIds((current) =>
+                                  current.filter((code) => code !== pump.code),
+                                );
+                              }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={forbiddenPumpIds.includes(pump.code)}
+                              onChange={() => {
+                                setForbiddenPumpIds((current) => toggle(current, pump.code));
+                                setRequiredPumpIds((current) =>
+                                  current.filter((code) => code !== pump.code),
+                                );
+                              }}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </fieldset>
+            ) : null}
+
+            <div className="form-grid">
+              <label>
+                Configurations générées au maximum
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={maximumConfigurations}
+                  onChange={(event) => setMaximumConfigurations(event.target.value)}
+                />
+              </label>
+              <label>
+                Évaluations au maximum
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={maximumEvaluations}
+                  onChange={(event) => setMaximumEvaluations(event.target.value)}
+                  placeholder="Sans limite"
+                />
+              </label>
+            </div>
             <button className="button button-primary" disabled={!scenarioId || optimizationMutation.isPending}>
               {optimizationMutation.isPending ? "Recherche…" : "Rechercher la configuration"}
             </button>
@@ -263,6 +460,19 @@ export function DecisionPage() {
               <dl className="detail-list">
                 <div><dt>Statut</dt><dd><StatusBadge value={optimization.status} /></dd></div>
                 <div><dt>Candidats évalués</dt><dd>{optimization.result_payload.evaluated_count} / {optimization.result_payload.generated_count}</dd></div>
+                <div>
+                  <dt>Espace exploré</dt>
+                  <dd>{optimization.result_payload.complete ? "Complet" : "Tronqué par les bornes"}</dd>
+                </div>
+                <div>
+                  <dt>Écart d'optimalité</dt>
+                  <dd>
+                    {optimization.result_payload.optimality_gap === null
+                      ? "—"
+                      : formatNumber(optimization.result_payload.optimality_gap)}
+                  </dd>
+                </div>
+                <div><dt>Configurations rejetées</dt><dd>{optimization.result_payload.rejected.length}</dd></div>
                 <div><dt>Moteur</dt><dd>{optimization.engine_version}</dd></div>
               </dl>
               {optimization.result_payload.best ? (
@@ -278,8 +488,36 @@ export function DecisionPage() {
                   </p>
                 </div>
               ) : (
-                <EmptyState title="Aucune solution faisable" detail="Consultez les configurations rejetées dans le résultat API." />
+                <EmptyState
+                  title="Aucune solution faisable"
+                  detail="Aucune configuration ne satisfait les contraintes retenues."
+                />
               )}
+              {optimization.result_payload.rejected.length ? (
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Configuration rejetée</th>
+                        <th>Motif</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {optimization.result_payload.rejected.slice(0, 20).map((entry, index) => (
+                        <tr key={rejectionConfigurationId(entry) + String(index)}>
+                          <td className="mono">{rejectionConfigurationId(entry)}</td>
+                          <td>{describeRejection(entry)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {optimization.result_payload.rejected.length > 20 ? (
+                    <p className="field-help">
+                      {optimization.result_payload.rejected.length - 20} autres rejets non affichés.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ) : (
             <EmptyState title="Aucune recherche" detail="Le scénario doit contenir au moins une pompe." />
@@ -288,4 +526,45 @@ export function DecisionPage() {
       </div>
     </div>
   );
+}
+
+function optionalNumber(value: string): number | null {
+  if (!value.trim()) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function divide(value: number | null, factor: number): number | null {
+  return value === null ? null : value / factor;
+}
+
+function multiply(value: number | null, factor: number): number | null {
+  return value === null ? null : value * factor;
+}
+
+function toggle(values: string[], value: string): string[] {
+  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+}
+
+/** Rend lisible le motif de rejet renvoyé par l'optimiseur. */
+export function describeRejection(entry: Record<string, unknown>): string {
+  const reasons = entry.reasons;
+  if (Array.isArray(reasons) && reasons.length) {
+    return reasons.map(String).join(" ; ");
+  }
+  return "Motif non renseigné par le moteur";
+}
+
+/** Identifiant lisible d'une configuration rejetée. */
+export function rejectionConfigurationId(entry: Record<string, unknown>): string {
+  const configuration = entry.configuration;
+  if (configuration && typeof configuration === "object") {
+    const identifier = (configuration as Record<string, unknown>).id;
+    if (typeof identifier === "string") {
+      return identifier;
+    }
+  }
+  return "—";
 }

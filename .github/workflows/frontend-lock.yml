@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Récupérer la branche
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: feature/frontend-shadcn-admin
           fetch-depth: 0

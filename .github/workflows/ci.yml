@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Récupérer le dépôt
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Installer Python 3.11
         uses: actions/setup-python@v5
@@ -83,7 +83,7 @@ jobs:
 
     steps:
       - name: Récupérer le dépôt
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Installer Node.js 22
         uses: actions/setup-node@v4
@@ -137,7 +137,7 @@ jobs:
 
     steps:
       - name: Récupérer le dépôt
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Valider la composition
         run: docker compose -f deployment/docker-compose.yml config --quiet

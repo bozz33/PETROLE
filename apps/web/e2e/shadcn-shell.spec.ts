@@ -133,6 +133,25 @@ async function installApiMock(page: Page): Promise<void> {
         service: "hydro-api",
         version: "0.1.0-test",
         environment: "test",
+        build: {
+          application_version: "0.1.0-test",
+          git_sha: "0000000000000000",
+          ref: "test",
+          build_date: "2026-08-07T00:00:00Z",
+          scientific_engine_version: "hydroliquid-0.1.0",
+          database_migration_version: "8b1f2d6c4e90",
+        },
+        deployment: { mode: "single_org", organization_label: "Exploitant" },
+      },
+      "/health/validation": {
+        suite: "scientific-validation",
+        passed: 41,
+        total: 41,
+        proof_hash: "0".repeat(64),
+        engine_version: "hydroliquid-0.1.0",
+        executed_at: "2026-08-07T00:00:00Z",
+        environment: "test",
+        source: "docs/validation",
       },
       "/health/ready": {
         status: "ready",
@@ -165,7 +184,10 @@ test("affiche le tableau de bord et conserve le thème sombre", async ({ page })
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Tableau de bord" })).toBeVisible();
   await expect(page.getByText("Pipeline Abidjan–Bouaké")).toBeVisible();
-  await expect(page.locator("canvas").first()).toBeVisible();
+  // Le graphique d'activité de démonstration a été retiré : le tableau de bord
+  // publie désormais l'attestation scientifique réellement servie par l'API.
+  await expect(page.getByText("41 / 41")).toBeVisible();
+  await expect(page.locator("canvas")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Activer le mode sombre" }).click();
   await expect(page.locator("html")).toHaveClass(/dark/);

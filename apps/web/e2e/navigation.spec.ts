@@ -6,6 +6,7 @@ const ROUTES = [
   ["/modelisation", "Modélisation"],
   ["/reseau", "Visualisation du réseau"],
   ["/bibliotheques", "Bibliothèques techniques"],
+  ["/scenarios", "Scénarios"],
   ["/calcul", "Calcul hydraulique"],
   ["/stockage", "Stockage et transferts"],
   ["/decision", "Comparaison et décision"],
@@ -44,6 +45,28 @@ async function installPlatformMock(page: Page): Promise<void> {
         service: "hydro-api",
         version: "0.1.0-test",
         environment: "test",
+        build: {
+          application_version: "0.1.0-test",
+          git_sha: "0000000000000000",
+          ref: "test",
+          build_date: "2026-08-07T00:00:00Z",
+          scientific_engine_version: "hydroliquid-0.1.0",
+          database_migration_version: "8b1f2d6c4e90",
+        },
+        deployment: { mode: "single_org", organization_label: "Exploitant" },
+      });
+      return;
+    }
+    if (path === "/health/validation") {
+      await respond(route, {
+        suite: "scientific-validation",
+        passed: 41,
+        total: 41,
+        proof_hash: "0".repeat(64),
+        engine_version: "hydroliquid-0.1.0",
+        executed_at: "2026-08-07T00:00:00Z",
+        environment: "test",
+        source: "docs/validation",
       });
       return;
     }

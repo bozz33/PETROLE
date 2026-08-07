@@ -127,7 +127,7 @@ export function AdministrationPage() {
   });
 
   const organizations = organizationsQuery.data?.items ?? [];
-  const singleOrganization = healthQuery.data?.deployment.mode === "single_org";
+  const singleOrganization = healthQuery.data?.deployment?.mode === "single_org";
   const members = membersQuery.data ?? [];
   const standards = standardsQuery.data?.items ?? [];
   const activeStandards = standards.filter((standard) => standard.status === "active");
@@ -402,12 +402,12 @@ export function AdministrationPage() {
       {healthQuery.data ? (
         <Panel title="Version de l'instance" description="Identité de build visible pour support et traçabilité.">
           <div className="resource-summary">
-            <div><span>Application</span><strong>v{healthQuery.data.build.application_version}</strong></div>
-            <div><span>SHA Git</span><strong className="mono hash">{healthQuery.data.build.git_sha}</strong></div>
-            <div><span>Référence</span><strong>{healthQuery.data.build.ref}</strong></div>
-            <div><span>Build</span><strong>{healthQuery.data.build.build_date}</strong></div>
-            <div><span>Moteur</span><strong>{healthQuery.data.build.scientific_engine_version}</strong></div>
-            <div><span>Migration</span><strong className="mono">{healthQuery.data.build.database_migration_version}</strong></div>
+            <div><span>Application</span><strong>v{healthQuery.data.build?.application_version}</strong></div>
+            <div><span>SHA Git</span><strong className="mono hash">{healthQuery.data.build?.git_sha}</strong></div>
+            <div><span>Référence</span><strong>{healthQuery.data.build?.ref}</strong></div>
+            <div><span>Build</span><strong>{healthQuery.data.build?.build_date}</strong></div>
+            <div><span>Moteur</span><strong>{healthQuery.data.build?.scientific_engine_version}</strong></div>
+            <div><span>Migration</span><strong className="mono">{healthQuery.data.build?.database_migration_version}</strong></div>
           </div>
         </Panel>
       ) : null}

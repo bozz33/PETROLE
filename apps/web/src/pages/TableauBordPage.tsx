@@ -45,7 +45,7 @@ export function TableauBordPage() {
   const activeProjects = projects.filter((project) => project.status === "active").length;
   const draftProjects = projects.filter((project) => project.status === "draft").length;
   const archivedProjects = projects.filter((project) => project.status === "archived").length;
-  const singleOrganization = healthQuery.data?.deployment.mode === "single_org";
+  const singleOrganization = healthQuery.data?.deployment?.mode === "single_org";
   const organization = organizations[0];
   const loading =
     healthQuery.isLoading ||

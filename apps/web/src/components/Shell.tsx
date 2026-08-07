@@ -303,12 +303,12 @@ export function Shell({ children }: PropsWithChildren) {
           </span>
           <small
             title={
-              healthQuery.data
+              healthQuery.data?.build
                 ? `Réf. ${healthQuery.data.build.ref}; construit ${healthQuery.data.build.build_date}; moteur ${healthQuery.data.build.scientific_engine_version}; migration ${healthQuery.data.build.database_migration_version}`
                 : "Métadonnées de build indisponibles"
             }
           >
-            {healthQuery.data
+            {healthQuery.data?.build
               ? `v${healthQuery.data.build.application_version} · ${healthQuery.data.build.git_sha.slice(0, 12)}`
               : "Version indisponible"}
           </small>

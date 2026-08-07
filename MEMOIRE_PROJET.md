@@ -1,6 +1,6 @@
 # Mémoire du projet PETROLE
 
-Dernière mise à jour : 7 août 2026.
+Dernière mise à jour : 8 août 2026.
 
 Ce fichier sert de point de reprise entre deux sessions de développement. Il décrit l'état
 constaté du dépôt, les preuves disponibles et les prochaines actions. Toute nouvelle session
@@ -355,6 +355,74 @@ Campagne finale vérifiée avant le tag :
 
 Commit du typage : `f71a176`. Les 9 commits de la série RC (`8206b1f` →
 `f71a176`) sont désormais poussés sur `origin/release/mvp-rc1`.
+
+## Fermeture MVP — lots F04 à F07 (8 août 2026)
+
+### MVP-F05 — transfert piloté par le réseau
+
+`TransferCreate` reçoit un bloc `hydraulic_context` facultatif : version de
+modèle, scénario, nœuds de raccordement, chemin orienté et groupe de pompage. Le
+résolveur du point de fonctionnement interroge HydroLiquid à chaque évolution des
+niveaux ; le débit redevient l'inconnue, pression de refoulement et puissance
+deviennent des sorties. Les fournir en entrée est refusé.
+
+Le chemin n'est jamais deviné : continuité, orientation, absence de boucle et
+aboutissement sont vérifiés avant tout calcul.
+
+**Blocage levé au passage** : le normaliseur refusait purement et simplement les
+nœuds de type réservoir, alors que le moteur sait convertir un niveau en pression
+statique dès que le pipeline porte ses bacs d'extrémité. Un raccordement de bac
+est désormais admis aux extrémités du chaînage et alimente `origin_tank` et
+`destination_tank` du paquet canonique. Sans cela, aucun transfert couplé
+n'était possible.
+
+### MVP-F04 — résultats et graphiques
+
+Bilans par tronçon, par station et par pompe ; informations numériques de
+résolution ; graphiques du profil hydraulique, de la pression et de la vitesse,
+du rendement et de la puissance, du NPSH, de l'évolution d'un transfert et de la
+comparaison des calculs. La courbe réseau du graphique pompe-réseau est
+explicitement désignée comme reconstituée, faute d'être publiée par le moteur.
+
+### MVP-F06 — entrées et sorties de données
+
+Import JSON accepté sous deux formes, une forme ambiguë étant refusée plutôt que
+devinée. Pièces jointes documentaires séparées de l'import scientifique, avec
+leurs propres formats. Exports XLSX, CSV par section et JSON canonique des
+résultats persistés.
+
+### MVP-F07 — validation et Pyomo
+
+Approbation de la simulation elle-même, distincte de celle du rapport :
+irréversible, tracée, et refusée si le calcul n'est pas éligible à une décision.
+
+Voie Pyomo fournie sans travestir la physique : le comportement hydraulique
+reste évalué par simulation, faute de formulation algébrique fermée ; Pyomo pose
+le problème réellement linéaire qui subsiste, choisir une configuration parmi
+celles évaluées. Un test de concordance vérifie que les deux voies retiennent le
+même optimum. Le solveur MILP HiGHS est embarqué : sans lui, la voie serait
+purement déclarative.
+
+### Preuves
+
+Campagne complète : [`docs/validation/qualification_backend_mvp_20260808.md`](docs/validation/qualification_backend_mvp_20260808.md).
+
+540 tests backend, 41/41 scientifiques avec empreinte **inchangée**, 45 tests
+web, 33 Playwright, ruff, mypy, TypeScript et build verts, `npm audit` sans
+vulnérabilité, gitleaks sans secret, Trivy sans HIGH/CRITICAL corrigeable, ZAP
+sans échec, sauvegarde et restauration vérifiées.
+
+### Comptes de recette
+
+Deux comptes dédiés existent sur l'instance, avec leurs rôles métier :
+`recette-engineer@petrole.distesage.com` (engineer) et
+`recette-approver@petrole.distesage.com` (approver). Leurs mots de passe ne
+figurent ni dans le dépôt ni dans la documentation.
+
+### Restant
+
+`MVP-F03` éditeur graphique du réseau ; `MVP-F08` recette par un ingénieur
+métier extérieur, puis release `v1.0.0-mvp`.
 
 ## Correction de l'audit et livraison du 7 août 2026 (commits `73cd3d6` → `01982a5`)
 

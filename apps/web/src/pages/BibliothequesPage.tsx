@@ -9,12 +9,20 @@ import {
   StatusBadge,
   SuccessNotice,
 } from "../components/Shell";
+import {
+  defaultFluidPayload,
+  FluidForm,
+  validateFluid,
+} from "../components/catalog/FluidForm";
+import { defaultPumpPayload, PumpForm, validatePump } from "../components/catalog/PumpForm";
 import { EXAMPLE_CATALOG_PAYLOADS } from "../samples";
 import type {
   CatalogCollection,
   CatalogItem,
+  FluidPayload,
   Organization,
   Page,
+  PumpPayload,
 } from "../types";
 import { formatDate } from "../types";
 
@@ -38,6 +46,17 @@ export function BibliothequesPage() {
   const [name, setName] = useState("");
   const [source, setSource] = useState("");
   const [payload, setPayload] = useState(examplePayload("fluids"));
+  const [fluid, setFluid] = useState<FluidPayload>(defaultFluidPayload);
+  const [pump, setPump] = useState<PumpPayload>(defaultPumpPayload);
+  const [expertMode, setExpertMode] = useState(false);
+
+  const structuredCollection = collection === "fluids" || collection === "pumps";
+  const useStructuredForm = structuredCollection && !expertMode;
+  const structuredProblems = useStructuredForm
+    ? collection === "fluids"
+      ? validateFluid(fluid)
+      : validatePump(pump)
+    : [];
 
   const organizationsQuery = useQuery({
     queryKey: ["organizations"],
@@ -72,7 +91,9 @@ export function BibliothequesPage() {
           organization_id: organizationId,
           code,
           name,
-          payload: JSON.parse(payload) as Record<string, unknown>,
+          payload: useStructuredForm
+            ? ((collection === "fluids" ? fluid : pump) as unknown as Record<string, unknown>)
+            : (JSON.parse(payload) as Record<string, unknown>),
           source: source || null,
         }),
       }),
@@ -81,6 +102,8 @@ export function BibliothequesPage() {
       setName("");
       setSource("");
       setPayload(examplePayload(collection));
+      setFluid(defaultFluidPayload());
+      setPump(defaultPumpPayload());
       await queryClient.invalidateQueries({
         queryKey: ["catalog", organizationId, collection],
       });
@@ -263,30 +286,79 @@ export function BibliothequesPage() {
               placeholder="Analyse laboratoire, courbe constructeur ou fiche technique"
             />
           </label>
-          <label>
-            Propriétés techniques en unités SI
-            <textarea
-              className="code-editor"
-              value={payload}
-              onChange={(event) => setPayload(event.target.value)}
-              spellCheck={false}
-              rows={20}
-            />
-          </label>
+          {structuredCollection ? (
+            <div className="button-row">
+              <button
+                type="button"
+                className="button button-ghost"
+                onClick={() => setExpertMode((current) => !current)}
+              >
+                {expertMode ? "Revenir au formulaire guidé" : "Passer en saisie JSON experte"}
+              </button>
+            </div>
+          ) : null}
+
+          {useStructuredForm ? (
+            collection === "fluids" ? (
+              <FluidForm value={fluid} onChange={setFluid} />
+            ) : (
+              <PumpForm value={pump} onChange={setPump} />
+            )
+          ) : (
+            <label>
+              Propriétés techniques en unités SI
+              <textarea
+                className="code-editor"
+                value={payload}
+                onChange={(event) => setPayload(event.target.value)}
+                spellCheck={false}
+                rows={20}
+              />
+            </label>
+          )}
+
+          {structuredProblems.length ? (
+            <div className="notice notice-error" role="alert">
+              <ul className="issue-list negative">
+                {structuredProblems.map((problem) => (
+                  <li key={problem}>
+                    <span>{problem}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <div className="button-row">
             <button
               className="button button-primary"
-              disabled={!organizationId || createMutation.isPending}
+              disabled={
+                !organizationId || createMutation.isPending || structuredProblems.length > 0
+              }
             >
               Enregistrer le brouillon
             </button>
-            <button
-              className="button button-ghost"
-              type="button"
-              onClick={() => setPayload(examplePayload(collection))}
-            >
-              Restaurer l'exemple
-            </button>
+            {useStructuredForm ? (
+              <button
+                className="button button-ghost"
+                type="button"
+                onClick={() =>
+                  collection === "fluids"
+                    ? setFluid(defaultFluidPayload())
+                    : setPump(defaultPumpPayload())
+                }
+              >
+                Réinitialiser la fiche
+              </button>
+            ) : (
+              <button
+                className="button button-ghost"
+                type="button"
+                onClick={() => setPayload(examplePayload(collection))}
+              >
+                Restaurer l'exemple
+              </button>
+            )}
           </div>
         </form>
       </Panel>

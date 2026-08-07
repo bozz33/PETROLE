@@ -716,3 +716,80 @@ export function formatDate(value: string | null): string {
 export function formatNumber(value: number, maximumFractionDigits = 3): string {
   return new Intl.NumberFormat("fr-FR", { maximumFractionDigits }).format(value);
 }
+
+/** Origine d'une valeur de propriété de fluide (D-v2 § 5.5). */
+export type PropertySource =
+  | "laboratory"
+  | "internal_table"
+  | "correlation"
+  | "coolprop"
+  | "constant";
+
+/** Statut qualité d'un point de propriété (D09 § 6). */
+export type PropertyQuality = "measured" | "approved" | "estimated" | "extrapolated";
+
+/** Catégories de produits gérées par le MVP (D09 § 6). */
+export type FluidCategory =
+  | "crude"
+  | "gasoline"
+  | "diesel"
+  | "kerosene"
+  | "fuel_oil_light"
+  | "fuel_oil_heavy"
+  | "condensate"
+  | "water"
+  | "custom";
+
+export interface PropertyPoint {
+  temperature_k: number;
+  value: number;
+  pressure_pa: number;
+  uncertainty: number | null;
+  method: string | null;
+  quality: PropertyQuality;
+}
+
+export interface PropertyTable {
+  points: PropertyPoint[];
+  source: PropertySource;
+  reference: string | null;
+}
+
+/** Charge utile d'un produit du catalogue, alignée sur `FluidInput`. */
+export interface FluidPayload {
+  category: FluidCategory;
+  reference_temperature_k: number;
+  reference_pressure_pa: number;
+  density_kg_m3: number | null;
+  kinematic_viscosity_m2_s: number | null;
+  vapor_pressure_pa: number | null;
+  density_table: PropertyTable | null;
+  kinematic_viscosity_table: PropertyTable | null;
+  vapor_pressure_table: PropertyTable | null;
+  thermal_expansion_1_k: number | null;
+  coolprop_name: string | null;
+  data_source: string | null;
+  batch_reference: string | null;
+}
+
+export interface PumpCurve {
+  flows_m3_s: number[];
+  heads_m: number[];
+  efficiencies: number[] | null;
+  powers_w: number[] | null;
+  npshr_m: number[] | null;
+  reference_speed_rpm: number | null;
+  interpolation: "linear" | "pchip";
+}
+
+/** Charge utile d'une pompe du catalogue, alignée sur `PumpModelInput`. */
+export interface PumpPayload {
+  curve: PumpCurve;
+  manufacturer: string | null;
+  motor_rated_power_w: number | null;
+  npsh_margin_m: number;
+  min_speed_ratio: number;
+  max_speed_ratio: number;
+  minimum_continuous_flow_m3_s: number | null;
+  data_source: string | null;
+}

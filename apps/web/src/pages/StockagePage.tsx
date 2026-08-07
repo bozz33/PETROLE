@@ -9,7 +9,8 @@ import {
   StatusBadge,
   SuccessNotice,
 } from "../components/Shell";
-import type { Organization, Page, Tank, Transfer } from "../types";
+import { defaultTankDraft, TankForm, validateTank } from "../components/tanks/TankForm";
+import type { Organization, Page, Tank, TankDraft, Transfer } from "../types";
 import { formatNumber } from "../types";
 
 interface BalanceResult {
@@ -22,6 +23,7 @@ interface BalanceResult {
 export function StockagePage() {
   const queryClient = useQueryClient();
   const [organizationId, setOrganizationId] = useState("");
+  const [tankDraft, setTankDraft] = useState<TankDraft>(defaultTankDraft);
   const [sourceId, setSourceId] = useState("");
   const [destinationId, setDestinationId] = useState("");
   const [transfer, setTransfer] = useState<Transfer | null>(null);
@@ -59,39 +61,15 @@ export function StockagePage() {
   }, [destinationId, sourceId, tanks]);
 
   const tankMutation = useMutation({
-    mutationFn: (form: FormData) => {
-      const height = Number(form.get("height_m"));
-      const capacity = Number(form.get("capacity_m3"));
-      const currentLevel = Number(form.get("current_level_m"));
+    mutationFn: () => {
+      const { strapping_origin: _origin, ...payload } = tankDraft;
       return apiRequest<Tank>("/tanks", {
         method: "POST",
-        body: jsonBody({
-          organization_id: organizationId,
-          name: form.get("name"),
-          code: form.get("code"),
-          tank_type: "vertical_fixed_roof",
-          elevation_m: Number(form.get("elevation_m")),
-          current_level_m: currentLevel,
-          fluid_id: String(form.get("fluid_id") || "").trim() || null,
-          compatible_fluid_ids: String(form.get("compatible_fluid_ids") || "")
-            .split(",")
-            .map((value) => value.trim())
-            .filter(Boolean),
-          levels: {
-            minimum_m: height * 0.05,
-            low_m: height * 0.1,
-            normal_m: height * 0.5,
-            high_m: height * 0.9,
-            high_high_m: height * 0.95,
-          },
-          strapping: [
-            { height_m: 0, volume_m3: 0 },
-            { height_m: height, volume_m3: capacity },
-          ],
-        }),
+        body: jsonBody({ organization_id: organizationId, ...payload }),
       });
     },
     onSuccess: async () => {
+      setTankDraft(defaultTankDraft());
       await queryClient.invalidateQueries({ queryKey: ["tanks", organizationId] });
     },
   });
@@ -176,6 +154,11 @@ export function StockagePage() {
     () => tanks.find((tank) => tank.id === sourceId),
     [sourceId, tanks],
   );
+  // Les écarts ne sont signalés qu'une fois la fiche entamée : afficher une
+  // alerte sur un formulaire encore vierge n'apporte rien à l'utilisateur.
+  const tankTouched = Boolean(tankDraft.name.trim() || tankDraft.code.trim());
+  const tankProblems = validateTank(tankDraft);
+  const visibleTankProblems = tankTouched ? tankProblems : [];
   const error =
     organizationsQuery.error ??
     tanksQuery.error ??
@@ -187,7 +170,7 @@ export function StockagePage() {
     <div className="stack">
       {error ? <ErrorNotice error={error} /> : null}
       {tankMutation.isSuccess ? (
-        <SuccessNotice>Le bac d'étude et son barémage théorique ont été enregistrés.</SuccessNotice>
+        <SuccessNotice>Le bac et sa table de barémage ont été enregistrés.</SuccessNotice>
       ) : null}
 
       <Panel
@@ -246,30 +229,33 @@ export function StockagePage() {
         )}
 
         <details className="editor-details" open={!tanks.length && Boolean(organizationId)}>
-          <summary>Créer un bac d'étude avec barémage théorique</summary>
+          <summary>Créer un bac</summary>
           <form
             className="compact-form"
             onSubmit={(event) => {
               event.preventDefault();
-              tankMutation.mutate(new FormData(event.currentTarget));
+              tankMutation.mutate();
             }}
           >
-            <div className="form-grid three">
-              <label>Nom<input name="name" required /></label>
-              <label>Code<input name="code" required /></label>
-              <label>Produit courant<input name="fluid_id" placeholder="diesel" /></label>
-              <label>Hauteur barémée (m)<input name="height_m" type="number" min="0.1" step="any" defaultValue="12" required /></label>
-              <label>Capacité (m³)<input name="capacity_m3" type="number" min="1" step="any" defaultValue="10000" required /></label>
-              <label>Niveau courant (m)<input name="current_level_m" type="number" min="0" step="any" defaultValue="6" required /></label>
-              <label>Altitude du fond (m)<input name="elevation_m" type="number" step="any" defaultValue="0" /></label>
-              <label>Produits compatibles<input name="compatible_fluid_ids" placeholder="diesel, kerosene" /></label>
-            </div>
-            <p className="field-help">
-              Ce barémage linéaire est réservé aux études et tests. Importez une table de jaugeage
-              certifiée avant toute utilisation opérationnelle.
-            </p>
-            <button className="button button-primary" disabled={!organizationId || tankMutation.isPending}>
-              Créer le bac d'étude
+            <TankForm value={tankDraft} onChange={setTankDraft} />
+            {visibleTankProblems.length ? (
+              <div className="notice notice-error" role="alert">
+                <ul className="issue-list negative">
+                  {visibleTankProblems.map((problem) => (
+                    <li key={problem}>
+                      <span>{problem}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <button
+              className="button button-primary"
+              disabled={!organizationId || tankMutation.isPending || tankProblems.length > 0}
+            >
+              {tankDraft.strapping_origin === "theoretical"
+                ? "Créer le bac d'étude avec barémage théorique"
+                : "Créer le bac avec sa table de jaugeage"}
             </button>
           </form>
         </details>

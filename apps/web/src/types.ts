@@ -793,3 +793,33 @@ export interface PumpPayload {
   minimum_continuous_flow_m3_s: number | null;
   data_source: string | null;
 }
+
+export interface StrappingPoint {
+  height_m: number;
+  volume_m3: number;
+}
+
+export interface TankLevels {
+  minimum_m: number;
+  low_m: number | null;
+  normal_m: number | null;
+  high_m: number | null;
+  high_high_m: number;
+}
+
+/** Fiche de bac en cours de saisie, alignée sur `TankCreate`. */
+export interface TankDraft {
+  name: string;
+  code: string;
+  tank_type: "vertical_fixed_roof" | "floating_roof" | "horizontal" | "sphere" | "custom";
+  elevation_m: number;
+  current_level_m: number;
+  fluid_id: string | null;
+  compatible_fluid_ids: string[];
+  status: "available" | "unavailable" | "maintenance" | "bypassed";
+  dead_volume_m3: number;
+  levels: TankLevels;
+  strapping: StrappingPoint[];
+  /** Trace l'origine de la table : elle n'est pas transmise au backend. */
+  strapping_origin: "theoretical" | "certified";
+}

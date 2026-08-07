@@ -86,10 +86,44 @@ class TankRead(BaseModel):
 
 
 class TransferCreate(BaseModel):
+    """Demande de transfert entre deux bacs.
+
+    Sans ``scenario_id``, le débit demandé est imposé : le module se comporte
+    comme une simulation de volumes et de niveaux. Avec ``scenario_id``, le
+    débit est déterminé à chaque pas par HydroLiquid à partir des niveaux
+    courants, du chemin hydraulique et des pompes retenues.
+    """
+
     source_tank_id: uuid.UUID
     destination_tank_id: uuid.UUID
     fluid_id: str = Field(min_length=1, max_length=100)
     requested_flow_m3_s: float = Field(gt=0)
+    scenario_id: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "Scénario fournissant le réseau, les stations et les options du solveur. "
+            "Active le couplage hydraulique du transfert."
+        ),
+    )
+    pump_ids: list[str] | None = Field(
+        default=None,
+        max_length=500,
+        description="Pompes en marche pendant le transfert ; toutes celles du modèle si omis.",
+    )
+    hydraulic_level_step_m: float = Field(
+        default=0.05,
+        gt=0,
+        description=(
+            "Variation de niveau au-delà de laquelle le point de fonctionnement est "
+            "recalculé. Évite un calcul hydraulique complet à chaque pas de temps."
+        ),
+    )
+    maximum_hydraulic_evaluations: int = Field(
+        default=2_000,
+        ge=1,
+        le=100_000,
+        description="Garde-fou sur le nombre de calculs hydrauliques d'un transfert.",
+    )
     target_volume_m3: float | None = Field(default=None, gt=0)
     target_destination_level_m: float | None = Field(default=None, gt=0)
     target_duration_s: float | None = Field(default=None, gt=0)

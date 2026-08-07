@@ -18,10 +18,10 @@ def operations_client(api_client_factory) -> Generator[TestClient, None, None]:
         yield client
 
 
-def _organization(client: TestClient) -> dict:
+def _organization(client: TestClient, slug: str = "exploitant-integre") -> dict:
     response = client.post(
         "/api/v1/organizations",
-        json={"name": "Exploitant intégré", "slug": "exploitant-integre"},
+        json={"name": "Exploitant " + slug, "slug": slug},
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -348,3 +348,103 @@ def test_optimisation_evalue_les_configurations_du_modele(operations_client) -> 
     assert optimizations.status_code == 200
     assert optimizations.json()["total"] == 1
     assert optimizations.json()["items"][0]["id"] == optimization["id"]
+
+
+def test_transfert_couple_au_reseau_hydraulique(operations_client) -> None:
+    """Avec un scénario, le débit du transfert vient de HydroLiquid.
+
+    Sans couplage, le module intègre un débit saisi par l'utilisateur. Avec un
+    scénario, chaque évolution des niveaux déclenche un calcul hydraulique et le
+    débit résulte du réseau, des stations et des pompes retenues.
+    """
+
+    organization = _organization(operations_client)
+    project = _project(operations_client, organization["id"])
+
+    source = _tank(
+        operations_client,
+        organization["id"],
+        code="TK-HS",
+        level_m=8.0,
+        fluid_id="diesel",
+        compatible=[],
+    )
+    destination = _tank(
+        operations_client,
+        organization["id"],
+        code="TK-HD",
+        level_m=2.0,
+        fluid_id=None,
+        compatible=["diesel"],
+    )
+
+    canonical = entree_canonique(
+        conduite=pipeline(stations=(station_serie(),)),
+        cas=scenario(imposed_flow_m3_s=0.15, inlet_pressure_pa=5_000_000.0),
+    ).payload()
+    scenario_record, _ = _calculation(operations_client, project["id"], canonical, "HYD")
+
+    response = operations_client.post(
+        f"/api/v1/organizations/{organization['id']}/transfers",
+        headers={"Idempotency-Key": "transfert-hydraulique-001"},
+        json={
+            "source_tank_id": source["id"],
+            "destination_tank_id": destination["id"],
+            "fluid_id": "diesel",
+            "requested_flow_m3_s": 0.1,
+            "target_volume_m3": 50.0,
+            "time_step_s": 120.0,
+            "scenario_id": scenario_record["id"],
+            "hydraulic_level_step_m": 0.02,
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    result = response.json()["result_payload"]
+    coupling = result["hydraulic_coupling"]
+    assert coupling["scenario_id"] == scenario_record["id"]
+    assert coupling["engine_version"].startswith("long_distance_liquid-")
+    assert coupling["evaluations"] >= 1
+    assert coupling["pump_ids"]
+
+
+def test_transfert_refuse_un_scenario_d_une_autre_organisation(operations_client) -> None:
+    organization = _organization(operations_client)
+    other = _organization(operations_client, slug="exploitant-tiers")
+    other_project = _project(operations_client, other["id"])
+
+    source = _tank(
+        operations_client,
+        organization["id"],
+        code="TK-XS",
+        level_m=8.0,
+        fluid_id="diesel",
+        compatible=[],
+    )
+    destination = _tank(
+        operations_client,
+        organization["id"],
+        code="TK-XD",
+        level_m=2.0,
+        fluid_id=None,
+        compatible=["diesel"],
+    )
+    canonical = entree_canonique(
+        cas=scenario(imposed_flow_m3_s=0.15, inlet_pressure_pa=5_000_000.0)
+    ).payload()
+    foreign_scenario, _ = _calculation(operations_client, other_project["id"], canonical, "XORG")
+
+    response = operations_client.post(
+        f"/api/v1/organizations/{organization['id']}/transfers",
+        headers={"Idempotency-Key": "transfert-hydraulique-002"},
+        json={
+            "source_tank_id": source["id"],
+            "destination_tank_id": destination["id"],
+            "fluid_id": "diesel",
+            "requested_flow_m3_s": 0.1,
+            "target_volume_m3": 50.0,
+            "scenario_id": foreign_scenario["id"],
+        },
+    )
+
+    assert response.status_code == 409, response.text

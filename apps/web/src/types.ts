@@ -125,6 +125,16 @@ export interface Transfer {
     warning_codes: string[];
     violation_codes: string[];
     samples: Array<Record<string, number | null>>;
+    /** Présent lorsque le débit a été déterminé par HydroLiquid. */
+    hydraulic_coupling?: {
+      scenario_id: string;
+      model_version_id: string;
+      engine_version: string;
+      pump_ids: string[];
+      evaluations: number;
+      reused_points: number;
+      failures: Array<{ time_s: number; detail: string }>;
+    };
   };
   balance_payload: Record<string, unknown> | null;
   created_at: string;

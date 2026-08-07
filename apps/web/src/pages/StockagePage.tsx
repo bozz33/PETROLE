@@ -11,7 +11,15 @@ import {
   SuccessNotice,
 } from "../components/Shell";
 import { defaultTankDraft, TankForm, validateTank } from "../components/tanks/TankForm";
-import type { Page, Tank, TankDraft, Transfer } from "../types";
+import type {
+  ModelVersion,
+  Page,
+  Project,
+  Scenario,
+  Tank,
+  TankDraft,
+  Transfer,
+} from "../types";
 import { formatNumber } from "../types";
 
 interface BalanceResult {
@@ -26,6 +34,11 @@ export function StockagePage() {
   const [organizationId, setOrganizationId] = useState("");
   const [tankDraft, setTankDraft] = useState<TankDraft>(defaultTankDraft);
   const [sourceId, setSourceId] = useState("");
+  const [objective, setObjective] = useState<TransferObjective>("volume");
+  const [transferProjectId, setTransferProjectId] = useState("");
+  const [transferModelId, setTransferModelId] = useState("");
+  const [transferScenarioId, setTransferScenarioId] = useState("");
+  const [hydraulicCoupling, setHydraulicCoupling] = useState(false);
   const [destinationId, setDestinationId] = useState("");
   const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [balance, setBalance] = useState<BalanceResult | null>(null);
@@ -65,6 +78,51 @@ export function StockagePage() {
     },
   });
 
+  const projectsQuery = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => apiRequest<Page<Project>>("/projects?limit=200&offset=0"),
+    enabled: hydraulicCoupling,
+  });
+  const modelsQuery = useQuery({
+    queryKey: ["models", transferProjectId],
+    queryFn: () =>
+      apiRequest<Page<ModelVersion>>(
+        "/projects/" + transferProjectId + "/models?limit=200&offset=0",
+      ),
+    enabled: hydraulicCoupling && Boolean(transferProjectId),
+  });
+  const scenariosQuery = useQuery({
+    queryKey: ["scenarios", transferModelId],
+    queryFn: () =>
+      apiRequest<Page<Scenario>>("/models/" + transferModelId + "/scenarios?limit=200&offset=0"),
+    enabled: hydraulicCoupling && Boolean(transferModelId),
+  });
+
+  const transferProjects = projectsQuery.data?.items ?? [];
+  const transferModels = modelsQuery.data?.items ?? [];
+  const transferScenarios = scenariosQuery.data?.items ?? [];
+
+  useEffect(() => {
+    if (!hydraulicCoupling) {
+      return;
+    }
+    if (!transferProjects.some((project) => project.id === transferProjectId)) {
+      setTransferProjectId(transferProjects[0]?.id ?? "");
+    }
+  }, [hydraulicCoupling, transferProjectId, transferProjects]);
+
+  useEffect(() => {
+    if (!transferModels.some((model) => model.id === transferModelId)) {
+      setTransferModelId(transferModels[0]?.id ?? "");
+    }
+  }, [transferModelId, transferModels]);
+
+  useEffect(() => {
+    if (!transferScenarios.some((item) => item.id === transferScenarioId)) {
+      setTransferScenarioId(transferScenarios[0]?.id ?? "");
+    }
+  }, [transferScenarioId, transferScenarios]);
+
   const transferMutation = useMutation({
     mutationFn: (form: FormData) => {
       return apiRequest<Transfer>(
@@ -77,13 +135,28 @@ export function StockagePage() {
             destination_tank_id: destinationId,
             fluid_id: form.get("fluid_id"),
             requested_flow_m3_s: Number(form.get("flow_m3_h")) / 3_600,
-            target_volume_m3: Number(form.get("target_volume_m3")),
-            time_step_s: Number(form.get("time_step_s")),
-            loss_fraction: Number(form.get("loss_percent")) / 100,
-            absorbed_power_w:
-              Number(form.get("power_kw")) > 0
-                ? Number(form.get("power_kw")) * 1_000
+            // Le moteur exige exactement un objectif : les deux autres restent nuls.
+            target_volume_m3:
+              objective === "volume" ? numberField(form, "target_volume_m3") : null,
+            target_destination_level_m:
+              objective === "level" ? numberField(form, "target_level_m") : null,
+            target_duration_s:
+              objective === "duration"
+                ? multiplyOrNull(numberField(form, "target_duration_h"), 3_600)
                 : null,
+            time_step_s: Number(form.get("time_step_s")),
+            maximum_flow_m3_s: divideOrNull(numberField(form, "maximum_flow_m3_h"), 3_600),
+            maximum_duration_s: multiplyOrNull(
+              numberField(form, "maximum_duration_h"),
+              3_600,
+            ) ?? 31_536_000,
+            loss_fraction: Number(form.get("loss_percent")) / 100,
+            discharge_pressure_pa: multiplyOrNull(
+              numberField(form, "discharge_pressure_bar"),
+              100_000,
+            ),
+            absorbed_power_w: multiplyOrNull(numberField(form, "power_kw"), 1_000),
+            scenario_id: hydraulicCoupling ? transferScenarioId || null : null,
           }),
         },
       );
@@ -266,15 +339,106 @@ export function StockagePage() {
                 </select>
               </label>
               <label>Produit<input name="fluid_id" defaultValue={selectedSource?.fluid_id ?? ""} required /></label>
-              <label>Débit (m³/h)<input name="flow_m3_h" type="number" min="0.001" step="any" defaultValue="360" required /></label>
-              <label>Volume cible (m³)<input name="target_volume_m3" type="number" min="0.001" step="any" defaultValue="100" required /></label>
+              <label>Débit demandé (m³/h)<input name="flow_m3_h" type="number" min="0.001" step="any" defaultValue="360" required /></label>
               <label>Pas de calcul (s)<input name="time_step_s" type="number" min="0.1" step="any" defaultValue="60" required /></label>
-              <label>Pertes (%)<input name="loss_percent" type="number" min="0" max="99" step="any" defaultValue="0" /></label>
-              <label>Puissance absorbée (kW)<input name="power_kw" type="number" min="0" step="any" defaultValue="0" /></label>
             </div>
+
+            <fieldset className="field-group">
+              <legend>Objectif du mouvement</legend>
+              <div className="form-grid three">
+                <label>
+                  Critère d'arrêt
+                  <select
+                    value={objective}
+                    onChange={(event) => setObjective(event.target.value as TransferObjective)}
+                  >
+                    <option value="volume">Volume transféré</option>
+                    <option value="level">Niveau du bac destination</option>
+                    <option value="duration">Durée</option>
+                  </select>
+                </label>
+                {objective === "volume" ? (
+                  <label>Volume cible (m³)<input name="target_volume_m3" type="number" min="0.001" step="any" defaultValue="100" required /></label>
+                ) : null}
+                {objective === "level" ? (
+                  <label>Niveau destination visé (m)<input name="target_level_m" type="number" min="0.001" step="any" defaultValue="5" required /></label>
+                ) : null}
+                {objective === "duration" ? (
+                  <label>Durée visée (h)<input name="target_duration_h" type="number" min="0.001" step="any" defaultValue="2" required /></label>
+                ) : null}
+              </div>
+              <p className="field-help">
+                Le calcul s'arrête à l'objectif ou au premier seuil de sécurité atteint,
+                selon ce qui survient en premier.
+              </p>
+            </fieldset>
+
+            <fieldset className="field-group">
+              <legend>Limites d'exploitation</legend>
+              <div className="form-grid three">
+                <label>Débit maximal (m³/h)<input name="maximum_flow_m3_h" type="number" min="0" step="any" placeholder="Sans limite" /></label>
+                <label>Durée maximale (h)<input name="maximum_duration_h" type="number" min="0" step="any" placeholder="Sans limite" /></label>
+                <label>Pertes (%)<input name="loss_percent" type="number" min="0" max="99" step="any" defaultValue="0" /></label>
+                <label>Pression de refoulement (bar abs.)<input name="discharge_pressure_bar" type="number" min="0" step="any" placeholder="Déduite du réseau si couplé" /></label>
+                <label>Puissance absorbée (kW)<input name="power_kw" type="number" min="0" step="any" placeholder="Déduite du réseau si couplé" /></label>
+              </div>
+            </fieldset>
+
+            <fieldset className="field-group">
+              <legend>Chemin hydraulique</legend>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={hydraulicCoupling}
+                  onChange={(event) => setHydraulicCoupling(event.target.checked)}
+                />
+                Déterminer le débit par le réseau plutôt que l'imposer
+              </label>
+              {hydraulicCoupling ? (
+                <div className="form-grid three">
+                  <label>
+                    Projet
+                    <select value={transferProjectId} onChange={(event) => setTransferProjectId(event.target.value)}>
+                      <option value="">Sélectionner</option>
+                      {transferProjects.map((project) => (
+                        <option key={project.id} value={project.id}>{project.code} — {project.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Version de modèle
+                    <select value={transferModelId} onChange={(event) => setTransferModelId(event.target.value)} disabled={!transferProjectId}>
+                      <option value="">Sélectionner</option>
+                      {transferModels.map((model) => (
+                        <option key={model.id} value={model.id}>V{model.version_number} — {model.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Scénario du transfert
+                    <select value={transferScenarioId} onChange={(event) => setTransferScenarioId(event.target.value)} disabled={!transferModelId}>
+                      <option value="">Sélectionner</option>
+                      {transferScenarios.map((item) => (
+                        <option key={item.id} value={item.id}>{item.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ) : (
+                <p className="field-help">
+                  Sans chemin hydraulique, le débit demandé est imposé : la simulation
+                  intègre des volumes et des niveaux, sans vérifier la faisabilité du réseau.
+                </p>
+              )}
+            </fieldset>
             <button
               className="button button-primary"
-              disabled={!sourceId || !destinationId || transferMutation.isPending}
+              disabled={
+                !sourceId ||
+                !destinationId ||
+                transferMutation.isPending ||
+                (hydraulicCoupling && !transferScenarioId)
+              }
             >
               {transferMutation.isPending ? "Simulation…" : "Simuler et archiver"}
             </button>
@@ -297,6 +461,44 @@ export function StockagePage() {
                 Calculer le bilan matière
               </button>
             </div>
+            {transfer.result_payload.hydraulic_coupling ? (
+              <div className="resource-summary">
+                <div>
+                  <span>Débit</span>
+                  <strong>Déterminé par le réseau</strong>
+                </div>
+                <div>
+                  <span>Moteur</span>
+                  <strong>{transfer.result_payload.hydraulic_coupling.engine_version}</strong>
+                </div>
+                <div>
+                  <span>Calculs hydrauliques</span>
+                  <strong>{transfer.result_payload.hydraulic_coupling.evaluations}</strong>
+                </div>
+                <div>
+                  <span>Points réutilisés</span>
+                  <strong>{transfer.result_payload.hydraulic_coupling.reused_points}</strong>
+                </div>
+                <div>
+                  <span>Pompes en marche</span>
+                  <strong>
+                    {transfer.result_payload.hydraulic_coupling.pump_ids.join(", ") || "aucune"}
+                  </strong>
+                </div>
+                {transfer.result_payload.hydraulic_coupling.failures.length ? (
+                  <div>
+                    <span>Points non résolus</span>
+                    <strong>
+                      {transfer.result_payload.hydraulic_coupling.failures.length}
+                    </strong>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="field-help">
+                Débit imposé par l'utilisateur : la faisabilité du réseau n'a pas été vérifiée.
+              </p>
+            )}
             {balance ? (
               <div className="notice">
                 <StatusBadge value={balance.within_tolerance ? "conforme" : "hors_tolerance"} />
@@ -318,4 +520,24 @@ function TransferMetric({ label, value, unit }: { label: string; value: string; 
       <small>{unit}</small>
     </article>
   );
+}
+
+/** Critère d'arrêt retenu ; le moteur en exige exactement un. */
+type TransferObjective = "volume" | "level" | "duration";
+
+function numberField(form: FormData, name: string): number | null {
+  const raw = form.get(name);
+  if (typeof raw !== "string" || !raw.trim()) {
+    return null;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function multiplyOrNull(value: number | null, factor: number): number | null {
+  return value === null ? null : value * factor;
+}
+
+function divideOrNull(value: number | null, factor: number): number | null {
+  return value === null ? null : value / factor;
 }

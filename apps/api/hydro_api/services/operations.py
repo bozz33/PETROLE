@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from copy import deepcopy
 from dataclasses import asdict
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -43,7 +43,7 @@ from hydro_optimization import (
     OptimizationConstraints,
     OptimizationRequest,
 )
-from hydro_shared.errors import InvalidInputError
+from hydro_shared.errors import HydroError, InvalidInputError
 from hydro_shared.hashing import sha256_of
 from hydro_tanks import (
     TankTransferEngine,
@@ -52,6 +52,11 @@ from hydro_tanks import (
     VolumeMeasurement,
     compute_transfer_balance,
     constant_operating_point,
+)
+from hydro_tanks.transfer import (
+    OperatingPointResolver,
+    TransferOperatingPoint,
+    TransferState,
 )
 from hydroliquid import get_engine
 
@@ -253,6 +258,158 @@ def _transfer_result_payload(result) -> dict[str, Any]:
     }
 
 
+def _hydraulic_operating_point_resolver(
+    session: Session,
+    data: TransferCreate,
+    organization_id: uuid.UUID,
+) -> tuple[OperatingPointResolver, dict[str, Any]]:
+    """Construit un résolveur qui interroge HydroLiquid à chaque évolution des niveaux.
+
+    Le moteur reçoit les niveaux courants des deux bacs comme conditions aux
+    limites et détermine le débit compatible : le transfert cesse d'être une
+    simple intégration de volumes à débit imposé.
+
+    Un calcul complet à chaque pas de temps serait prohibitif ; le point est donc
+    recalculé lorsque l'un des niveaux a varié de plus de ``hydraulic_level_step_m``,
+    et le nombre total d'évaluations reste borné.
+    """
+
+    if data.scenario_id is None:
+        raise InvalidInputError("Aucun scénario n'a été fourni pour le couplage hydraulique.")
+
+    scenario = session.get(ScenarioRecord, data.scenario_id)
+    if scenario is None:
+        raise ResourceNotFoundError("Scénario", data.scenario_id)
+    model = scenario.model_version
+    project = model.project
+    if project.organization_id != organization_id:
+        raise ResourceConflictError(
+            "Le scénario du transfert doit appartenir à l'organisation du mouvement."
+        )
+
+    engine = get_engine("long_distance_liquid")
+    base_payload = core.canonical_payload_for_calculation(
+        session,
+        model,
+        scenario,
+        engine_name=engine.name,
+        engine_version=f"{engine.name}-{engine.version}",
+        organization_id=organization_id,
+    )
+    base_input = canonical_input_from_dict(base_payload)
+    available_pump_ids = sorted(
+        pump.id for station in base_input.pipeline.stations for pump in station.pumps
+    )
+    selected_pump_ids = sorted(data.pump_ids or available_pump_ids)
+    unknown = set(selected_pump_ids) - set(available_pump_ids)
+    if unknown:
+        raise InvalidInputError(
+            "Le transfert référence des pompes absentes du modèle.",
+            pump_ids=sorted(unknown),
+        )
+
+    diagnostics: dict[str, Any] = {
+        "scenario_id": str(scenario.id),
+        "model_version_id": str(model.id),
+        "engine_version": f"{engine.name}-{engine.version}",
+        "pump_ids": selected_pump_ids,
+        "evaluations": 0,
+        "reused_points": 0,
+        "failures": [],
+    }
+    cache: dict[str, Any] = {"levels": None, "point": None}
+
+    def build_payload(source_level_m: float, destination_level_m: float) -> dict[str, Any]:
+        payload = deepcopy(base_payload)
+        scenario_payload = payload["scenario"]
+        # Le débit devient l'inconnue : les deux extrémités fournissent les
+        # conditions aux limites exigées par le moteur.
+        scenario_payload["imposed_flow_m3_s"] = None
+        scenario_payload["inlet_tank_level_m"] = source_level_m
+        scenario_payload["outlet_tank_level_m"] = destination_level_m
+        if data.maximum_flow_m3_s is not None:
+            solver = scenario_payload.setdefault("solver", {})
+            solver["max_flow_m3_s"] = data.maximum_flow_m3_s
+        if selected_pump_ids:
+            overrides = {
+                item["pump_id"]: item
+                for item in scenario_payload.get("pump_overrides", [])
+                if isinstance(item, dict) and item.get("pump_id")
+            }
+            active = set(selected_pump_ids)
+            for pump_id in available_pump_ids:
+                previous = overrides.get(pump_id, {})
+                overrides[pump_id] = {
+                    "pump_id": pump_id,
+                    "status": previous.get("status"),
+                    "running": pump_id in active,
+                    "speed_ratio": previous.get("speed_ratio"),
+                }
+            scenario_payload["pump_overrides"] = [
+                overrides[pump_id] for pump_id in sorted(overrides)
+            ]
+        return payload
+
+    def resolve(state: TransferState) -> TransferOperatingPoint:
+        previous = cache["levels"]
+        if (
+            previous is not None
+            and abs(state.source_level_m - previous[0]) < data.hydraulic_level_step_m
+            and abs(state.destination_level_m - previous[1]) < data.hydraulic_level_step_m
+        ):
+            diagnostics["reused_points"] += 1
+            return cast(TransferOperatingPoint, cache["point"])
+
+        if diagnostics["evaluations"] >= data.maximum_hydraulic_evaluations:
+            diagnostics["reused_points"] += 1
+            if cache["point"] is None:
+                raise InvalidInputError(
+                    "Le budget de calculs hydrauliques est épuisé avant toute évaluation."
+                )
+            return cast(TransferOperatingPoint, cache["point"])
+
+        candidate = canonical_input_from_dict(
+            build_payload(state.source_level_m, state.destination_level_m)
+        )
+        diagnostics["evaluations"] += 1
+        try:
+            result = engine.simulate(candidate)
+        except HydroError as error:
+            diagnostics["failures"].append({"time_s": state.time_s, "detail": str(error)})
+            return TransferOperatingPoint(
+                flow_m3_s=0.0,
+                feasible=False,
+                detail="Le calcul hydraulique n'a pas abouti à ce point de fonctionnement.",
+            )
+
+        discharge_pressure_pa: float | None = None
+        if result.stations:
+            discharge_pressure_pa = max(
+                station.discharge_pressure_pa for station in result.stations
+            )
+        absorbed_power_w = (
+            result.energy.total_absorbed_power_w
+            if result.energy is not None and result.energy.total_absorbed_power_w is not None
+            else None
+        )
+        flow_m3_s = max(result.flow_m3_s, 0.0)
+        if data.maximum_flow_m3_s is not None:
+            flow_m3_s = min(flow_m3_s, data.maximum_flow_m3_s)
+
+        point = TransferOperatingPoint(
+            flow_m3_s=flow_m3_s,
+            discharge_pressure_pa=discharge_pressure_pa,
+            absorbed_power_w=absorbed_power_w,
+            feasible=result.is_feasible and flow_m3_s > 0.0,
+            detail=None if result.is_feasible else "Le résultat hydraulique n'est pas réalisable.",
+        )
+        cache["levels"] = (state.source_level_m, state.destination_level_m)
+        cache["point"] = point
+        return point
+
+    return resolve, diagnostics
+
+
 def simulate_transfer(
     session: Session,
     organization_id: uuid.UUID,
@@ -297,14 +454,23 @@ def simulate_transfer(
         maximum_flow_m3_s=data.maximum_flow_m3_s,
         loss_fraction=data.loss_fraction,
     )
-    resolver = constant_operating_point(
-        data.requested_flow_m3_s,
-        discharge_pressure_pa=data.discharge_pressure_pa,
-        absorbed_power_w=data.absorbed_power_w,
-    )
+    hydraulic_diagnostics: dict[str, Any] | None = None
+    if data.scenario_id is not None:
+        resolver, hydraulic_diagnostics = _hydraulic_operating_point_resolver(
+            session, data, organization_id
+        )
+    else:
+        resolver = constant_operating_point(
+            data.requested_flow_m3_s,
+            discharge_pressure_pa=data.discharge_pressure_pa,
+            absorbed_power_w=data.absorbed_power_w,
+        )
     created_at = utc_now()
     started_at = utc_now()
     result = TankTransferEngine().simulate(request, resolver)
+    result_payload = _transfer_result_payload(result)
+    if hydraulic_diagnostics is not None:
+        result_payload["hydraulic_coupling"] = hydraulic_diagnostics
     record = TransferRun(
         organization_id=organization_id,
         source_tank_id=source_record.id,
@@ -313,7 +479,7 @@ def simulate_transfer(
         status=result.stop_reason.value,
         input_hash=input_hash,
         input_payload=input_payload,
-        result_payload=_transfer_result_payload(result),
+        result_payload=result_payload,
         created_at=created_at,
         started_at=started_at,
         finished_at=utc_now(),

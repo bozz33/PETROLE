@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
+import { OrganizationField } from "../components/OrganizationField";
 import { apiRequest, jsonBody } from "../api";
 import { EmptyState, ErrorNotice, Panel, StatusBadge, SuccessNotice } from "../components/Shell";
 import type {
@@ -8,7 +9,6 @@ import type {
   DatasetImport,
   DatasetKind,
   DatasetPreview,
-  Organization,
   Page,
   Project,
   StoredFile,
@@ -60,10 +60,6 @@ export function DonneesPage() {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [importResult, setImportResult] = useState<DatasetImport | null>(null);
 
-  const organizationsQuery = useQuery({
-    queryKey: ["organizations"],
-    queryFn: () => apiRequest<Page<Organization>>("/organizations?limit=200&offset=0"),
-  });
   const projectsQuery = useQuery({
     queryKey: ["projects", organizationId],
     queryFn: () =>
@@ -73,14 +69,8 @@ export function DonneesPage() {
     enabled: Boolean(organizationId),
   });
 
-  const organizations = organizationsQuery.data?.items ?? [];
   const projects = projectsQuery.data?.items ?? [];
 
-  useEffect(() => {
-    if (!organizationId && organizations.length) {
-      setOrganizationId(organizations[0].id);
-    }
-  }, [organizationId, organizations]);
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
@@ -155,7 +145,6 @@ export function DonneesPage() {
     [kind, mapping],
   );
   const error =
-    organizationsQuery.error ??
     projectsQuery.error ??
     uploadMutation.error ??
     mappingMutation.error ??
@@ -182,21 +171,7 @@ export function DonneesPage() {
             uploadMutation.mutate();
           }}
         >
-          <label>
-            Organisation
-            <select
-              value={organizationId}
-              onChange={(event) => setOrganizationId(event.target.value)}
-              required
-            >
-              <option value="">Sélectionner</option>
-              {organizations.map((organization) => (
-                <option key={organization.id} value={organization.id}>
-                  {organization.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <OrganizationField value={organizationId} onChange={setOrganizationId} />
           <label>
             Projet, facultatif
             <select

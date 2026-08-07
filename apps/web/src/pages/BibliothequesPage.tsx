@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { OrganizationField } from "../components/OrganizationField";
 import { apiRequest, jsonBody } from "../api";
 import {
   EmptyState,
@@ -20,7 +21,6 @@ import type {
   CatalogCollection,
   CatalogItem,
   FluidPayload,
-  Organization,
   Page,
   PumpPayload,
 } from "../types";
@@ -58,10 +58,6 @@ export function BibliothequesPage() {
       : validatePump(pump)
     : [];
 
-  const organizationsQuery = useQuery({
-    queryKey: ["organizations"],
-    queryFn: () => apiRequest<Page<Organization>>("/organizations?limit=200&offset=0"),
-  });
   const itemsQuery = useQuery({
     queryKey: ["catalog", organizationId, collection],
     queryFn: () =>
@@ -74,14 +70,8 @@ export function BibliothequesPage() {
     enabled: Boolean(organizationId),
   });
 
-  const organizations = organizationsQuery.data?.items ?? [];
   const items = itemsQuery.data?.items ?? [];
 
-  useEffect(() => {
-    if (!organizationId && organizations.length) {
-      setOrganizationId(organizations[0].id);
-    }
-  }, [organizationId, organizations]);
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -136,7 +126,6 @@ export function BibliothequesPage() {
   });
 
   const error =
-    organizationsQuery.error ??
     itemsQuery.error ??
     createMutation.error ??
     approveMutation.error ??
@@ -156,20 +145,7 @@ export function BibliothequesPage() {
         description="Chaque ressource possède une source, une empreinte et un cycle d'approbation."
       >
         <div className="form-grid">
-          <label>
-            Organisation
-            <select
-              value={organizationId}
-              onChange={(event) => setOrganizationId(event.target.value)}
-            >
-              <option value="">Sélectionner</option>
-              {organizations.map((organization) => (
-                <option key={organization.id} value={organization.id}>
-                  {organization.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <OrganizationField value={organizationId} onChange={setOrganizationId} />
           <label>
             Famille
             <select

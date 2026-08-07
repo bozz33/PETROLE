@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { OrganizationField } from "../components/OrganizationField";
 import { apiRequest, jsonBody } from "../api";
 import {
   EmptyState,
@@ -10,7 +11,7 @@ import {
   SuccessNotice,
 } from "../components/Shell";
 import { defaultTankDraft, TankForm, validateTank } from "../components/tanks/TankForm";
-import type { Organization, Page, Tank, TankDraft, Transfer } from "../types";
+import type { Page, Tank, TankDraft, Transfer } from "../types";
 import { formatNumber } from "../types";
 
 interface BalanceResult {
@@ -29,10 +30,6 @@ export function StockagePage() {
   const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [balance, setBalance] = useState<BalanceResult | null>(null);
 
-  const organizationsQuery = useQuery({
-    queryKey: ["organizations"],
-    queryFn: () => apiRequest<Page<Organization>>("/organizations?limit=200&offset=0"),
-  });
   const tanksQuery = useQuery({
     queryKey: ["tanks", organizationId],
     queryFn: () =>
@@ -42,14 +39,8 @@ export function StockagePage() {
     enabled: Boolean(organizationId),
   });
 
-  const organizations = organizationsQuery.data?.items ?? [];
   const tanks = tanksQuery.data?.items ?? [];
 
-  useEffect(() => {
-    if (!organizationId && organizations.length) {
-      setOrganizationId(organizations[0].id);
-    }
-  }, [organizationId, organizations]);
 
   useEffect(() => {
     if (!tanks.some((tank) => tank.id === sourceId)) {
@@ -160,7 +151,6 @@ export function StockagePage() {
   const tankProblems = validateTank(tankDraft);
   const visibleTankProblems = tankTouched ? tankProblems : [];
   const error =
-    organizationsQuery.error ??
     tanksQuery.error ??
     tankMutation.error ??
     transferMutation.error ??
@@ -177,20 +167,7 @@ export function StockagePage() {
         title="Parc de stockage"
         description="Volumes et marges calculés exclusivement depuis le barémage du bac."
       >
-        <label>
-          Organisation
-          <select
-            value={organizationId}
-            onChange={(event) => setOrganizationId(event.target.value)}
-          >
-            <option value="">Sélectionner</option>
-            {organizations.map((organization) => (
-              <option key={organization.id} value={organization.id}>
-                {organization.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <OrganizationField value={organizationId} onChange={setOrganizationId} />
         {tanks.length ? (
           <div className="table-wrap">
             <table>

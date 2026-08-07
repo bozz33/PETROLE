@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+import { OrganizationField } from "../components/OrganizationField";
 import { apiRequest } from "@/api";
 import { PipelineMap } from "@/components/maps/PipelineMap";
 import { EmptyState, ErrorNotice, Panel, StatusBadge } from "@/components/Shell";
@@ -9,7 +10,6 @@ import type {
   ModelVersion,
   NetworkEdge,
   NetworkNode,
-  Organization,
   Page,
   Project,
 } from "@/types";
@@ -22,10 +22,6 @@ export function VisualisationReseauPage() {
   const [modelId, setModelId] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("schema");
 
-  const organizationsQuery = useQuery({
-    queryKey: ["organizations"],
-    queryFn: () => apiRequest<Page<Organization>>("/organizations?limit=200&offset=0"),
-  });
   const projectsQuery = useQuery({
     queryKey: ["projects", organizationId],
     queryFn: () =>
@@ -53,7 +49,6 @@ export function VisualisationReseauPage() {
     enabled: Boolean(modelId),
   });
 
-  const organizations = organizationsQuery.data?.items ?? [];
   const projects = projectsQuery.data?.items ?? [];
   const models = modelsQuery.data?.items ?? [];
   const nodes = nodesQuery.data?.items ?? [];
@@ -68,11 +63,6 @@ export function VisualisationReseauPage() {
   const mapStyleUrl =
     import.meta.env.VITE_MAP_STYLE_URL ?? "https://demotiles.maplibre.org/style.json";
 
-  useEffect(() => {
-    if (!organizationId && organizations.length) {
-      setOrganizationId(organizations[0].id);
-    }
-  }, [organizationId, organizations]);
 
   useEffect(() => {
     if (!projects.some((project) => project.id === projectId)) {
@@ -89,7 +79,6 @@ export function VisualisationReseauPage() {
   }, [modelId, models]);
 
   const error =
-    organizationsQuery.error ??
     projectsQuery.error ??
     modelsQuery.error ??
     nodesQuery.error ??
@@ -106,20 +95,7 @@ export function VisualisationReseauPage() {
         description="Choisissez la version à afficher dans le schéma technologique ou sur la carte."
       >
         <div className="form-grid three">
-          <label>
-            Organisation
-            <select
-              value={organizationId}
-              onChange={(event) => setOrganizationId(event.target.value)}
-            >
-              <option value="">Sélectionner</option>
-              {organizations.map((organization) => (
-                <option key={organization.id} value={organization.id}>
-                  {organization.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <OrganizationField value={organizationId} onChange={setOrganizationId} />
           <label>
             Projet
             <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>

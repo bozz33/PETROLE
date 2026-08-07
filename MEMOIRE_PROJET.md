@@ -488,6 +488,72 @@ expert pour les produits et les pompes.
   clause n'est établie ;
 - l'organisation de l'instance de production s'appelle encore « test ».
 
+## Fermeture MVP — lots F01 et F02 (7 août 2026)
+
+Le périmètre est gelé : plus aucune fonctionnalité hors des huit lots de fermeture
+définis avec l'audit. Une fonction n'est considérée terminée que si elle existe dans le
+backend, est utilisable dans l'interface sans JSON ni ligne de commande, est testée et
+participe au parcours métier réel.
+
+### MVP-F01 — instance mono-exploitant
+
+Le backend imposait déjà l'organisation, mais six pages métier continuaient de charger
+la liste des organisations et d'en demander une : Projets, Modélisation, Visualisation du
+réseau, Bibliothèques, Stockage et Données.
+
+`apps/web/src/deployment.ts` résout l'espace courant depuis l'état de santé publié par
+l'API. `OrganizationField` devient une mention en lecture seule en mono-exploitant et
+redevient un sélecteur en multi-organisations. Le formulaire de création d'organisation
+disparaît du parcours mono-exploitant.
+
+L'organisation de production a été renommée **PETROLE / DISTESAGE**
+(`petrole-distesage`) et son identifiant est fixé dans `deployment/.env.vps` par
+`HYDRO_DEFAULT_ORGANIZATION_ID`, ce qui rend le périmètre déterministe.
+
+### MVP-F02 — fiches industrielles et réseau typé
+
+Nouvelles fiches guidées, sans JSON dans le parcours normal :
+
+- **vanne** — type, diamètre, K, Cv, Kv, taux d'ouverture, temps de manœuvre, position de
+  repli, classe de pression ;
+- **matériau** — rugosité, pression maximale admissible, spécification, grade, SMYS,
+  résistance ultime, géométrie, surépaisseur de corrosion, température de conception ;
+- **accessoire** — type, K, longueur équivalente, diamètre.
+
+Ces trois familles sont typées côté API (`ValveInput`, `MaterialInput`,
+`AccessoryInput`) mais **volontairement hors de l'union du payload de catalogue** : tous
+leurs champs étant facultatifs, Pydantic pourrait retenir le mauvais modèle et effacer
+silencieusement les champs propres à l'autre famille. La validation est appliquée par le
+service, qui connaît la famille demandée ; un test vérifie la survie des champs.
+
+Le réseau devient typé :
+
+- le formulaire de nœud change selon le type — configuration complète de station, débit
+  imposé pour injection et soutirage, rappel de la condition aval pour un terminal ;
+  latitude, longitude et état sont saisissables ;
+- le tronçon reçoit sa géométrie mécanique, un profil altimétrique multi-points avec
+  coordonnées, et une table d'accessoires typée.
+
+Les règles du backend sont reproduites avant l'envoi : profil croissant couvrant
+exactement le tronçon, cohérence diamètres/épaisseur, bornes de la station.
+
+### Preuves
+
+| Contrôle | Résultat |
+|---|---:|
+| Suite backend Docker | **522 tests réussis** |
+| Tests unitaires web | **40 réussis** |
+| Playwright bureau et mobile | **33 réussis** |
+| ruff, mypy, TypeScript, build Vite | verts |
+
+### Lots restants
+
+`MVP-F03` modélisation complète et React Flow éditeur ; `MVP-F04` résultats détaillés et
+graphiques obligatoires ; `MVP-F05` transfert connecté à HydroLiquid — chantier critique ;
+`MVP-F06` imports JSON, liaison imports, pièces jointes et exports ; `MVP-F07`
+optimisation finale et workflow de validation ; `MVP-F08` qualification complète, recette
+métier et release `v1.0.0-mvp`.
+
 ## Requalification backend du 3 août 2026
 
 La requalification consolidée est consignée dans

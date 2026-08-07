@@ -22,6 +22,7 @@ from hydro_api.models import (
     NetworkEdge,
     NetworkNode,
     ScenarioRecord,
+    TankRecord,
 )
 from hydro_api.schemas.network import (
     AssetInstanceCreate,
@@ -861,33 +862,40 @@ def validate_network(session: Session, model_id: uuid.UUID) -> NetworkValidation
     if ordered_edges:
         first_node = node_by_id.get(ordered_edges[0].from_node_id)
         last_node = node_by_id.get(ordered_edges[-1].to_node_id)
-        if first_node is not None and first_node.kind != "source":
+        if first_node is not None and first_node.kind not in {"source", "tank"}:
             error(
                 "NET_CHAIN_SOURCE",
-                "Le premier tronçon doit partir du nœud source.",
+                "Le premier tronçon doit partir du nœud source ou d'un raccordement de bac.",
                 "node",
                 first_node.id,
             )
-        if last_node is not None and last_node.kind != "terminal":
+        if last_node is not None and last_node.kind not in {"terminal", "tank"}:
             error(
                 "NET_CHAIN_TERMINAL",
-                "Le dernier tronçon doit aboutir au nœud terminal.",
+                "Le dernier tronçon doit aboutir au nœud terminal ou à un raccordement de bac.",
                 "node",
                 last_node.id,
             )
 
+    terminal_node_ids: set[uuid.UUID] = set()
+    if ordered_edges:
+        terminal_node_ids = {ordered_edges[0].from_node_id, ordered_edges[-1].to_node_id}
+
     kinds = Counter(node.kind for node in nodes)
-    if kinds["source"] != 1:
+    boundary_kinds = Counter(node.kind for node in nodes if node.id in terminal_node_ids)
+    # Une extrémité vaut source ou terminal selon qu'elle ouvre ou ferme le
+    # chaînage : un raccordement de bac y tient le même rôle.
+    if kinds["source"] + boundary_kinds["tank"] < 1:
         warning(
             "NET_SOURCE_COUNT",
-            "Un pipeline linéaire devrait contenir exactement une source.",
+            "Un pipeline linéaire devrait s'ouvrir sur une source ou un raccordement de bac.",
             "model",
             model_id,
         )
-    if kinds["terminal"] != 1:
+    if kinds["terminal"] + boundary_kinds["tank"] < 1:
         warning(
             "NET_TERMINAL_COUNT",
-            "Un pipeline linéaire devrait contenir exactement un terminal.",
+            "Un pipeline linéaire devrait se fermer sur un terminal ou un raccordement de bac.",
             "model",
             model_id,
         )
@@ -931,13 +939,26 @@ def validate_network(session: Session, model_id: uuid.UUID) -> NetworkValidation
         if node.kind == "station" and pump_count_by_node[node.id] == 0:
             error("NET_STATION_EMPTY", "La station ne contient aucune pompe.", "node", node.id)
         if node.kind == "tank":
-            error(
-                "NET_NODE_UNSUPPORTED",
-                "Le nœud tank n'est pas compilable par le moteur liquide du MVP ; utilisez "
-                "un nœud source ou terminal et gérez le bac par le module d'exploitation.",
-                "node",
-                node.id,
-            )
+            # Un raccordement de bac n'est compilable qu'aux extrémités du
+            # chaînage : ailleurs, le moteur liquide du MVP n'a pas de modèle
+            # de piquage intermédiaire.
+            if node.id not in terminal_node_ids:
+                error(
+                    "NET_NODE_UNSUPPORTED",
+                    "Un raccordement de bac ne peut être placé qu'à une extrémité du "
+                    "chaînage ; utilisez une injection ou un soutirage pour un piquage "
+                    "intermédiaire.",
+                    "node",
+                    node.id,
+                )
+            elif not _declared_tank_id(node):
+                error(
+                    "NET_TANK_REFERENCE",
+                    "Un raccordement de bac doit désigner le réservoir raccordé par "
+                    "payload.tank_id.",
+                    "node",
+                    node.id,
+                )
         if node.kind in {"injection", "offtake"}:
             flow = node.payload.get("flow_m3_s")
             if isinstance(flow, bool) or not isinstance(flow, int | float) or flow <= 0:
@@ -1011,6 +1032,39 @@ def validate_network(session: Session, model_id: uuid.UUID) -> NetworkValidation
     )
 
 
+def _boundary_tank_payload(session: Session, node: NetworkNode | None) -> dict[str, Any] | None:
+    """Sérialise le réservoir raccordé à une extrémité du chaînage."""
+
+    if node is None or node.kind != "tank":
+        return None
+    tank_id = _declared_tank_id(node)
+    if tank_id is None:
+        return None
+    record = session.get(TankRecord, tank_id)
+    if record is None:
+        raise InvalidInputError(
+            "Le nœud de raccordement désigne un réservoir inexistant.",
+            node_id=str(node.id),
+            tank_id=str(tank_id),
+        )
+    from hydro_api.services.operations import tank_domain_payload
+
+    return tank_domain_payload(record)
+
+
+def _declared_tank_id(node: NetworkNode) -> uuid.UUID | None:
+    """Retourne le réservoir désigné par un nœud de raccordement, s'il existe."""
+
+    payload = node.payload if isinstance(node.payload, dict) else {}
+    raw = payload.get("tank_id")
+    if raw is None:
+        return None
+    try:
+        return uuid.UUID(str(raw))
+    except ValueError:
+        return None
+
+
 def canonical_sections_from_normalized(
     session: Session,
     model: ModelVersion,
@@ -1026,6 +1080,7 @@ def canonical_sections_from_normalized(
         )
     nodes, edges, assets = _model_components(session, model.id)
     ordered_edges = sorted(edges, key=lambda item: item.sequence)
+    node_by_id = {node.id: node for node in nodes}
     fluid_id = uuid.UUID(str(model.payload["fluid_catalog_item_id"]))
     fluid = session.get(CatalogItem, fluid_id)
     if fluid is None:
@@ -1208,8 +1263,15 @@ def canonical_sections_from_normalized(
         "profile": {"points": profile_points},
         "stations": stations,
         "injections": injections,
-        "origin_tank": None,
-        "destination_tank": None,
+        # Les bacs d'extrémité permettent au moteur de convertir un niveau en
+        # pression statique : sans eux, un transfert ne peut pas être piloté par
+        # les niveaux des réservoirs.
+        "origin_tank": _boundary_tank_payload(
+            session, node_by_id.get(ordered_edges[0].from_node_id) if ordered_edges else None
+        ),
+        "destination_tank": _boundary_tank_payload(
+            session, node_by_id.get(ordered_edges[-1].to_node_id) if ordered_edges else None
+        ),
     }
     equipment_payload = {
         "pump_models": [pump_models[identifier] for identifier in sorted(pump_models)]

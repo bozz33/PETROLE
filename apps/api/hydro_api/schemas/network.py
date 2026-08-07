@@ -15,6 +15,7 @@ from hydro_api.schemas.scientific import (
     OfftakeNodePayloadInput,
     PumpAssetInput,
     StationConfigurationInput,
+    TankNodePayloadInput,
     TerminalNodePayloadInput,
     ValveAssetInput,
     payload_to_dict,
@@ -26,6 +27,7 @@ from hydro_api.schemas.scientific import (
 #: déjà persistées. La valeur par défaut est définie au niveau du champ.
 NodePayload = (
     StationConfigurationInput
+    | TankNodePayloadInput
     | InjectionNodePayloadInput
     | OfftakeNodePayloadInput
     | TerminalNodePayloadInput

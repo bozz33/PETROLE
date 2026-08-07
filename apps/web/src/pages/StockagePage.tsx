@@ -13,7 +13,10 @@ import {
 } from "../components/Shell";
 import { defaultTankDraft, TankForm, validateTank } from "../components/tanks/TankForm";
 import type {
+  AssetInstance,
   ModelVersion,
+  NetworkEdge,
+  NetworkNode,
   Page,
   Project,
   Scenario,
@@ -40,6 +43,7 @@ export function StockagePage() {
   const [transferModelId, setTransferModelId] = useState("");
   const [transferScenarioId, setTransferScenarioId] = useState("");
   const [hydraulicCoupling, setHydraulicCoupling] = useState(false);
+  const [selectedPumpIds, setSelectedPumpIds] = useState<string[]>([]);
   const [destinationId, setDestinationId] = useState("");
   const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [balance, setBalance] = useState<BalanceResult | null>(null);
@@ -99,9 +103,45 @@ export function StockagePage() {
     enabled: hydraulicCoupling && Boolean(transferModelId),
   });
 
+  const nodesQuery = useQuery({
+    queryKey: ["nodes", transferModelId],
+    queryFn: () =>
+      apiRequest<Page<NetworkNode>>("/models/" + transferModelId + "/nodes?limit=1000&offset=0"),
+    enabled: hydraulicCoupling && Boolean(transferModelId),
+  });
+  const edgesQuery = useQuery({
+    queryKey: ["edges", transferModelId],
+    queryFn: () =>
+      apiRequest<Page<NetworkEdge>>("/models/" + transferModelId + "/edges?limit=2000&offset=0"),
+    enabled: hydraulicCoupling && Boolean(transferModelId),
+  });
+  const assetsQuery = useQuery({
+    queryKey: ["assets", transferModelId],
+    queryFn: () =>
+      apiRequest<Page<AssetInstance>>("/models/" + transferModelId + "/assets?limit=2000&offset=0"),
+    enabled: hydraulicCoupling && Boolean(transferModelId),
+  });
+
   const transferProjects = projectsQuery.data?.items ?? [];
   const transferModels = modelsQuery.data?.items ?? [];
   const transferScenarios = scenariosQuery.data?.items ?? [];
+  const networkNodes = nodesQuery.data?.items ?? [];
+  const networkEdges = edgesQuery.data?.items ?? [];
+  const networkPumps = (assetsQuery.data?.items ?? []).filter(
+    (asset) => asset.role === "main" || asset.role === "standby",
+  );
+
+  /**
+   * Le chemin se déduit du raccordement des bacs : les nœuds désignant les deux
+   * réservoirs bornent une suite continue de tronçons orientés.
+   */
+  const sourceNode = networkNodes.find(
+    (node) => node.kind === "tank" && String(node.payload.tank_id ?? "") === sourceId,
+  );
+  const destinationNode = networkNodes.find(
+    (node) => node.kind === "tank" && String(node.payload.tank_id ?? "") === destinationId,
+  );
+  const pathEdges = buildPath(networkEdges, sourceNode?.id ?? "", destinationNode?.id ?? "");
 
   useEffect(() => {
     if (!hydraulicCoupling) {
@@ -157,7 +197,17 @@ export function StockagePage() {
               100_000,
             ),
             absorbed_power_w: multiplyOrNull(numberField(form, "power_kw"), 1_000),
-            scenario_id: hydraulicCoupling ? transferScenarioId || null : null,
+            hydraulic_context:
+              hydraulicCoupling && sourceNode && destinationNode && pathEdges
+                ? {
+                    model_version_id: transferModelId,
+                    scenario_id: transferScenarioId,
+                    source_node_id: sourceNode.id,
+                    destination_node_id: destinationNode.id,
+                    path_edge_ids: pathEdges.map((edge) => edge.id),
+                    pump_asset_ids: selectedPumpIds,
+                  }
+                : null,
           }),
         },
       );
@@ -396,6 +446,7 @@ export function StockagePage() {
                 Déterminer le débit par le réseau plutôt que l'imposer
               </label>
               {hydraulicCoupling ? (
+                <>
                 <div className="form-grid three">
                   <label>
                     Projet
@@ -425,6 +476,59 @@ export function StockagePage() {
                     </select>
                   </label>
                 </div>
+                  {sourceNode && destinationNode && pathEdges ? (
+                    <div className="resource-summary">
+                      <div>
+                        <span>Chemin retenu</span>
+                        <strong>{pathEdges.map((edge) => edge.code).join(" → ")}</strong>
+                      </div>
+                      <div>
+                        <span>Longueur</span>
+                        <strong>
+                          {formatNumber(
+                            pathEdges.reduce((total, edge) => total + edge.length_m, 0) / 1000,
+                            3,
+                          )}{" "}
+                          km
+                        </strong>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="notice notice-error" role="alert">
+                      {!sourceNode || !destinationNode
+                        ? "Aucun nœud de cette version ne raccorde les deux bacs choisis. Déclarez le réservoir dans le nœud correspondant, écran Modélisation."
+                        : "Aucun chemin orienté continu ne relie les deux raccordements dans cette version de modèle."}
+                    </div>
+                  )}
+
+                  {networkPumps.length ? (
+                    <fieldset className="selection-fieldset">
+                      <legend>Pompes en marche pendant le transfert</legend>
+                      {networkPumps.map((pump) => (
+                        <label className="selection-option" key={pump.id}>
+                          <input
+                            type="checkbox"
+                            checked={selectedPumpIds.includes(pump.id)}
+                            onChange={() =>
+                              setSelectedPumpIds((current) =>
+                                current.includes(pump.id)
+                                  ? current.filter((item) => item !== pump.id)
+                                  : [...current, pump.id],
+                              )
+                            }
+                          />
+                          <span>
+                            <strong>{pump.code}</strong>
+                            <small>{pump.role === "standby" ? "Secours" : "Principale"}</small>
+                          </span>
+                        </label>
+                      ))}
+                      <p className="field-help">
+                        Sans sélection, toutes les pompes du chemin sont considérées en marche.
+                      </p>
+                    </fieldset>
+                  ) : null}
+                </>
               ) : (
                 <p className="field-help">
                   Sans chemin hydraulique, le débit demandé est imposé : la simulation
@@ -438,7 +542,7 @@ export function StockagePage() {
                 !sourceId ||
                 !destinationId ||
                 transferMutation.isPending ||
-                (hydraulicCoupling && !transferScenarioId)
+                (hydraulicCoupling && (!transferScenarioId || !pathEdges))
               }
             >
               {transferMutation.isPending ? "Simulation…" : "Simuler et archiver"}
@@ -546,4 +650,51 @@ function multiplyOrNull(value: number | null, factor: number): number | null {
 
 function divideOrNull(value: number | null, factor: number): number | null {
   return value === null ? null : value / factor;
+}
+
+/**
+ * Reconstitue la suite orientée de tronçons reliant deux nœuds.
+ *
+ * Retourne `null` lorsqu'aucun chemin simple n'existe : le module refuse alors
+ * de deviner une route, conformément au choix de reproductibilité du MVP.
+ */
+export function buildPath(
+  edges: NetworkEdge[],
+  fromNodeId: string,
+  toNodeId: string,
+): NetworkEdge[] | null {
+  if (!fromNodeId || !toNodeId || fromNodeId === toNodeId) {
+    return null;
+  }
+  const byOrigin = new Map<string, NetworkEdge[]>();
+  for (const edge of edges) {
+    const bucket = byOrigin.get(edge.from_node_id) ?? [];
+    bucket.push(edge);
+    byOrigin.set(edge.from_node_id, bucket);
+  }
+
+  const visited = new Set<string>([fromNodeId]);
+  const path: NetworkEdge[] = [];
+
+  const walk = (nodeId: string): boolean => {
+    if (nodeId === toNodeId) {
+      return true;
+    }
+    const candidates = [...(byOrigin.get(nodeId) ?? [])].sort((a, b) => a.sequence - b.sequence);
+    for (const edge of candidates) {
+      if (visited.has(edge.to_node_id)) {
+        continue;
+      }
+      visited.add(edge.to_node_id);
+      path.push(edge);
+      if (walk(edge.to_node_id)) {
+        return true;
+      }
+      path.pop();
+      visited.delete(edge.to_node_id);
+    }
+    return false;
+  };
+
+  return walk(fromNodeId) ? path : null;
 }

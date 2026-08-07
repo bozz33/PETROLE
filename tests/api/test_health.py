@@ -46,7 +46,7 @@ def test_sante_api() -> None:
             "ref": "unknown",
             "build_date": "unknown",
             "scientific_engine_version": "hydroliquid-0.1.0",
-            "database_migration_version": "8b1f2d6c4e90",
+            "database_migration_version": "5e9a1c7b2f48",
         },
         "deployment": {
             "mode": "multi_org",
@@ -78,7 +78,7 @@ def test_version_expose_identite_build_et_moteur() -> None:
         "ref": "v0.1.0-rc.1",
         "build_date": "2026-08-06T10:00:00Z",
         "scientific_engine_version": "hydroliquid-0.1.0",
-        "database_migration_version": "8b1f2d6c4e90",
+        "database_migration_version": "5e9a1c7b2f48",
     }
     assert scientific_validation.status_code == 200
     assert scientific_validation.json()["passed"] == 41

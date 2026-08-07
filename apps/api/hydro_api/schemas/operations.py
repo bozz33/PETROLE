@@ -85,6 +85,44 @@ class TankRead(BaseModel):
     updated_at: datetime
 
 
+class TransferHydraulicContext(BaseModel):
+    """Chemin hydraulique et groupe de pompage d'un transfert.
+
+    Le chemin est explicitement désigné : le MVP ne cherche pas de route
+    automatique lorsque plusieurs sont possibles, afin que la simulation reste
+    reproductible.
+    """
+
+    model_version_id: uuid.UUID
+    scenario_id: uuid.UUID
+    source_node_id: uuid.UUID = Field(description="Nœud raccordant le bac source.")
+    destination_node_id: uuid.UUID = Field(description="Nœud raccordant le bac destination.")
+    path_edge_ids: list[uuid.UUID] = Field(
+        min_length=1,
+        max_length=5_000,
+        description="Tronçons orientés du chemin, du nœud source au nœud destination.",
+    )
+    pump_asset_ids: list[uuid.UUID] = Field(
+        default_factory=list,
+        max_length=500,
+        description="Pompes en marche pendant le transfert ; toutes celles du chemin si vide.",
+    )
+    level_step_m: float = Field(
+        default=0.05,
+        gt=0,
+        description=(
+            "Variation de niveau au-delà de laquelle le point de fonctionnement est "
+            "recalculé. Évite un calcul hydraulique complet à chaque pas de temps."
+        ),
+    )
+    maximum_evaluations: int = Field(
+        default=2_000,
+        ge=1,
+        le=100_000,
+        description="Garde-fou sur le nombre de calculs hydrauliques d'un transfert.",
+    )
+
+
 class TransferCreate(BaseModel):
     """Demande de transfert entre deux bacs.
 
@@ -98,31 +136,12 @@ class TransferCreate(BaseModel):
     destination_tank_id: uuid.UUID
     fluid_id: str = Field(min_length=1, max_length=100)
     requested_flow_m3_s: float = Field(gt=0)
-    scenario_id: uuid.UUID | None = Field(
+    hydraulic_context: TransferHydraulicContext | None = Field(
         default=None,
         description=(
-            "Scénario fournissant le réseau, les stations et les options du solveur. "
-            "Active le couplage hydraulique du transfert."
+            "Chemin hydraulique et groupe de pompage. Absent, le débit demandé est "
+            "imposé et le comportement historique est conservé."
         ),
-    )
-    pump_ids: list[str] | None = Field(
-        default=None,
-        max_length=500,
-        description="Pompes en marche pendant le transfert ; toutes celles du modèle si omis.",
-    )
-    hydraulic_level_step_m: float = Field(
-        default=0.05,
-        gt=0,
-        description=(
-            "Variation de niveau au-delà de laquelle le point de fonctionnement est "
-            "recalculé. Évite un calcul hydraulique complet à chaque pas de temps."
-        ),
-    )
-    maximum_hydraulic_evaluations: int = Field(
-        default=2_000,
-        ge=1,
-        le=100_000,
-        description="Garde-fou sur le nombre de calculs hydrauliques d'un transfert.",
     )
     target_volume_m3: float | None = Field(default=None, gt=0)
     target_destination_level_m: float | None = Field(default=None, gt=0)
@@ -133,6 +152,24 @@ class TransferCreate(BaseModel):
     loss_fraction: float = Field(default=0.0, ge=0, lt=1)
     discharge_pressure_pa: float | None = Field(default=None, ge=0)
     absorbed_power_w: float | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def reject_computed_inputs(self) -> TransferCreate:
+        """Interdit de saisir ce que HydroLiquid doit calculer.
+
+        Accepter une pression de refoulement ou une puissance absorbée alors que
+        le réseau les détermine ferait coexister deux valeurs contradictoires
+        dans le même résultat.
+        """
+
+        if self.hydraulic_context is None:
+            return self
+        if self.discharge_pressure_pa is not None or self.absorbed_power_w is not None:
+            raise ValueError(
+                "En couplage hydraulique, la pression de refoulement et la puissance "
+                "absorbée sont calculées par le moteur : elles ne peuvent pas être fournies."
+            )
+        return self
 
     @model_validator(mode="after")
     def validate_objective(self) -> TransferCreate:

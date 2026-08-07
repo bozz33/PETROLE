@@ -14,8 +14,11 @@ from sqlalchemy.orm import Session
 from hydro_api.database.base import utc_now
 from hydro_api.errors import ResourceConflictError, ResourceNotFoundError
 from hydro_api.models import (
+    AssetInstance,
     AuditEvent,
     CalculationRun,
+    NetworkEdge,
+    NetworkNode,
     OptimizationRun,
     Organization,
     Project,
@@ -32,6 +35,7 @@ from hydro_api.schemas.operations import (
     TankUpdate,
     TransferBalanceCreate,
     TransferCreate,
+    TransferHydraulicContext,
 )
 from hydro_api.services import core
 from hydro_domain import canonical_input_from_dict
@@ -109,6 +113,12 @@ def _tank_domain(record: TankRecord) -> Tank:
         status=EquipmentStatus(record.status),
         dead_volume_m3=record.dead_volume_m3,
     )
+
+
+def tank_domain_payload(record: TankRecord) -> dict[str, Any]:
+    """Sérialise un réservoir au format attendu par le paquet canonique."""
+
+    return _tank_domain(record).as_dict()
 
 
 def tank_payload(record: TankRecord) -> dict[str, Any]:
@@ -258,11 +268,158 @@ def _transfer_result_payload(result) -> dict[str, Any]:
     }
 
 
+def _validate_hydraulic_context(
+    session: Session,
+    context: TransferHydraulicContext,
+    *,
+    organization_id: uuid.UUID,
+    source_tank_id: uuid.UUID,
+    destination_tank_id: uuid.UUID,
+) -> tuple[ScenarioRecord, list[AssetInstance]]:
+    """Vérifie que le chemin désigné relie réellement les deux bacs.
+
+    Le MVP ne cherche pas de route automatique : le chemin est explicite et sa
+    continuité est contrôlée avant tout calcul, afin qu'une simulation reste
+    reproductible et qu'aucun tronçon étranger ne s'y glisse.
+    """
+
+    scenario = session.get(ScenarioRecord, context.scenario_id)
+    if scenario is None:
+        raise ResourceNotFoundError("Scénario", context.scenario_id)
+    if scenario.model_version_id != context.model_version_id:
+        raise ResourceConflictError(
+            "Le scénario du transfert n'appartient pas à la version de modèle indiquée."
+        )
+    model = scenario.model_version
+    if model.project.organization_id != organization_id:
+        raise ResourceConflictError(
+            "Le chemin hydraulique doit appartenir à l'organisation du mouvement."
+        )
+
+    nodes = {
+        node.id: node
+        for node in session.scalars(
+            select(NetworkNode).where(NetworkNode.model_version_id == model.id)
+        ).all()
+    }
+    for node_id in (context.source_node_id, context.destination_node_id):
+        if node_id not in nodes:
+            raise ResourceConflictError(
+                "Un nœud du chemin n'appartient pas à la version de modèle indiquée."
+            )
+    if context.source_node_id == context.destination_node_id:
+        raise ResourceConflictError(
+            "Les nœuds de départ et d'arrivée du chemin doivent être distincts."
+        )
+
+    _assert_tank_node(nodes[context.source_node_id], source_tank_id, "source")
+    _assert_tank_node(nodes[context.destination_node_id], destination_tank_id, "destination")
+
+    edges = {
+        edge.id: edge
+        for edge in session.scalars(
+            select(NetworkEdge).where(NetworkEdge.model_version_id == model.id)
+        ).all()
+    }
+    if len(set(context.path_edge_ids)) != len(context.path_edge_ids):
+        raise ResourceConflictError("Le chemin hydraulique contient deux fois le même tronçon.")
+
+    current = context.source_node_id
+    visited: set[uuid.UUID] = {current}
+    path_edges: list[NetworkEdge] = []
+    for edge_id in context.path_edge_ids:
+        edge = edges.get(edge_id)
+        if edge is None:
+            raise ResourceConflictError(
+                "Un tronçon du chemin n'appartient pas à la version de modèle indiquée."
+            )
+        if edge.from_node_id != current:
+            raise ResourceConflictError(
+                f"Le chemin hydraulique est discontinu au tronçon {edge.code}."
+            )
+        if edge.to_node_id in visited:
+            raise ResourceConflictError(
+                "Le chemin hydraulique repasse par un nœud déjà parcouru ; "
+                "les boucles ne sont pas admises."
+            )
+        visited.add(edge.to_node_id)
+        path_edges.append(edge)
+        current = edge.to_node_id
+
+    if current != context.destination_node_id:
+        raise ResourceConflictError(
+            "Le chemin hydraulique n'aboutit pas au nœud de destination indiqué."
+        )
+
+    path_node_ids = {context.source_node_id, *(edge.to_node_id for edge in path_edges)}
+    path_edge_ids = {edge.id for edge in path_edges}
+    pumps = _resolve_path_pumps(session, model.id, context, path_node_ids, path_edge_ids)
+    return scenario, pumps
+
+
+def _assert_tank_node(node: NetworkNode, tank_id: uuid.UUID, role: str) -> None:
+    """Vérifie qu'un nœud raccorde bien le réservoir attendu."""
+
+    if node.kind != "tank":
+        raise ResourceConflictError(
+            f"Le nœud {role} du chemin doit être un raccordement de réservoir."
+        )
+    payload = node.payload if isinstance(node.payload, dict) else {}
+    declared = payload.get("tank_id")
+    if declared is None:
+        raise ResourceConflictError(
+            f"Le nœud {role} {node.code} ne déclare aucun réservoir raccordé."
+        )
+    if str(declared) != str(tank_id):
+        raise ResourceConflictError(
+            f"Le nœud {role} {node.code} raccorde un autre réservoir que celui du transfert."
+        )
+
+
+def _resolve_path_pumps(
+    session: Session,
+    model_version_id: uuid.UUID,
+    context: TransferHydraulicContext,
+    path_node_ids: set[uuid.UUID],
+    path_edge_ids: set[uuid.UUID],
+) -> list[AssetInstance]:
+    """Retourne les pompes du chemin, éventuellement restreintes à la sélection."""
+
+    candidates = [
+        asset
+        for asset in session.scalars(
+            select(AssetInstance).where(AssetInstance.model_version_id == model_version_id)
+        ).all()
+        if asset.role in {"main", "standby"}
+        and (
+            (asset.node_id is not None and asset.node_id in path_node_ids)
+            or (asset.edge_id is not None and asset.edge_id in path_edge_ids)
+        )
+    ]
+    if not context.pump_asset_ids:
+        return candidates
+
+    by_id = {asset.id: asset for asset in candidates}
+    selected: list[AssetInstance] = []
+    for asset_id in context.pump_asset_ids:
+        asset = by_id.get(asset_id)
+        if asset is None:
+            raise ResourceConflictError(
+                "Une pompe sélectionnée n'appartient pas au chemin hydraulique du transfert."
+            )
+        if asset.status == "unavailable":
+            raise ResourceConflictError(
+                f"La pompe {asset.code} est déclarée indisponible dans le modèle."
+            )
+        selected.append(asset)
+    return selected
+
+
 def _hydraulic_operating_point_resolver(
     session: Session,
     data: TransferCreate,
     organization_id: uuid.UUID,
-) -> tuple[OperatingPointResolver, dict[str, Any]]:
+) -> tuple[OperatingPointResolver, dict[str, Any], ScenarioRecord]:
     """Construit un résolveur qui interroge HydroLiquid à chaque évolution des niveaux.
 
     Le moteur reçoit les niveaux courants des deux bacs comme conditions aux
@@ -270,22 +427,22 @@ def _hydraulic_operating_point_resolver(
     simple intégration de volumes à débit imposé.
 
     Un calcul complet à chaque pas de temps serait prohibitif ; le point est donc
-    recalculé lorsque l'un des niveaux a varié de plus de ``hydraulic_level_step_m``,
-    et le nombre total d'évaluations reste borné.
+    recalculé lorsque l'un des niveaux a varié de plus de ``level_step_m``, et le
+    nombre total d'évaluations reste borné.
     """
 
-    if data.scenario_id is None:
-        raise InvalidInputError("Aucun scénario n'a été fourni pour le couplage hydraulique.")
+    context = data.hydraulic_context
+    if context is None:
+        raise InvalidInputError("Aucun contexte hydraulique n'a été fourni.")
 
-    scenario = session.get(ScenarioRecord, data.scenario_id)
-    if scenario is None:
-        raise ResourceNotFoundError("Scénario", data.scenario_id)
+    scenario, pump_assets = _validate_hydraulic_context(
+        session,
+        context,
+        organization_id=organization_id,
+        source_tank_id=data.source_tank_id,
+        destination_tank_id=data.destination_tank_id,
+    )
     model = scenario.model_version
-    project = model.project
-    if project.organization_id != organization_id:
-        raise ResourceConflictError(
-            "Le scénario du transfert doit appartenir à l'organisation du mouvement."
-        )
 
     engine = get_engine("long_distance_liquid")
     base_payload = core.canonical_payload_for_calculation(
@@ -300,19 +457,17 @@ def _hydraulic_operating_point_resolver(
     available_pump_ids = sorted(
         pump.id for station in base_input.pipeline.stations for pump in station.pumps
     )
-    selected_pump_ids = sorted(data.pump_ids or available_pump_ids)
-    unknown = set(selected_pump_ids) - set(available_pump_ids)
-    if unknown:
-        raise InvalidInputError(
-            "Le transfert référence des pompes absentes du modèle.",
-            pump_ids=sorted(unknown),
-        )
+    running_pump_ids = sorted({asset.code for asset in pump_assets} & set(available_pump_ids))
 
     diagnostics: dict[str, Any] = {
-        "scenario_id": str(scenario.id),
         "model_version_id": str(model.id),
+        "scenario_id": str(scenario.id),
         "engine_version": f"{engine.name}-{engine.version}",
-        "pump_ids": selected_pump_ids,
+        "source_node_id": str(context.source_node_id),
+        "destination_node_id": str(context.destination_node_id),
+        "path_edge_ids": [str(edge_id) for edge_id in context.path_edge_ids],
+        "pump_asset_ids": [str(asset.id) for asset in pump_assets],
+        "running_pump_ids": running_pump_ids,
         "evaluations": 0,
         "reused_points": 0,
         "failures": [],
@@ -325,18 +480,20 @@ def _hydraulic_operating_point_resolver(
         # Le débit devient l'inconnue : les deux extrémités fournissent les
         # conditions aux limites exigées par le moteur.
         scenario_payload["imposed_flow_m3_s"] = None
+        scenario_payload["inlet_pressure_pa"] = None
+        scenario_payload["outlet_pressure_pa"] = None
         scenario_payload["inlet_tank_level_m"] = source_level_m
         scenario_payload["outlet_tank_level_m"] = destination_level_m
         if data.maximum_flow_m3_s is not None:
             solver = scenario_payload.setdefault("solver", {})
             solver["max_flow_m3_s"] = data.maximum_flow_m3_s
-        if selected_pump_ids:
+        if available_pump_ids:
             overrides = {
                 item["pump_id"]: item
                 for item in scenario_payload.get("pump_overrides", [])
                 if isinstance(item, dict) and item.get("pump_id")
             }
-            active = set(selected_pump_ids)
+            active = set(running_pump_ids)
             for pump_id in available_pump_ids:
                 previous = overrides.get(pump_id, {})
                 overrides[pump_id] = {
@@ -354,18 +511,18 @@ def _hydraulic_operating_point_resolver(
         previous = cache["levels"]
         if (
             previous is not None
-            and abs(state.source_level_m - previous[0]) < data.hydraulic_level_step_m
-            and abs(state.destination_level_m - previous[1]) < data.hydraulic_level_step_m
+            and abs(state.source_level_m - previous[0]) < context.level_step_m
+            and abs(state.destination_level_m - previous[1]) < context.level_step_m
         ):
             diagnostics["reused_points"] += 1
             return cast(TransferOperatingPoint, cache["point"])
 
-        if diagnostics["evaluations"] >= data.maximum_hydraulic_evaluations:
-            diagnostics["reused_points"] += 1
+        if diagnostics["evaluations"] >= context.maximum_evaluations:
             if cache["point"] is None:
                 raise InvalidInputError(
                     "Le budget de calculs hydrauliques est épuisé avant toute évaluation."
                 )
+            diagnostics["reused_points"] += 1
             return cast(TransferOperatingPoint, cache["point"])
 
         candidate = canonical_input_from_dict(
@@ -407,7 +564,7 @@ def _hydraulic_operating_point_resolver(
         cache["point"] = point
         return point
 
-    return resolve, diagnostics
+    return resolve, diagnostics, scenario
 
 
 def simulate_transfer(
@@ -455,8 +612,9 @@ def simulate_transfer(
         loss_fraction=data.loss_fraction,
     )
     hydraulic_diagnostics: dict[str, Any] | None = None
-    if data.scenario_id is not None:
-        resolver, hydraulic_diagnostics = _hydraulic_operating_point_resolver(
+    hydraulic_scenario: ScenarioRecord | None = None
+    if data.hydraulic_context is not None:
+        resolver, hydraulic_diagnostics, hydraulic_scenario = _hydraulic_operating_point_resolver(
             session, data, organization_id
         )
     else:
@@ -480,6 +638,15 @@ def simulate_transfer(
         input_hash=input_hash,
         input_payload=input_payload,
         result_payload=result_payload,
+        model_version_id=(
+            hydraulic_scenario.model_version_id if hydraulic_scenario is not None else None
+        ),
+        scenario_id=hydraulic_scenario.id if hydraulic_scenario is not None else None,
+        hydraulic_engine_version=(
+            str(hydraulic_diagnostics["engine_version"])
+            if hydraulic_diagnostics is not None
+            else None
+        ),
         created_at=created_at,
         started_at=started_at,
         finished_at=utc_now(),

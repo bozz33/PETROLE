@@ -7,7 +7,13 @@ from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from tests.factories import entree_canonique, pipeline, scenario, station_serie
+from tests.factories import (
+    brut_leger,
+    entree_canonique,
+    pipeline,
+    scenario,
+    station_serie,
+)
 
 
 @pytest.fixture
@@ -350,21 +356,192 @@ def test_optimisation_evalue_les_configurations_du_modele(operations_client) -> 
     assert optimizations.json()["items"][0]["id"] == optimization["id"]
 
 
-def test_transfert_couple_au_reseau_hydraulique(operations_client) -> None:
-    """Avec un scénario, le débit du transfert vient de HydroLiquid.
+# --- Transfert couplé au réseau hydraulique (MVP-F05) -------------------------
 
-    Sans couplage, le module intègre un débit saisi par l'utilisateur. Avec un
-    scénario, chaque évolution des niveaux déclenche un calcul hydraulique et le
-    débit résulte du réseau, des stations et des pompes retenues.
+
+def _network_transfer_fixture(client: TestClient, suffix: str = "a") -> dict:
+    """Construit un exploitant, deux bacs, un modèle réseau et son scénario.
+
+    Les deux nœuds d'extrémité déclarent explicitement le réservoir qu'ils
+    raccordent : sans cette liaison, le transfert ne peut pas être rattaché au
+    réseau de façon déterministe.
     """
 
-    organization = _organization(operations_client)
-    project = _project(operations_client, organization["id"])
+    organization = _organization(client, slug="exploitant-hydraulique-" + suffix)
+    project = _project(client, organization["id"])
 
+    source_tank = _tank(
+        client,
+        organization["id"],
+        code="TK-NS-" + suffix.upper(),
+        level_m=8.0,
+        fluid_id="diesel",
+        compatible=[],
+    )
+    destination_tank = _tank(
+        client,
+        organization["id"],
+        code="TK-ND-" + suffix.upper(),
+        level_m=2.0,
+        fluid_id=None,
+        compatible=["diesel"],
+    )
+
+    canonical = entree_canonique(
+        cas=scenario(imposed_flow_m3_s=0.15, inlet_pressure_pa=5_000_000.0)
+    ).payload()
+    fluid = client.post(
+        "/api/v1/catalog/fluids",
+        json={
+            "organization_id": organization["id"],
+            "code": "BRUT-TRANSFERT-" + suffix.upper(),
+            "name": "Brut du transfert couplé",
+            "payload": brut_leger().as_dict(),
+            "source": "Analyse laboratoire",
+        },
+    )
+    assert fluid.status_code == 201, fluid.text
+    fluid_approval = client.post(f"/api/v1/catalog/items/{fluid.json()['id']}/approve")
+    assert fluid_approval.status_code == 200, fluid_approval.text
+
+    model = client.post(
+        f"/api/v1/projects/{project['id']}/models",
+        json={
+            "name": "Modèle réseau transfert",
+            "payload": {
+                "units": canonical["units"],
+                "fluid_catalog_item_id": fluid_approval.json()["id"],
+                "rules": canonical["rules"],
+            },
+        },
+    )
+    assert model.status_code == 201, model.text
+    model_id = model.json()["id"]
+
+    source_node = client.post(
+        f"/api/v1/models/{model_id}/nodes",
+        json={
+            "code": "ND-S",
+            "name": "Piquage bac source",
+            "kind": "tank",
+            "elevation_m": 10.0,
+            "payload": {"tank_id": source_tank["id"]},
+        },
+    )
+    assert source_node.status_code == 201, source_node.text
+    middle_node = client.post(
+        f"/api/v1/models/{model_id}/nodes",
+        json={"code": "ND-J", "name": "Jonction", "kind": "junction", "elevation_m": 5.0},
+    )
+    assert middle_node.status_code == 201, middle_node.text
+    destination_node = client.post(
+        f"/api/v1/models/{model_id}/nodes",
+        json={
+            "code": "ND-D",
+            "name": "Piquage bac destination",
+            "kind": "tank",
+            "elevation_m": 2.0,
+            "payload": {"tank_id": destination_tank["id"]},
+        },
+    )
+    assert destination_node.status_code == 201, destination_node.text
+
+    def _edge(code: str, sequence: int, start: dict, end: dict) -> dict:
+        response = client.post(
+            f"/api/v1/models/{model_id}/edges",
+            json={
+                "from_node_id": start["id"],
+                "to_node_id": end["id"],
+                "code": code,
+                "name": "Tronçon " + code,
+                "sequence": sequence,
+                "length_m": 1000.0,
+                "inner_diameter_m": 0.5,
+                "roughness_m": 0.000045,
+                "mawp_pa": 8_000_000.0,
+                "profile": [
+                    {"chainage_m": 0.0, "elevation_m": start["elevation_m"]},
+                    {"chainage_m": 1000.0, "elevation_m": end["elevation_m"]},
+                ],
+            },
+        )
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    first = _edge("TR-1", 1, source_node.json(), middle_node.json())
+    second = _edge("TR-2", 2, middle_node.json(), destination_node.json())
+
+    scenario_response = client.post(
+        f"/api/v1/models/{model_id}/scenarios",
+        json={"name": "Transfert nominal", "payload": canonical["scenario"]},
+    )
+    assert scenario_response.status_code == 201, scenario_response.text
+
+    return {
+        "organization": organization,
+        "project": project,
+        "source_tank": source_tank,
+        "destination_tank": destination_tank,
+        "model_id": model_id,
+        "source_node": source_node.json(),
+        "middle_node": middle_node.json(),
+        "destination_node": destination_node.json(),
+        "edges": [first, second],
+        "scenario": scenario_response.json(),
+    }
+
+
+def _transfer_body(fixture: dict, **overrides) -> dict:
+    body = {
+        "source_tank_id": fixture["source_tank"]["id"],
+        "destination_tank_id": fixture["destination_tank"]["id"],
+        "fluid_id": "diesel",
+        "requested_flow_m3_s": 0.1,
+        "target_volume_m3": 50.0,
+        "time_step_s": 120.0,
+        "hydraulic_context": {
+            "model_version_id": fixture["model_id"],
+            "scenario_id": fixture["scenario"]["id"],
+            "source_node_id": fixture["source_node"]["id"],
+            "destination_node_id": fixture["destination_node"]["id"],
+            "path_edge_ids": [edge["id"] for edge in fixture["edges"]],
+            "pump_asset_ids": [],
+            "level_step_m": 0.02,
+        },
+    }
+    body.update(overrides)
+    return body
+
+
+def test_transfert_couple_publie_sa_filiation_hydraulique(operations_client) -> None:
+    """Le débit provient du réseau et la filiation est enregistrée en base."""
+
+    fixture = _network_transfer_fixture(operations_client)
+
+    response = operations_client.post(
+        f"/api/v1/organizations/{fixture['organization']['id']}/transfers",
+        headers={"Idempotency-Key": "transfert-hydraulique-001"},
+        json=_transfer_body(fixture),
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    coupling = body["result_payload"]["hydraulic_coupling"]
+    assert coupling["scenario_id"] == fixture["scenario"]["id"]
+    assert coupling["model_version_id"] == fixture["model_id"]
+    assert coupling["engine_version"].startswith("long_distance_liquid-")
+    assert coupling["path_edge_ids"] == [edge["id"] for edge in fixture["edges"]]
+    assert coupling["evaluations"] >= 1
+
+
+def test_transfert_sans_contexte_conserve_le_comportement_historique(operations_client) -> None:
+    """L'ancien contrat reste accepté et produit exactement le même résultat."""
+
+    organization = _organization(operations_client, slug="exploitant-historique")
     source = _tank(
         operations_client,
         organization["id"],
-        code="TK-HS",
+        code="TK-HS2",
         level_m=8.0,
         fluid_id="diesel",
         compatible=[],
@@ -372,79 +549,138 @@ def test_transfert_couple_au_reseau_hydraulique(operations_client) -> None:
     destination = _tank(
         operations_client,
         organization["id"],
-        code="TK-HD",
+        code="TK-HD2",
         level_m=2.0,
         fluid_id=None,
         compatible=["diesel"],
     )
 
-    canonical = entree_canonique(
-        conduite=pipeline(stations=(station_serie(),)),
-        cas=scenario(imposed_flow_m3_s=0.15, inlet_pressure_pa=5_000_000.0),
-    ).payload()
-    scenario_record, _ = _calculation(operations_client, project["id"], canonical, "HYD")
-
     response = operations_client.post(
         f"/api/v1/organizations/{organization['id']}/transfers",
-        headers={"Idempotency-Key": "transfert-hydraulique-001"},
+        headers={"Idempotency-Key": "transfert-historique-001"},
         json={
             "source_tank_id": source["id"],
             "destination_tank_id": destination["id"],
             "fluid_id": "diesel",
             "requested_flow_m3_s": 0.1,
-            "target_volume_m3": 50.0,
-            "time_step_s": 120.0,
-            "scenario_id": scenario_record["id"],
-            "hydraulic_level_step_m": 0.02,
+            "target_volume_m3": 100.0,
+            "time_step_s": 333.0,
+            "loss_fraction": 0.01,
+            "absorbed_power_w": 50_000.0,
         },
     )
 
     assert response.status_code == 201, response.text
     result = response.json()["result_payload"]
-    coupling = result["hydraulic_coupling"]
-    assert coupling["scenario_id"] == scenario_record["id"]
-    assert coupling["engine_version"].startswith("long_distance_liquid-")
-    assert coupling["evaluations"] >= 1
-    assert coupling["pump_ids"]
+    assert result["stop_reason"] == "target_volume_reached"
+    assert result["duration_s"] == pytest.approx(1_000.0)
+    assert result["withdrawn_volume_m3"] == pytest.approx(100.0)
+    assert result["energy_j"] == pytest.approx(50_000_000.0)
+    assert "hydraulic_coupling" not in result
 
 
-def test_transfert_refuse_un_scenario_d_une_autre_organisation(operations_client) -> None:
-    organization = _organization(operations_client)
-    other = _organization(operations_client, slug="exploitant-tiers")
-    other_project = _project(operations_client, other["id"])
+def test_transfert_couple_refuse_les_grandeurs_calculees(operations_client) -> None:
+    """Pression de refoulement et puissance sont des sorties, pas des entrées."""
 
-    source = _tank(
-        operations_client,
-        organization["id"],
-        code="TK-XS",
-        level_m=8.0,
-        fluid_id="diesel",
-        compatible=[],
-    )
-    destination = _tank(
-        operations_client,
-        organization["id"],
-        code="TK-XD",
-        level_m=2.0,
-        fluid_id=None,
-        compatible=["diesel"],
-    )
-    canonical = entree_canonique(
-        cas=scenario(imposed_flow_m3_s=0.15, inlet_pressure_pa=5_000_000.0)
-    ).payload()
-    foreign_scenario, _ = _calculation(operations_client, other_project["id"], canonical, "XORG")
+    fixture = _network_transfer_fixture(operations_client)
 
     response = operations_client.post(
-        f"/api/v1/organizations/{organization['id']}/transfers",
+        f"/api/v1/organizations/{fixture['organization']['id']}/transfers",
         headers={"Idempotency-Key": "transfert-hydraulique-002"},
-        json={
-            "source_tank_id": source["id"],
-            "destination_tank_id": destination["id"],
-            "fluid_id": "diesel",
-            "requested_flow_m3_s": 0.1,
-            "target_volume_m3": 50.0,
-            "scenario_id": foreign_scenario["id"],
-        },
+        json=_transfer_body(fixture, absorbed_power_w=50_000.0),
+    )
+
+    assert response.status_code == 422, response.text
+
+
+def test_transfert_refuse_un_chemin_discontinu(operations_client) -> None:
+    fixture = _network_transfer_fixture(operations_client)
+    body = _transfer_body(fixture)
+    # Le second tronçon seul ne part pas du nœud source.
+    body["hydraulic_context"]["path_edge_ids"] = [fixture["edges"][1]["id"]]
+
+    response = operations_client.post(
+        f"/api/v1/organizations/{fixture['organization']['id']}/transfers",
+        headers={"Idempotency-Key": "transfert-hydraulique-003"},
+        json=body,
     )
 
     assert response.status_code == 409, response.text
+    assert "discontinu" in response.json()["detail"]
+
+
+def test_transfert_refuse_un_chemin_qui_n_aboutit_pas(operations_client) -> None:
+    fixture = _network_transfer_fixture(operations_client)
+    body = _transfer_body(fixture)
+    body["hydraulic_context"]["path_edge_ids"] = [fixture["edges"][0]["id"]]
+
+    response = operations_client.post(
+        f"/api/v1/organizations/{fixture['organization']['id']}/transfers",
+        headers={"Idempotency-Key": "transfert-hydraulique-004"},
+        json=body,
+    )
+
+    assert response.status_code == 409, response.text
+    assert "aboutit" in response.json()["detail"]
+
+
+def test_transfert_refuse_un_noeud_ne_raccordant_pas_le_bac(operations_client) -> None:
+    fixture = _network_transfer_fixture(operations_client)
+    body = _transfer_body(fixture)
+    # La jonction ne déclare aucun réservoir raccordé.
+    body["hydraulic_context"]["source_node_id"] = fixture["middle_node"]["id"]
+    body["hydraulic_context"]["path_edge_ids"] = [fixture["edges"][1]["id"]]
+
+    response = operations_client.post(
+        f"/api/v1/organizations/{fixture['organization']['id']}/transfers",
+        headers={"Idempotency-Key": "transfert-hydraulique-005"},
+        json=body,
+    )
+
+    assert response.status_code == 409, response.text
+    assert "raccordement" in response.json()["detail"]
+
+
+def test_transfert_refuse_un_scenario_d_une_autre_version(operations_client) -> None:
+    fixture = _network_transfer_fixture(operations_client)
+    other = _network_transfer_fixture(operations_client, suffix="b")
+    body = _transfer_body(fixture)
+    body["hydraulic_context"]["scenario_id"] = other["scenario"]["id"]
+
+    response = operations_client.post(
+        f"/api/v1/organizations/{fixture['organization']['id']}/transfers",
+        headers={"Idempotency-Key": "transfert-hydraulique-006"},
+        json=body,
+    )
+
+    assert response.status_code == 409, response.text
+
+
+def test_transfert_change_d_empreinte_avec_le_chemin(operations_client) -> None:
+    """Changer le chemin ou le scénario doit produire un autre transfert."""
+
+    fixture = _network_transfer_fixture(operations_client)
+
+    first = operations_client.post(
+        f"/api/v1/organizations/{fixture['organization']['id']}/transfers",
+        headers={"Idempotency-Key": "transfert-hydraulique-007"},
+        json=_transfer_body(fixture),
+    )
+    assert first.status_code == 201, first.text
+
+    replay = operations_client.post(
+        f"/api/v1/organizations/{fixture['organization']['id']}/transfers",
+        headers={"Idempotency-Key": "transfert-hydraulique-007"},
+        json=_transfer_body(fixture),
+    )
+    assert replay.status_code == 201
+    assert replay.json()["id"] == first.json()["id"]
+
+    changed = _transfer_body(fixture)
+    changed["hydraulic_context"]["level_step_m"] = 0.5
+    conflict = operations_client.post(
+        f"/api/v1/organizations/{fixture['organization']['id']}/transfers",
+        headers={"Idempotency-Key": "transfert-hydraulique-007"},
+        json=changed,
+    )
+    assert conflict.status_code == 409, conflict.text

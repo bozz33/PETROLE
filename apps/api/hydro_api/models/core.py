@@ -232,6 +232,17 @@ class TransferRun(UUIDPrimaryKeyMixin, Base):
     input_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     result_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     balance_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    #: Filiation hydraulique, renseignée uniquement pour un transfert couplé au
+    #: réseau. Les transferts à débit imposé conservent des valeurs nulles.
+    model_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("model_versions.id", ondelete="RESTRICT"),
+    )
+    scenario_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("scenarios.id", ondelete="RESTRICT"),
+    )
+    hydraulic_engine_version: Mapped[str | None] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     finished_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

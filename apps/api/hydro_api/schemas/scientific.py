@@ -15,6 +15,7 @@ documenter et valider tôt, sans dupliquer la logique scientifique.
 from __future__ import annotations
 
 import itertools
+import uuid
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -297,6 +298,20 @@ class OfftakeNodePayloadInput(BaseModel):
     flow_m3_s: float = Field(gt=0, description="Débit soutiré du réseau (m³/s).")
 
 
+class TankNodePayloadInput(BaseModel):
+    """Payload d'un nœud de raccordement de réservoir.
+
+    Le nœud porte l'altitude du piquage ; ``tank_id`` désigne le réservoir
+    réellement raccordé. Sans cette liaison, un transfert ne peut pas être
+    rattaché de façon déterministe au réseau.
+    """
+
+    tank_id: uuid.UUID = Field(description="Réservoir raccordé à ce nœud.")
+    connection_label: str | None = Field(
+        default=None, max_length=200, description="Repère du piquage sur le bac."
+    )
+
+
 class TerminalNodePayloadInput(BaseModel):
     """Payload d'un nœud terminal (réservoir d'extrémité destination).
 
@@ -485,6 +500,7 @@ __all__ = [
     "SolverOptionsInput",
     "StationConfigurationInput",
     "StationOverrideInput",
+    "TankNodePayloadInput",
     "TerminalNodePayloadInput",
     "ValveAssetInput",
     "ValveInput",

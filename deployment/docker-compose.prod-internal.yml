@@ -14,6 +14,13 @@
 # à ne publier aucun port hôte pour ces services (ils restent joinables par leur
 # nom sur le réseau interne `application`).
 services:
+  # La terminaison TLS est assurée par le nginx natif du VPS, qui occupe déjà les
+  # ports 80 et 443 pour les autres sites hébergés. Le conteneur Caddy défini par
+  # docker-compose.vps.yml est donc placé dans un profil inactif : sans cela,
+  # chaque déploiement se termine par un conflit de port.
+  caddy:
+    profiles: ["caddy-terminaison"]
+
   api:
     ports: !reset []
   worker:

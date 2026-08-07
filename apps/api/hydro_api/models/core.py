@@ -670,6 +670,16 @@ class CalculationRun(UUIDPrimaryKeyMixin, Base):
     input_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     result_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     diagnostics: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    #: Décision humaine sur la simulation elle-même, distincte de celle du rapport.
+    #: Un rapport atteste d'une rédaction ; l'approbation du calcul atteste que le
+    #: résultat physique est retenu comme référence.
+    approval_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    approval_comment: Mapped[str | None] = mapped_column(String(2_000))
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("user_accounts.id", ondelete="SET NULL"),
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

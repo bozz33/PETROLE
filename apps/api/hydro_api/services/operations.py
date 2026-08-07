@@ -47,6 +47,10 @@ from hydro_optimization import (
     OptimizationConstraints,
     OptimizationRequest,
 )
+from hydro_optimization.pyomo_selection import (
+    PyomoSelectionOptimizer,
+    PyomoSolverUnavailableError,
+)
 from hydro_shared.errors import HydroError, InvalidInputError
 from hydro_shared.hashing import sha256_of
 from hydro_tanks import (
@@ -1093,7 +1097,15 @@ def run_optimization(
 
     created_at = utc_now()
     started_at = utc_now()
-    result = ExhaustivePumpOptimizer().optimize(request, evaluate)
+    optimizer: ExhaustivePumpOptimizer | PyomoSelectionOptimizer = (
+        PyomoSelectionOptimizer() if data.solver == "pyomo" else ExhaustivePumpOptimizer()
+    )
+    try:
+        result = optimizer.optimize(request, evaluate)
+    except PyomoSolverUnavailableError as error:
+        raise ResourceConflictError(
+            f"La voie Pyomo est indisponible sur cette instance : {error}"
+        ) from error
     result_payload = _optimization_result_payload(result)
     record = OptimizationRun(
         organization_id=project.organization_id,

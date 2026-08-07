@@ -9,6 +9,7 @@ from hydro_api.schemas.catalog import (
 from hydro_api.schemas.core import (
     ApprovalResponse,
     AuditEventRead,
+    CalculationApproval,
     CalculationCreate,
     CalculationRead,
     CalculationResultRead,
@@ -62,6 +63,7 @@ from hydro_api.schemas.scientific import (
 __all__ = [
     "ApprovalResponse",
     "AuditEventRead",
+    "CalculationApproval",
     "CalculationCreate",
     "CalculationRead",
     "CalculationResultRead",

@@ -343,9 +343,7 @@ def test_piece_jointe_documentaire_est_separee_des_donnees(import_client) -> Non
     assert body["purpose"] == "document"
     assert body["description"] == "Fiche constructeur"
 
-    listing = import_client.get(
-        "/api/v1/documents", params={"organization_id": organization["id"]}
-    )
+    listing = import_client.get("/api/v1/documents", params={"organization_id": organization["id"]})
     assert listing.status_code == 200, listing.text
     assert listing.json()["total"] == 1
 

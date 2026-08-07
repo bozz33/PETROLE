@@ -254,9 +254,19 @@ class CalculationRead(BaseModel):
     phase: str
     progress_percent: int = Field(ge=0, le=100)
     input_hash: str
+    approval_status: str
+    approval_comment: str | None = None
+    approved_at: datetime | None = None
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+
+
+class CalculationApproval(BaseModel):
+    """Décision humaine retenant ou écartant une simulation."""
+
+    decision: Literal["approved", "rejected"]
+    comment: str | None = Field(default=None, max_length=2_000)
 
 
 class CalculationSummaryRead(BaseModel):

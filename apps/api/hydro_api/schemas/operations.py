@@ -283,6 +283,14 @@ class OptimizationCreate(BaseModel):
     constraints: OptimizationConstraintsInput = Field(default_factory=OptimizationConstraintsInput)
     maximum_configurations: int = Field(default=100_000, ge=1, le=1_000_000)
     maximum_evaluations: int | None = Field(default=None, ge=1, le=1_000_000)
+    solver: Literal["enumeration", "pyomo"] = Field(
+        default="enumeration",
+        description=(
+            "Voie de résolution. « enumeration » parcourt et classe les configurations ; "
+            "« pyomo » pose la décision finale comme un programme en nombres entiers. "
+            "Les deux retiennent le même optimum sur un espace de recherche identique."
+        ),
+    )
 
 
 class OptimizationRead(BaseModel):

@@ -230,3 +230,48 @@ def test_metrique_objectif_absente_rejetee():
 
     assert result.status is OptimizationStatus.INFEASIBLE
     assert "Coût absent" in result.rejected[0].reasons[-1]
+
+
+@pytest.mark.scientific
+def test_voie_pyomo_retrouve_l_optimum_de_l_enumeration() -> None:
+    """La sélection par programmation entière doit converger vers le même choix.
+
+    La physique reste évaluée par simulation : Pyomo ne pose que le problème de
+    décision réellement linéaire, choisir une configuration parmi celles évaluées.
+    """
+
+    from hydro_optimization.pyomo_selection import (
+        PyomoSelectionOptimizer,
+        PyomoSolverUnavailableError,
+    )
+
+    request = OptimizationRequest(
+        pump_ids=("P1", "P2", "P3"),
+        speed_options=(0.8, 1.0),
+        objective=ObjectiveKind.MIN_ENERGY,
+    )
+
+    def evaluate(configuration) -> CandidateEvaluation:
+        # Énergie décroissante avec le nombre de pompes actives, pour que
+        # l'optimum soit non trivial et unique.
+        active = configuration.active_pump_count
+        return CandidateEvaluation(
+            flow_m3_s=0.05 * max(active, 1),
+            energy_kwh=100.0 - 7.5 * active + 0.5 * sum(ratio for _, ratio in configuration.speed_ratios),
+            cost=None,
+            minimum_pressure_pa=300_000.0,
+            maximum_pressure_pa=5_000_000.0,
+            starts_count=active,
+            converged=True,
+        )
+
+    enumerated = ExhaustivePumpOptimizer().optimize(request, evaluate)
+    try:
+        selected = PyomoSelectionOptimizer().optimize(request, evaluate)
+    except PyomoSolverUnavailableError as error:  # pragma: no cover - dépend de l'image
+        pytest.skip(f"Solveur MILP indisponible : {error}")
+
+    assert enumerated.ranked
+    assert selected.ranked
+    assert selected.ranked[0].objective_value == pytest.approx(enumerated.ranked[0].objective_value)
+    assert selected.ranked[0].configuration.id == enumerated.ranked[0].configuration.id

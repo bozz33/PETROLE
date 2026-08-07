@@ -32,6 +32,7 @@ export function CalculPage() {
   const [scenarioId, setScenarioId] = useState("");
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [lastCalculation, setLastCalculation] = useState<Calculation | null>(null);
+  const [approvalComment, setApprovalComment] = useState("");
 
   const projectsQuery = useQuery({
     queryKey: ["projects"],
@@ -107,6 +108,18 @@ export function CalculPage() {
     onSuccess: setResult,
   });
 
+  const approvalMutation = useMutation({
+    mutationFn: (decision: "approved" | "rejected") =>
+      apiRequest<Calculation>(
+        "/calculations/" + (result?.calculation_id ?? "") + "/approve",
+        {
+          method: "POST",
+          body: jsonBody({ decision, comment: approvalComment.trim() || null }),
+        },
+      ),
+    onSuccess: setLastCalculation,
+  });
+
   const exportMutation = useMutation({
     mutationFn: ({
       format,
@@ -143,7 +156,9 @@ export function CalculPage() {
     projectsQuery.error ??
     modelsQuery.error ??
     scenariosQuery.error ??
-    calculationMutation.error;
+    calculationMutation.error ??
+    approvalMutation.error ??
+    exportMutation.error;
 
   return (
     <div className="stack">
@@ -316,6 +331,60 @@ export function CalculPage() {
               ) : null}
             </>
           ) : null}
+
+          <Panel
+            title="Décision sur la simulation"
+            description="Retenir ce résultat comme référence, ou l'écarter. Distinct de l'approbation d'un rapport."
+          >
+            <div className="resource-summary">
+              <div>
+                <span>Statut</span>
+                <StatusBadge value={lastCalculation?.approval_status ?? "pending"} />
+              </div>
+              {lastCalculation?.approval_comment ? (
+                <div>
+                  <span>Commentaire</span>
+                  <strong>{lastCalculation.approval_comment}</strong>
+                </div>
+              ) : null}
+            </div>
+            {lastCalculation?.approval_status === "pending" ? (
+              <>
+                <label>
+                  Commentaire de décision
+                  <input
+                    value={approvalComment}
+                    onChange={(event) => setApprovalComment(event.target.value)}
+                    placeholder="Motif de la décision"
+                  />
+                </label>
+                <div className="button-row">
+                  <button
+                    type="button"
+                    className="button button-primary"
+                    disabled={!summary.decision_eligible || approvalMutation.isPending}
+                    onClick={() => approvalMutation.mutate("approved")}
+                  >
+                    Retenir ce calcul
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    disabled={approvalMutation.isPending}
+                    onClick={() => approvalMutation.mutate("rejected")}
+                  >
+                    Écarter ce calcul
+                  </button>
+                </div>
+                {!summary.decision_eligible ? (
+                  <p className="field-help">
+                    Une décision positive exige un calcul convergé, physiquement acceptable
+                    et évalué par un jeu de règles approuvé.
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+          </Panel>
 
           <Panel
             title="Exports"

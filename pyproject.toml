@@ -23,6 +23,9 @@ dependencies = [
     "CoolProp>=6.6",
     # Optimisation (DEC-ENGINE-002)
     "Pyomo>=6.7",
+    # Solveur MILP embarqué : sans lui, Pyomo ne peut résoudre aucun modèle et
+    # la voie de sélection exacte resterait purement déclarative.
+    "highspy>=1.7",
     # Backend central (DEC-ARCH-001)
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",

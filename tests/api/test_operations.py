@@ -737,3 +737,80 @@ def test_export_csv_exige_une_section(operations_client) -> None:
     )
 
     assert response.status_code == 409, response.text
+
+
+def test_optimisation_par_voie_pyomo_retient_le_meme_optimum(operations_client) -> None:
+    """Les deux voies doivent converger sur un espace de recherche identique."""
+
+    organization = _organization(operations_client, slug="exploitant-pyomo")
+    project = _project(operations_client, organization["id"])
+    canonical = entree_canonique(
+        conduite=pipeline(stations=(station_serie(),)),
+        cas=scenario(imposed_flow_m3_s=0.15, inlet_pressure_pa=5_000_000.0),
+    ).payload()
+    scenario_record, _ = _calculation(operations_client, project["id"], canonical, "PYO")
+
+    body = {"objective": "min_energy", "speed_options": [0.9, 1.0]}
+    enumerated = operations_client.post(
+        f"/api/v1/scenarios/{scenario_record['id']}/optimizations",
+        headers={"Idempotency-Key": "optimisation-enumeration"},
+        json=body,
+    )
+    assert enumerated.status_code == 201, enumerated.text
+
+    with_pyomo = operations_client.post(
+        f"/api/v1/scenarios/{scenario_record['id']}/optimizations",
+        headers={"Idempotency-Key": "optimisation-pyomo"},
+        json={**body, "solver": "pyomo"},
+    )
+    assert with_pyomo.status_code == 201, with_pyomo.text
+
+    first = enumerated.json()["result_payload"]
+    second = with_pyomo.json()["result_payload"]
+    assert first["best"] is not None
+    assert second["best"] is not None
+    assert second["best"]["configuration"]["id"] == first["best"]["configuration"]["id"]
+    assert second["best"]["objective_value"] == pytest.approx(first["best"]["objective_value"])
+
+
+def test_approbation_du_calcul_est_distincte_de_celle_du_rapport(operations_client) -> None:
+    """Un résultat physique se retient comme référence, indépendamment du document."""
+
+    organization = _organization(operations_client, slug="exploitant-approbation")
+    project = _project(operations_client, organization["id"])
+    canonical = entree_canonique(
+        cas=scenario(imposed_flow_m3_s=0.15, inlet_pressure_pa=5_000_000.0)
+    ).payload()
+    _, calculation = _calculation(operations_client, project["id"], canonical, "APP")
+
+    assert calculation["approval_status"] == "pending"
+
+    results = operations_client.get(f"/api/v1/calculations/{calculation['id']}/results")
+    assert results.status_code == 200
+    eligible = results.json()["result"]["decision_eligible"]
+
+    decision = operations_client.post(
+        f"/api/v1/calculations/{calculation['id']}/approve",
+        json={"decision": "approved", "comment": "Retenu comme référence."},
+    )
+
+    if not eligible:
+        # Sans jeu de règles approuvé, la décision positive reste interdite :
+        # c'est la garde attendue, pas un défaut du parcours.
+        assert decision.status_code == 409, decision.text
+        rejection = operations_client.post(
+            f"/api/v1/calculations/{calculation['id']}/approve",
+            json={"decision": "rejected", "comment": "Écarté faute d'évaluation normative."},
+        )
+        assert rejection.status_code == 200, rejection.text
+        assert rejection.json()["approval_status"] == "rejected"
+        return
+
+    assert decision.status_code == 200, decision.text
+    assert decision.json()["approval_status"] == "approved"
+
+    replay = operations_client.post(
+        f"/api/v1/calculations/{calculation['id']}/approve",
+        json={"decision": "rejected", "comment": "Changement d'avis."},
+    )
+    assert replay.status_code == 409, replay.text

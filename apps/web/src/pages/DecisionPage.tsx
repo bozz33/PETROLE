@@ -41,6 +41,7 @@ export function DecisionPage() {
   const [allowViolations, setAllowViolations] = useState(false);
   const [maximumConfigurations, setMaximumConfigurations] = useState("100000");
   const [maximumEvaluations, setMaximumEvaluations] = useState("");
+  const [solver, setSolver] = useState<"enumeration" | "pyomo">("enumeration");
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [optimization, setOptimization] = useState<Optimization | null>(null);
 
@@ -134,6 +135,7 @@ export function DecisionPage() {
               .filter((value) => Number.isFinite(value) && value > 0),
             reference_duration_s: (optionalNumber(referenceDurationH) ?? 1) * 3_600,
             energy_price_per_kwh: optionalNumber(energyPricePerKwh),
+            solver,
             maximum_configurations: optionalNumber(maximumConfigurations) ?? 100_000,
             maximum_evaluations: optionalNumber(maximumEvaluations),
             constraints: {
@@ -444,6 +446,20 @@ export function DecisionPage() {
                   value={maximumConfigurations}
                   onChange={(event) => setMaximumConfigurations(event.target.value)}
                 />
+              </label>
+              <label>
+                Voie de résolution
+                <select
+                  value={solver}
+                  onChange={(event) => setSolver(event.target.value as "enumeration" | "pyomo")}
+                >
+                  <option value="enumeration">Énumération filtrée</option>
+                  <option value="pyomo">Programmation en nombres entiers (Pyomo)</option>
+                </select>
+                <small>
+                  Les deux voies retiennent le même optimum ; la seconde pose la décision
+                  comme un programme explicite.
+                </small>
               </label>
               <label>
                 Évaluations au maximum

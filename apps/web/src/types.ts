@@ -503,6 +503,10 @@ export interface Calculation {
   phase: "queued" | "running" | "completed" | "failed" | "cancelled";
   progress_percent: number;
   input_hash: string;
+  /** Décision humaine sur la simulation, distincte de celle du rapport. */
+  approval_status: "pending" | "approved" | "rejected";
+  approval_comment: string | null;
+  approved_at: string | null;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;

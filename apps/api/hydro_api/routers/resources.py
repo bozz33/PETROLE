@@ -17,6 +17,7 @@ from hydro_api.deployment import (
 from hydro_api.errors import ResourceConflictError
 from hydro_api.schemas import (
     ApprovalResponse,
+    CalculationApproval,
     CalculationCreate,
     CalculationRead,
     CalculationResultRead,
@@ -515,6 +516,34 @@ def read_calculation_results(calculation_id: uuid.UUID, session: DatabaseSession
         result=calculation.result_payload,
         diagnostics=calculation.diagnostics,
     )
+
+
+@router.post(
+    "/calculations/{calculation_id}/approve",
+    response_model=CalculationRead,
+    summary="Approuver ou rejeter une simulation",
+)
+def approve_calculation(
+    calculation_id: uuid.UUID,
+    data: CalculationApproval,
+    request: Request,
+    session: DatabaseSession,
+):
+    """Retient ou écarte un résultat physique comme référence du projet.
+
+    Cette décision est distincte de l'approbation d'un rapport, qui ne porte que
+    sur le document produit.
+    """
+
+    access = request.state.access_context
+    calculation = core.approve_calculation(
+        session,
+        calculation_id,
+        data.decision,
+        data.comment,
+        actor_id=access.user_id,
+    )
+    return core.calculation_payload(session, calculation)
 
 
 @router.get(

@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     build_git_sha: str = "unknown"
     build_ref: str = "unknown"
     build_date: str = "unknown"
-    database_migration_version: str = "7c2d4f8b1a35"
+    database_migration_version: str = "9f3b6e0d5c17"
 
     @model_validator(mode="after")
     def validate_production_security(self) -> Settings:

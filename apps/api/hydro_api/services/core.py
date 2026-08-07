@@ -771,6 +771,9 @@ def calculation_payload(session: Session, calculation: CalculationRun) -> dict[s
         "phase": phase,
         "progress_percent": progress,
         "input_hash": calculation.input_hash,
+        "approval_status": calculation.approval_status,
+        "approval_comment": calculation.approval_comment,
+        "approved_at": calculation.approved_at,
         "created_at": calculation.created_at,
         "started_at": calculation.started_at,
         "finished_at": calculation.finished_at,
@@ -1524,6 +1527,66 @@ def create_report(
     )
     _flush(session, "Impossible d'enregistrer l'événement d'audit du rapport.")
     return report
+
+
+def approve_calculation(
+    session: Session,
+    calculation_id: uuid.UUID,
+    decision: str,
+    comment: str | None,
+    *,
+    actor_id: uuid.UUID | None,
+) -> CalculationRun:
+    """Enregistre la décision humaine retenant ou écartant une simulation.
+
+    Une approbation positive exige un résultat éligible à la décision : un calcul
+    non convergé, physiquement bloqué ou non évalué par un jeu de règles approuvé
+    ne peut pas devenir une référence.
+    """
+
+    calculation = session.scalar(
+        select(CalculationRun).where(CalculationRun.id == calculation_id).with_for_update()
+    )
+    if calculation is None:
+        raise ResourceNotFoundError("Calcul", calculation_id)
+    if calculation.approval_status != "pending":
+        if calculation.approval_status == decision and calculation.approval_comment == comment:
+            return calculation
+        raise ResourceConflictError(
+            "Une décision a déjà été enregistrée pour ce calcul et ne peut pas être remplacée."
+        )
+
+    result_payload = calculation.result_payload
+    if decision == "approved" and not (
+        result_payload and result_payload.get("decision_eligible", False)
+    ):
+        raise ResourceConflictError(
+            "Ce calcul n'est pas éligible à une décision positive : vérifiez la "
+            "convergence, les contrôles physiques et l'évaluation normative."
+        )
+
+    calculation.approval_status = decision
+    calculation.approval_comment = comment
+    calculation.approved_by = actor_id
+    calculation.approved_at = utc_now()
+    session.flush()
+
+    organization_id = calculation.scenario.model_version.project.organization_id
+    _audit(
+        session,
+        organization_id=organization_id,
+        actor_id=actor_id,
+        action=f"calculation.{decision}",
+        object_type="calculation",
+        object_id=calculation.id,
+        details={
+            "input_hash": calculation.input_hash,
+            "engine_version": calculation.engine_version,
+            "comment": comment,
+        },
+    )
+    session.flush()
+    return calculation
 
 
 def approve_report(

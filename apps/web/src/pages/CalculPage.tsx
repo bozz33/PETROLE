@@ -1,12 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
+import {
+  HydraulicProfileChart,
+  NpshChart,
+  PressureDistanceChart,
+  PumpEfficiencyPowerChart,
+} from "../components/charts/HydraulicCharts";
+import {
+  NumericalSummaryPanel,
+  SegmentResultsPanel,
+  StationResultsPanel,
+} from "../components/results/DetailedResults";
 import { apiRequest, jsonBody } from "../api";
 import { EmptyState, ErrorNotice, Panel, StatusBadge } from "../components/Shell";
 import { useNavigation } from "../routing";
 import type {
   Calculation,
-  CalculationProfilePoint,
   CalculationResult,
   ModelVersion,
   Page,
@@ -21,6 +31,7 @@ export function CalculPage() {
   const [modelId, setModelId] = useState("");
   const [scenarioId, setScenarioId] = useState("");
   const [result, setResult] = useState<CalculationResult | null>(null);
+  const [lastCalculation, setLastCalculation] = useState<Calculation | null>(null);
 
   const projectsQuery = useQuery({
     queryKey: ["projects"],
@@ -90,14 +101,19 @@ export function CalculPage() {
       if (current.status.includes("QUEUED") || current.status.includes("RUNNING")) {
         throw new Error("Le calcul dépasse le délai d'attente de deux minutes.");
       }
-      return apiRequest<CalculationResult>(
-        "/calculations/" + calculation.id + "/results",
-      );
+      setLastCalculation(current);
+      return apiRequest<CalculationResult>("/calculations/" + calculation.id + "/results");
     },
     onSuccess: setResult,
   });
 
   const summary = result?.result;
+  const runningPumps = (summary?.stations ?? []).flatMap((station) =>
+    station.pumps.filter((pump) => pump.running),
+  );
+  const npshChart = runningPumps.length ? <NpshChart pumps={runningPumps} /> : null;
+  const engineVersion = lastCalculation?.engine_version ?? "non publié";
+  const inputHash = lastCalculation?.input_hash ?? "non publiée";
   const profile = useMemo(() => summary?.profile ?? [], [summary]);
   const violations = summary?.violations ?? [];
   const warnings = summary?.warnings ?? [];
@@ -248,11 +264,43 @@ export function CalculPage() {
           </Panel>
 
           <Panel
-            title="Profil pression–altitude"
-            description="Pression absolue et profil altimétrique suivant le chaînage."
+            title="Profil hydraulique"
+            description="Ligne piézométrique et profil du terrain suivant le chaînage."
           >
-            <ProfileChart points={profile} />
+            <HydraulicProfileChart points={profile} />
           </Panel>
+
+          <Panel
+            title="Pression et vitesse"
+            description="Pression absolue et vitesse d'écoulement suivant le chaînage."
+          >
+            <PressureDistanceChart points={profile} />
+          </Panel>
+
+          <SegmentResultsPanel segments={summary.segments ?? []} />
+          <StationResultsPanel stations={summary.stations ?? []} />
+
+          {runningPumps.length ? (
+            <>
+              <Panel
+                title="Rendement et puissance des pompes"
+                description="Point de fonctionnement de chaque pompe en marche."
+              >
+                <PumpEfficiencyPowerChart pumps={runningPumps} />
+              </Panel>
+              {npshChart ? (
+                <Panel title="NPSH" description="Disponible, requis et marge résultante par pompe.">
+                  {npshChart}
+                </Panel>
+              ) : null}
+            </>
+          ) : null}
+
+          <NumericalSummaryPanel
+            summary={summary}
+            engineVersion={engineVersion}
+            inputHash={inputHash}
+          />
 
           <div className="content-grid equal">
             <Panel title="Contrôles physiques" description="Violations bloquantes.">
@@ -358,80 +406,6 @@ function ResultMetric({
       <strong>{value}</strong>
       <small>{unit || "sans unité"}</small>
     </article>
-  );
-}
-
-function ProfileChart({ points }: { points: CalculationProfilePoint[] }) {
-  if (!points.length) {
-    return <EmptyState title="Profil vide" detail="Aucun point de profil n'a été produit." />;
-  }
-  const width = 900;
-  const height = 300;
-  const padding = 34;
-  const chainages = points.map((point) => point.chainage_m);
-  const pressures = points.map((point) => point.pressure_pa / 100000);
-  const minX = Math.min(...chainages);
-  const maxX = Math.max(...chainages);
-  const minY = Math.min(...pressures);
-  const maxY = Math.max(...pressures);
-  const x = (value: number) =>
-    padding + ((value - minX) / Math.max(maxX - minX, 1)) * (width - 2 * padding);
-  const y = (value: number) =>
-    height -
-    padding -
-    ((value - minY) / Math.max(maxY - minY, 1)) * (height - 2 * padding);
-  const polyline = points
-    .map((point) => String(x(point.chainage_m)) + "," + String(y(point.pressure_pa / 100000)))
-    .join(" ");
-
-  return (
-    <div className="chart-wrap">
-      <svg
-        className="profile-chart"
-        viewBox={"0 0 " + width + " " + height}
-        role="img"
-        aria-label="Profil de pression absolue suivant le chaînage"
-      >
-        <defs>
-          <linearGradient id="pressure-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#18a980" stopOpacity="0.34" />
-            <stop offset="100%" stopColor="#18a980" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <line x1={padding} y1={padding} x2={padding} y2={height - padding} />
-        <line
-          x1={padding}
-          y1={height - padding}
-          x2={width - padding}
-          y2={height - padding}
-        />
-        <polygon
-          points={
-            padding +
-            "," +
-            (height - padding) +
-            " " +
-            polyline +
-            " " +
-            (width - padding) +
-            "," +
-            (height - padding)
-          }
-          fill="url(#pressure-fill)"
-          stroke="none"
-        />
-        <polyline points={polyline} fill="none" stroke="#18a980" strokeWidth="3" />
-        <text x={padding} y={20}>
-          {formatNumber(maxY)} bar
-        </text>
-        <text x={padding} y={height - 8}>
-          {formatNumber(minX / 1000)} km
-        </text>
-        <text x={width - padding} y={height - 8} textAnchor="end">
-          {formatNumber(maxX / 1000)} km
-        </text>
-      </svg>
-    </div>
   );
 }
 

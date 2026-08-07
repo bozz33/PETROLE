@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { OrganizationField } from "../components/OrganizationField";
+import { TransferTimelineChart } from "../components/charts/HydraulicCharts";
 import { apiRequest, jsonBody } from "../api";
 import {
   EmptyState,
@@ -499,6 +500,11 @@ export function StockagePage() {
                 Débit imposé par l'utilisateur : la faisabilité du réseau n'a pas été vérifiée.
               </p>
             )}
+            {transfer.result_payload.samples.length ? (
+              <div className="chart-wrap">
+                <TransferTimelineChart transfer={transfer} />
+              </div>
+            ) : null}
             {balance ? (
               <div className="notice">
                 <StatusBadge value={balance.within_tolerance ? "conforme" : "hors_tolerance"} />

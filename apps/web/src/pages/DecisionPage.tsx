@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
+import { ScenarioComparisonChart } from "../components/charts/HydraulicCharts";
 import { apiRequest, jsonBody } from "../api";
 import {
   EmptyState,
@@ -242,6 +243,10 @@ export function DecisionPage() {
             </button>
           </form>
           {comparison ? (
+            <>
+            <div className="chart-wrap">
+              <ScenarioComparisonChart comparison={comparison} />
+            </div>
             <div className="table-wrap">
               <table>
                 <thead>
@@ -260,6 +265,7 @@ export function DecisionPage() {
                 </tbody>
               </table>
             </div>
+            </>
           ) : (
             <EmptyState title="Aucune comparaison" detail="Sélectionnez au moins deux calculs convergés pour créer un classement." />
           )}

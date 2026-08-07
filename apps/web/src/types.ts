@@ -575,6 +575,15 @@ export interface CalculationPayload {
   violations: CalculationIssue[];
   warnings: CalculationIssue[];
   profile: CalculationProfilePoint[];
+  segments?: SegmentResultRow[];
+  stations?: StationResultRow[];
+  diagnostics?: SolverDiagnosticsPayload;
+  energy?: {
+    total_hydraulic_power_w?: number | null;
+    total_absorbed_power_w?: number | null;
+    [key: string]: unknown;
+  };
+  environment?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -935,4 +944,74 @@ export interface EdgeFitting {
   quantity: number;
   chainage_m: number | null;
   opening_ratio: number;
+}
+
+/** Bilan hydraulique d'un tronçon, aligné sur `SegmentResult`. */
+export interface SegmentResultRow {
+  segment_id: string;
+  label: string | null;
+  flow_m3_s: number;
+  velocity_m_s: number;
+  reynolds: number;
+  friction_factor: number;
+  friction_model: string;
+  friction_head_loss_m: number;
+  minor_head_loss_m: number;
+  total_head_loss_m: number;
+  elevation_change_m: number;
+  inlet_pressure_pa: number;
+  outlet_pressure_pa: number;
+  min_pressure_pa: number;
+  max_pressure_pa: number;
+  maop_margin_pa: number | null;
+  flow_regime: string;
+}
+
+/** Point de fonctionnement d'une pompe, aligné sur `PumpResult`. */
+export interface PumpResultRow {
+  pump_id: string;
+  label: string;
+  station_id: string;
+  running: boolean;
+  flow_m3_s: number;
+  head_m: number;
+  speed_ratio: number;
+  efficiency: number | null;
+  hydraulic_power_w: number | null;
+  absorbed_power_w: number | null;
+  npsh_required_m: number | null;
+  npsh_available_m: number | null;
+  npsh_margin_m: number | null;
+  within_curve_domain: boolean;
+  off_bep_ratio: number | null;
+}
+
+/** Bilan d'une station de pompage, aligné sur `StationResult`. */
+export interface StationResultRow {
+  station_id: string;
+  name: string;
+  chainage_m: number;
+  elevation_m: number;
+  in_service: boolean;
+  bypassed: boolean;
+  flow_m3_s: number;
+  suction_pressure_pa: number;
+  discharge_pressure_pa: number;
+  differential_pressure_pa: number;
+  head_m: number;
+  hydraulic_power_w: number;
+  absorbed_power_w: number | null;
+  efficiency: number | null;
+  active_pump_count: number;
+  pumps: PumpResultRow[];
+}
+
+/** Informations numériques de résolution publiées avec le résultat. */
+export interface SolverDiagnosticsPayload {
+  method?: string;
+  converged?: boolean;
+  iterations?: number;
+  residual?: number;
+  duration_s?: number;
+  [key: string]: unknown;
 }

@@ -891,3 +891,38 @@ export interface AccessoryPayload {
   manufacturer: string | null;
   data_source: string | null;
 }
+
+/** Configuration hydraulique d'un nœud station, alignée sur `StationConfigurationInput`. */
+export interface StationConfiguration {
+  arrangement: "series" | "parallel";
+  suction_pressure_min_pa: number | null;
+  discharge_pressure_max_pa: number | null;
+  suction_line_k: number;
+  suction_line_diameter_m: number | null;
+  bypass_k: number;
+  drive_efficiency: number;
+  label: string | null;
+}
+
+/** Payload d'un nœud : sa forme dépend du type de nœud choisi. */
+export type NodePayload =
+  | StationConfiguration
+  | { flow_m3_s: number }
+  | Record<string, never>;
+
+/** Compléments géométriques d'un tronçon, alignés sur `EdgeGeometryInput`. */
+export interface EdgeGeometry {
+  outer_diameter_m: number | null;
+  wall_thickness_m: number | null;
+  minimum_pressure_pa: number | null;
+}
+
+/** Accessoire porté par un tronçon, aligné sur le modèle `Fitting` du moteur. */
+export interface EdgeFitting {
+  id: string;
+  kind: string;
+  k_coefficient: number;
+  quantity: number;
+  chainage_m: number | null;
+  opening_ratio: number;
+}

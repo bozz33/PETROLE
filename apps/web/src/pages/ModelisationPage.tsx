@@ -2,6 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { OrganizationField } from "../components/OrganizationField";
+import {
+  defaultEdgeGeometry,
+  defaultProfile,
+  EdgeDetailsForm,
+  validateEdgeDetails,
+} from "../components/network/EdgeDetailsForm";
+import {
+  defaultNodePayload,
+  NodePayloadForm,
+  validateNodePayload,
+} from "../components/network/NodePayloadForm";
 import { apiRequest, jsonBody } from "../api";
 import {
   EmptyState,
@@ -18,7 +29,11 @@ import type {
   NetworkEdge,
   NetworkNode,
   NetworkValidationReport,
+  NodePayload,
   Page,
+  ProfilePoint,
+  EdgeFitting,
+  EdgeGeometry,
   Project,
 } from "../types";
 
@@ -39,7 +54,10 @@ export function ModelisationPage() {
   const [nodeName, setNodeName] = useState("");
   const [nodeKind, setNodeKind] = useState<NetworkNode["kind"]>("source");
   const [nodeElevation, setNodeElevation] = useState("0");
-  const [nodePayload, setNodePayload] = useState("{}");
+  const [nodeLatitude, setNodeLatitude] = useState("");
+  const [nodeLongitude, setNodeLongitude] = useState("");
+  const [nodeStatus, setNodeStatus] = useState<NetworkNode["status"]>("available");
+  const [nodePayload, setNodePayload] = useState<NodePayload>(() => defaultNodePayload("source"));
 
   const [edgeCode, setEdgeCode] = useState("");
   const [edgeName, setEdgeName] = useState("");
@@ -51,7 +69,10 @@ export function ModelisationPage() {
   const [edgeRoughness, setEdgeRoughness] = useState("0.000045");
   const [edgeMawp, setEdgeMawp] = useState("8000000");
   const [edgeMaterialId, setEdgeMaterialId] = useState("");
-  const [edgeFittings, setEdgeFittings] = useState("[]");
+  const [edgeStatus, setEdgeStatus] = useState<NetworkEdge["status"]>("available");
+  const [edgeGeometry, setEdgeGeometry] = useState<EdgeGeometry>(defaultEdgeGeometry);
+  const [edgeProfile, setEdgeProfile] = useState<ProfilePoint[]>(() => defaultProfile(1000, 0, 0));
+  const [edgeFittings, setEdgeFittings] = useState<EdgeFitting[]>([]);
 
   const [assetCatalogId, setAssetCatalogId] = useState("");
   const [assetLocationType, setAssetLocationType] = useState<"node" | "edge">("node");
@@ -190,6 +211,30 @@ export function ModelisationPage() {
     ]);
   };
 
+  useEffect(() => {
+    if (edgeProfile.length > 2) {
+      return;
+    }
+    const length = Number(edgeLength);
+    if (!Number.isFinite(length) || length <= 0) {
+      return;
+    }
+    const fromElevation = nodes.find((node) => node.id === edgeFromId)?.elevation_m ?? 0;
+    const toElevation = nodes.find((node) => node.id === edgeToId)?.elevation_m ?? 0;
+    setEdgeProfile((current) =>
+      current.length > 2 ? current : defaultProfile(length, fromElevation, toElevation),
+    );
+  }, [edgeFromId, edgeLength, edgeProfile.length, edgeToId, nodes]);
+
+  const nodePayloadProblems = validateNodePayload(nodeKind, nodePayload);
+  const edgeProblems = validateEdgeDetails(
+    Number(edgeLength),
+    edgeGeometry,
+    Number(edgeDiameter),
+    edgeProfile,
+    edgeFittings,
+  );
+
   const nodeMutation = useMutation({
     mutationFn: () =>
       apiRequest<NetworkNode>("/models/" + modelId + "/nodes", {
@@ -199,13 +244,18 @@ export function ModelisationPage() {
           name: nodeName,
           kind: nodeKind,
           elevation_m: Number(nodeElevation),
-          payload: JSON.parse(nodePayload) as Record<string, unknown>,
+          latitude: optionalCoordinate(nodeLatitude),
+          longitude: optionalCoordinate(nodeLongitude),
+          status: nodeStatus,
+          payload: nodePayload as unknown as Record<string, unknown>,
         }),
       }),
     onSuccess: async () => {
       setNodeCode("");
       setNodeName("");
-      setNodePayload("{}");
+      setNodeLatitude("");
+      setNodeLongitude("");
+      setNodePayload(defaultNodePayload(nodeKind));
       await invalidateNetwork();
     },
   });
@@ -213,8 +263,6 @@ export function ModelisationPage() {
   const edgeMutation = useMutation({
     mutationFn: () => {
       const length = Number(edgeLength);
-      const fromElevation = nodes.find((node) => node.id === edgeFromId)?.elevation_m ?? 0;
-      const toElevation = nodes.find((node) => node.id === edgeToId)?.elevation_m ?? 0;
       return apiRequest<NetworkEdge>("/models/" + modelId + "/edges", {
         method: "POST",
         body: jsonBody({
@@ -228,19 +276,18 @@ export function ModelisationPage() {
           inner_diameter_m: Number(edgeDiameter),
           roughness_m: Number(edgeRoughness),
           mawp_pa: Number(edgeMawp),
-          profile: [
-            { chainage_m: 0, elevation_m: fromElevation },
-            { chainage_m: length, elevation_m: toElevation },
-          ],
-          fittings: JSON.parse(edgeFittings) as Array<Record<string, unknown>>,
-          payload: {},
+          status: edgeStatus,
+          profile: edgeProfile,
+          fittings: edgeFittings as unknown as Array<Record<string, unknown>>,
+          payload: edgeGeometry as unknown as Record<string, unknown>,
         }),
       });
     },
     onSuccess: async () => {
       setEdgeCode("");
       setEdgeName("");
-      setEdgeFittings("[]");
+      setEdgeFittings([]);
+      setEdgeGeometry(defaultEdgeGeometry());
       await invalidateNetwork();
     },
   });
@@ -402,16 +449,38 @@ export function ModelisationPage() {
             <div className="form-grid three">
               <label>Code<input value={nodeCode} onChange={(event) => setNodeCode(event.target.value.toUpperCase())} required /></label>
               <label>Nom<input value={nodeName} onChange={(event) => setNodeName(event.target.value)} required /></label>
-              <label>Type<select value={nodeKind} onChange={(event) => setNodeKind(event.target.value as NetworkNode["kind"])}>
+              <label>Type<select value={nodeKind} onChange={(event) => {
+                const nextKind = event.target.value as NetworkNode["kind"];
+                setNodeKind(nextKind);
+                setNodePayload(defaultNodePayload(nextKind));
+              }}>
                 <option value="source">Source</option><option value="tank">Réservoir</option>
                 <option value="station">Station</option><option value="junction">Jonction</option>
                 <option value="injection">Injection</option><option value="offtake">Soutirage</option>
                 <option value="terminal">Terminal</option>
               </select></label>
             </div>
-            <label>Altitude (m)<input type="number" step="any" value={nodeElevation} onChange={(event) => setNodeElevation(event.target.value)} required /></label>
-            <label>Paramètres complémentaires<textarea className="code-editor compact-code" value={nodePayload} onChange={(event) => setNodePayload(event.target.value)} rows={6} spellCheck={false} /></label>
-            <button className="button button-primary" disabled={!editable || nodeMutation.isPending}>Ajouter le nœud</button>
+            <div className="form-grid three">
+              <label>Altitude (m)<input type="number" step="any" value={nodeElevation} onChange={(event) => setNodeElevation(event.target.value)} required /></label>
+              <label>Latitude<input type="number" step="any" min="-90" max="90" value={nodeLatitude} onChange={(event) => setNodeLatitude(event.target.value)} placeholder="Facultative" /></label>
+              <label>Longitude<input type="number" step="any" min="-180" max="180" value={nodeLongitude} onChange={(event) => setNodeLongitude(event.target.value)} placeholder="Facultative" /></label>
+            </div>
+            <label>État<select value={nodeStatus} onChange={(event) => setNodeStatus(event.target.value as NetworkNode["status"])}>
+              <option value="available">Disponible</option>
+              <option value="maintenance">En maintenance</option>
+              <option value="unavailable">Indisponible</option>
+            </select></label>
+            <NodePayloadForm kind={nodeKind} value={nodePayload} onChange={setNodePayload} />
+            {nodePayloadProblems.length ? (
+              <div className="notice notice-error" role="alert">
+                <ul className="issue-list negative">
+                  {nodePayloadProblems.map((problem) => (
+                    <li key={problem}><span>{problem}</span></li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <button className="button button-primary" disabled={!editable || nodeMutation.isPending || nodePayloadProblems.length > 0}>Ajouter le nœud</button>
           </form>
         </details>
       </Panel>
@@ -443,8 +512,30 @@ export function ModelisationPage() {
               <label>MAWP (Pa)<input type="number" min="0" step="any" value={edgeMawp} onChange={(event) => setEdgeMawp(event.target.value)} required /></label>
               <label>Matériau approuvé<select value={edgeMaterialId} onChange={(event) => setEdgeMaterialId(event.target.value)}><option value="">Aucun matériau lié</option>{materials.map((item) => <option key={item.id} value={item.id}>{item.code} — {item.name}</option>)}</select></label>
             </div>
-            <label>Accessoires locaux<textarea className="code-editor compact-code" value={edgeFittings} onChange={(event) => setEdgeFittings(event.target.value)} rows={6} spellCheck={false} /></label>
-            <button className="button button-primary" disabled={!editable || nodes.length < 2 || edgeMutation.isPending}>Ajouter le tronçon</button>
+            <label>État<select value={edgeStatus} onChange={(event) => setEdgeStatus(event.target.value as NetworkEdge["status"])}>
+              <option value="available">Disponible</option>
+              <option value="maintenance">En maintenance</option>
+              <option value="unavailable">Indisponible</option>
+            </select></label>
+            <EdgeDetailsForm
+              lengthM={Number(edgeLength)}
+              geometry={edgeGeometry}
+              onGeometryChange={setEdgeGeometry}
+              profile={edgeProfile}
+              onProfileChange={setEdgeProfile}
+              fittings={edgeFittings}
+              onFittingsChange={setEdgeFittings}
+            />
+            {edgeProblems.length ? (
+              <div className="notice notice-error" role="alert">
+                <ul className="issue-list negative">
+                  {edgeProblems.map((problem) => (
+                    <li key={problem}><span>{problem}</span></li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <button className="button button-primary" disabled={!editable || nodes.length < 2 || edgeMutation.isPending || edgeProblems.length > 0}>Ajouter le tronçon</button>
           </form>
         </details>
       </Panel>
@@ -475,4 +566,13 @@ export function ModelisationPage() {
       </Panel>
     </div>
   );
+}
+
+/** Coordonnée géographique facultative : une chaîne vide reste absente. */
+function optionalCoordinate(value: string): number | null {
+  if (!value.trim()) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }

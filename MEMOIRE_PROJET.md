@@ -1,6 +1,6 @@
 # Mémoire du projet PETROLE
 
-Dernière mise à jour : 6 août 2026.
+Dernière mise à jour : 7 août 2026.
 
 Ce fichier sert de point de reprise entre deux sessions de développement. Il décrit l'état
 constaté du dépôt, les preuves disponibles et les prochaines actions. Toute nouvelle session
@@ -355,6 +355,118 @@ Campagne finale vérifiée avant le tag :
 
 Commit du typage : `f71a176`. Les 9 commits de la série RC (`8206b1f` →
 `f71a176`) sont désormais poussés sur `origin/release/mvp-rc1`.
+
+## Correction de l'audit et livraison du 7 août 2026 (commits `73cd3d6` → `01982a5`)
+
+Un audit technique externe a relevé cinq écarts : frontend déployé issu d'une branche
+non fusionnée, expression « multi-tenant actif » trop forte, indicateurs fictifs sur le
+tableau de bord, parcours Scénario absent de l'interface, et identifiants techniques
+demandés à l'utilisateur. Le commit `ffc4b38` avait traité la première série ; cette
+session a corrigé ce qui restait et vérifié l'ensemble.
+
+### Attestation scientifique réellement vérifiable
+
+L'endpoint `/api/v1/health/validation` publiait un fichier figé dont l'empreinte
+(`b476c957…`) ne correspondait à aucune exécution reproductible : le condensat portait
+sur un contenu incluant l'horodatage, les durées mesurées et la machine.
+
+Le dossier de preuve distingue désormais deux condensats :
+
+- `proof_hash` — résultats scientifiques seuls, **reproductible** d'une exécution à
+  l'autre ; c'est lui qui est publié ;
+- `sha256` — dossier complet avec horodatage et environnement, pour tracer une
+  exécution précise.
+
+Une observation peut être marquée `reproducible=False` lorsqu'elle mesure une grandeur
+dépendante de la machine. Un seul cas est concerné : `V-020` (durée de calcul).
+
+L'attestation est produite par la commande d'exécution :
+
+```bash
+hydro-validate \
+  --attestation apps/api/hydro_api/scientific_validation_proof.json \
+  --attestation-source docs/validation/qualification_backend_mvp_20260807.md
+```
+
+Le test `test_attestation_publiee_correspond_a_une_execution_reelle` relance les 41 cas
+et compare comptage, moteur et empreinte au fichier embarqué : plus aucune valeur ne
+peut être saisie à la main sans faire échouer la qualification.
+
+`scientific_engine_version` expose désormais `ENGINE_VERSION` (`hydroliquid-0.1.0`), la
+version normative du noyau, et non l'identifiant du solveur longue distance.
+
+### Écran Scénarios
+
+Les conditions d'étude se saisissaient dans une zone JSON libre. L'écran `/scenarios`
+les expose sous forme de formulaire typé aligné sur `ScenarioPayloadInput` :
+identification, température, débit imposé, conditions amont et aval, état et rapport de
+vitesse de chaque pompe, disponibilité des stations et des tronçons, pertes singulières
+ajoutées, limites de vitesse, options du solveur, prévisualisation de l'entrée
+canonique. Les équipements sont choisis dans les listes du modèle.
+
+La règle de contrainte du moteur est reproduite avant enregistrement : le formulaire
+signale les problèmes sous-contraints et sur-contraints.
+
+### Optimiseur et rapports
+
+La page Comparaison et décision expose l'ensemble du contrat de l'optimiseur : durée de
+référence, prix de l'énergie, bornes de débit et de pression, nombre maximal de pompes
+actives, pompes imposées ou exclues, tolérance aux violations, bornes d'énumération. Le
+résultat affiche l'état de l'espace exploré, l'écart d'optimalité et les configurations
+rejetées avec leur motif.
+
+La page Rapports ne demande plus de recopier des identifiants : le calcul se choisit par
+projet, version, scénario puis calcul, et la source d'un rapport opérationnel est
+restreinte aux ressources réellement acceptées par l'API.
+
+### Défauts corrigés au passage
+
+- le pied de la barre latérale et l'écran Administration lisaient les métadonnées de
+  build sans garde : une réponse de santé incomplète faisait échouer le rendu de toute
+  l'application ;
+- les simulations de bout en bout servaient une santé sans bloc `build` et attendaient
+  encore le graphique d'activité de démonstration retiré du tableau de bord ;
+- le conteneur Caddy tentait de binder les ports 80 et 443 occupés par le nginx natif :
+  chaque déploiement se terminait par une erreur de conflit. Il est désormais placé dans
+  un profil inactif par l'override de production.
+
+### Preuves de cette campagne
+
+| Contrôle | Résultat |
+|---|---:|
+| Suite backend Docker (`-m "not slow"`) | **520 tests réussis** en 75,36 s |
+| Validation scientifique | **41/41**, empreinte `6973bd97…` reproductible |
+| ruff format / lint / mypy | verts (198 / 97 fichiers) |
+| Tests unitaires web | **10 réussis** |
+| Playwright bureau et mobile | **33 réussis** |
+| TypeScript et build Vite | sans erreur |
+
+Document de campagne : `docs/validation/qualification_backend_mvp_20260807.md`.
+
+### Déploiement effectué
+
+Images construites avec `HYDRO_BUILD_GIT_SHA`, `HYDRO_BUILD_REF` et `HYDRO_BUILD_DATE`,
+puis mises en service sur `petrole.distesage.com`. La production sert donc exactement
+`main` :
+
+```json
+{"git_sha":"d1df3b09dc3de0ecf7eec5c31a62cf858fb75eb3","ref":"main",
+ "scientific_engine_version":"hydroliquid-0.1.0","deployment":{"mode":"single_org"}}
+```
+
+`main` a été poussée sur `origin` (`01982a5`).
+
+### Limites restantes
+
+- le parcours complet projet → fluide → pompes → réseau → scénario → calcul →
+  comparaison → rapport n'a pas encore été déroulé sur une instance réelle : la base de
+  production ne contient aucun projet ;
+- les bibliothèques techniques (fluides, pompes, vannes, matériaux) se saisissent
+  toujours en JSON brut ;
+- aucune politique PostgreSQL de sécurité au niveau des lignes n'est en place ;
+- aucune donnée constructeur, table de jaugeage certifiée ni conformité clause par
+  clause n'est établie ;
+- l'organisation de l'instance de production s'appelle encore « test ».
 
 ## Requalification backend du 3 août 2026
 

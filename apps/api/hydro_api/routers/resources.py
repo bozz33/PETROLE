@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 from sqlalchemy.orm import Session
@@ -39,7 +39,7 @@ from hydro_api.schemas import (
     ScenarioRead,
     ScenarioUpdate,
 )
-from hydro_api.services import core
+from hydro_api.services import core, exports
 from hydro_api.storage import ObjectStorageDependency
 
 router = APIRouter()
@@ -514,6 +514,67 @@ def read_calculation_results(calculation_id: uuid.UUID, session: DatabaseSession
         status=calculation.status,
         result=calculation.result_payload,
         diagnostics=calculation.diagnostics,
+    )
+
+
+@router.get(
+    "/calculations/{calculation_id}/export",
+    summary="Exporter les résultats d'un calcul en XLSX, CSV ou JSON",
+    responses={200: {"content": {"application/octet-stream": {}}}},
+)
+def export_calculation(
+    calculation_id: uuid.UUID,
+    session: DatabaseSession,
+    export_format: Annotated[Literal["xlsx", "csv", "json"], Query(alias="format")] = "xlsx",
+    section: Annotated[Literal["profile", "segments", "stations", "pumps"] | None, Query()] = None,
+):
+    """Restitue les résultats déjà calculés, sans nouvelle exécution du moteur.
+
+    Le format CSV n'accepte qu'une section à la fois : un fichier plat ne peut
+    pas porter plusieurs tableaux sans ambiguïté.
+    """
+
+    calculation = core.get_calculation(session, calculation_id)
+    payload = calculation.result_payload
+    if not payload:
+        raise ResourceConflictError("Ce calcul ne porte aucun résultat exportable.")
+
+    requested = [section] if section else list(exports.EXPORT_SECTIONS)
+    sections = {name: exports.section_rows(payload, name) for name in requested}
+    stem = f"calcul-{calculation.id}"
+
+    if export_format == "csv":
+        if section is None:
+            raise ResourceConflictError(
+                "Précisez la section à exporter : un CSV ne porte qu'un seul tableau."
+            )
+        content = exports.to_csv(sections[section], section)
+        media_type = "text/csv"
+        filename = f"{stem}-{section}.csv"
+    elif export_format == "json":
+        content = exports.to_json(
+            {
+                "calculation_id": str(calculation.id),
+                "status": calculation.status,
+                "input_hash": calculation.input_hash,
+                "engine_version": calculation.engine_version,
+                "sections": sections,
+            }
+        )
+        media_type = "application/json"
+        filename = f"{stem}.json"
+    else:
+        content = exports.to_xlsx(sections)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = f"{stem}.xlsx"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
     )
 
 

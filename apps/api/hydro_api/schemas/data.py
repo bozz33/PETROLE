@@ -22,6 +22,9 @@ class StoredFileRead(BaseModel):
     media_type: str
     size_bytes: int
     content_hash: str
+    purpose: str
+    project_id: uuid.UUID | None
+    description: str | None
     created_at: datetime
 
 

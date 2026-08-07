@@ -484,8 +484,10 @@ class StoredFile(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "files"
     __table_args__ = (
         UniqueConstraint("bucket", "object_key"),
+        CheckConstraint("purpose IN ('dataset', 'document')", name="purpose_valid"),
         Index("ix_files_organization_created", "organization_id", "created_at"),
         Index("ix_files_content_hash", "content_hash"),
+        Index("ix_files_organization_purpose", "organization_id", "purpose"),
     )
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
@@ -499,6 +501,14 @@ class StoredFile(UUIDPrimaryKeyMixin, Base):
     media_type: Mapped[str] = mapped_column(String(100), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(71), nullable=False)
+    #: ``dataset`` pour une donnée scientifique importable, ``document`` pour une
+    #: pièce jointe consultée telle quelle. Les formats admis diffèrent.
+    purpose: Mapped[str] = mapped_column(String(20), nullable=False, default="dataset")
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("projects.id", ondelete="RESTRICT"),
+    )
+    description: Mapped[str | None] = mapped_column(String(1_000))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 

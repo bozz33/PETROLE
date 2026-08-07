@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { OrganizationField } from "../components/OrganizationField";
-import { apiRequest, jsonBody } from "../api";
+import { apiRequest, downloadApiFile, jsonBody } from "../api";
 import { EmptyState, ErrorNotice, Panel, StatusBadge, SuccessNotice } from "../components/Shell";
 import type {
   Dataset,
@@ -13,7 +13,7 @@ import type {
   Project,
   StoredFile,
 } from "../types";
-import { formatNumber } from "../types";
+import { formatDate, formatNumber } from "../types";
 
 const FIELD_LABELS: Record<DatasetKind, Array<[string, string]>> = {
   profile: [
@@ -144,7 +144,40 @@ export function DonneesPage() {
       [...REQUIRED_FIELDS[kind]].every((field) => Boolean(mapping[field])),
     [kind, mapping],
   );
+  const queryClient = useQueryClient();
+  const documentsQuery = useQuery({
+    queryKey: ["documents", organizationId],
+    queryFn: () =>
+      apiRequest<Page<StoredFile>>(
+        "/documents?limit=100&offset=0&organization_id=" + organizationId,
+      ),
+    enabled: Boolean(organizationId),
+  });
+  const documents = documentsQuery.data?.items ?? [];
+
+  const documentMutation = useMutation({
+    mutationFn: async (form: FormData) => {
+      const payload = new FormData();
+      payload.set("organization_id", organizationId);
+      const file = form.get("file");
+      if (!(file instanceof File)) {
+        throw new Error("Sélectionnez un document à joindre.");
+      }
+      payload.set("file", file);
+      const description = String(form.get("description") ?? "").trim();
+      if (description) {
+        payload.set("description", description);
+      }
+      return apiRequest<StoredFile>("/documents", { method: "POST", body: payload });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["documents", organizationId] });
+    },
+  });
+
   const error =
+    documentsQuery.error ??
+    documentMutation.error ??
     projectsQuery.error ??
     uploadMutation.error ??
     mappingMutation.error ??
@@ -343,6 +376,92 @@ export function DonneesPage() {
           <EmptyState
             title="Import non exécuté"
             detail="Validez le mapping puis lancez la normalisation."
+          />
+        )}
+      </Panel>
+
+      <Panel
+        title="Pièces jointes du projet"
+        description="Fiches constructeur, plans, notes et rapports, conservés tels quels."
+      >
+        <form
+          className="compact-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            documentMutation.mutate(new FormData(event.currentTarget));
+          }}
+        >
+          <div className="form-grid">
+            <label>
+              Document
+              <input
+                name="file"
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.xlsx,.docx,.csv,.txt"
+                required
+              />
+              <small>PDF, image, classeur, document texte. Ces fichiers ne sont pas importés comme données.</small>
+            </label>
+            <label>
+              Description
+              <input name="description" placeholder="Fiche constructeur P-101" />
+            </label>
+          </div>
+          <button
+            className="button button-primary"
+            disabled={!organizationId || documentMutation.isPending}
+          >
+            {documentMutation.isPending ? "Téléversement…" : "Joindre le document"}
+          </button>
+        </form>
+
+        {documents.length ? (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Document</th>
+                  <th>Type</th>
+                  <th>Taille</th>
+                  <th>Empreinte</th>
+                  <th>Ajouté le</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {documents.map((document) => (
+                  <tr key={document.id}>
+                    <td>
+                      <strong>{document.filename}</strong>
+                      <small>{document.description ?? "Sans description"}</small>
+                    </td>
+                    <td>{document.media_type}</td>
+                    <td>{formatNumber(document.size_bytes / 1024, 1)} Kio</td>
+                    <td className="mono hash">{document.content_hash.slice(0, 24)}…</td>
+                    <td>{formatDate(document.created_at)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="button button-ghost"
+                        onClick={() =>
+                          void downloadApiFile(
+                            "/files/" + document.id + "/download",
+                            document.filename,
+                          )
+                        }
+                      >
+                        Télécharger
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState
+            title="Aucune pièce jointe"
+            detail="Joignez les documents constructeur et les notes techniques du projet."
           />
         )}
       </Panel>

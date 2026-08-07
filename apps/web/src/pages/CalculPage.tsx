@@ -12,7 +12,7 @@ import {
   SegmentResultsPanel,
   StationResultsPanel,
 } from "../components/results/DetailedResults";
-import { apiRequest, jsonBody } from "../api";
+import { apiRequest, downloadApiFile, jsonBody } from "../api";
 import { EmptyState, ErrorNotice, Panel, StatusBadge } from "../components/Shell";
 import { useNavigation } from "../routing";
 import type {
@@ -105,6 +105,27 @@ export function CalculPage() {
       return apiRequest<CalculationResult>("/calculations/" + calculation.id + "/results");
     },
     onSuccess: setResult,
+  });
+
+  const exportMutation = useMutation({
+    mutationFn: ({
+      format,
+      section,
+    }: {
+      format: "xlsx" | "csv" | "json";
+      section?: "profile" | "segments" | "stations" | "pumps";
+    }) => {
+      const calculationId = result?.calculation_id ?? "";
+      const query = new URLSearchParams({ format });
+      if (section) {
+        query.set("section", section);
+      }
+      const extension = format === "csv" ? `-${section ?? "profil"}.csv` : `.${format}`;
+      return downloadApiFile(
+        "/calculations/" + calculationId + "/export?" + query.toString(),
+        "calcul-" + calculationId.slice(0, 8) + extension,
+      );
+    },
   });
 
   const summary = result?.result;
@@ -296,6 +317,45 @@ export function CalculPage() {
             </>
           ) : null}
 
+          <Panel
+            title="Exports"
+            description="Résultats déjà calculés, restitués sans nouvelle exécution."
+          >
+            <div className="button-row">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => exportMutation.mutate({ format: "xlsx" })}
+                disabled={exportMutation.isPending}
+              >
+                Classeur XLSX
+              </button>
+              <button
+                type="button"
+                className="button button-ghost"
+                onClick={() => exportMutation.mutate({ format: "json" })}
+                disabled={exportMutation.isPending}
+              >
+                Données JSON
+              </button>
+              {(["profile", "segments", "stations", "pumps"] as const).map((section) => (
+                <button
+                  key={section}
+                  type="button"
+                  className="button button-ghost"
+                  onClick={() => exportMutation.mutate({ format: "csv", section })}
+                  disabled={exportMutation.isPending}
+                >
+                  CSV {SECTION_LABELS[section]}
+                </button>
+              ))}
+            </div>
+            <p className="field-help">
+              Le classeur regroupe le profil, les tronçons, les stations et les pompes. Un
+              fichier CSV ne porte qu'un seul tableau à la fois.
+            </p>
+          </Panel>
+
           <NumericalSummaryPanel
             summary={summary}
             engineVersion={engineVersion}
@@ -412,3 +472,11 @@ function ResultMetric({
 function formatOptionalNumber(value: number | null, unit: string | null): string {
   return value === null ? "—" : formatNumber(value) + (unit ? " " + unit : "");
 }
+
+/** Intitulés courts des sections exportables. */
+const SECTION_LABELS: Record<"profile" | "segments" | "stations" | "pumps", string> = {
+  profile: "profil",
+  segments: "tronçons",
+  stations: "stations",
+  pumps: "pompes",
+};

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Generator
 from io import BytesIO
 
@@ -258,3 +259,120 @@ def test_import_hash_streaming_matches_canonical_hash() -> None:
 
     expected = sha256_of({"file_hash": file_hash, "mapping": mapping, "rows": rows})
     assert f"sha256:{digest.hexdigest()}" == expected
+
+
+def test_import_accepte_un_document_json(import_client) -> None:
+    """Le MVP exige CSV, XLSX et JSON ; seuls les deux premiers étaient acceptés."""
+
+    organization = _organization(import_client)
+    document = json.dumps(
+        {
+            "points": [
+                {"chainage_m": 0.0, "elevation_m": 10.0},
+                {"chainage_m": 500.0, "elevation_m": 18.5},
+                {"chainage_m": 1000.0, "elevation_m": 12.25},
+            ]
+        }
+    ).encode("utf-8")
+    stored_file = _upload(
+        import_client,
+        organization["id"],
+        "profil.json",
+        document,
+        "application/json",
+    )
+
+    dataset = import_client.post(
+        "/api/v1/datasets",
+        json={
+            "organization_id": organization["id"],
+            "file_id": stored_file["id"],
+            "name": "Profil importé en JSON",
+            "kind": "profile",
+        },
+    )
+    assert dataset.status_code == 201, dataset.text
+
+    preview = import_client.post(f"/api/v1/datasets/{dataset.json()['id']}/preview")
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["columns"] == ["chainage_m", "elevation_m"]
+    assert preview.json()["row_count"] == 3
+
+
+def test_import_json_refuse_une_forme_ambigue(import_client) -> None:
+    """Deux listes candidates : le service refuse au lieu de deviner la bonne."""
+
+    organization = _organization(import_client)
+    document = json.dumps({"a": [{"x": 1}], "b": [{"y": 2}]}).encode("utf-8")
+    stored_file = _upload(
+        import_client,
+        organization["id"],
+        "ambigu.json",
+        document,
+        "application/json",
+    )
+
+    dataset = import_client.post(
+        "/api/v1/datasets",
+        json={
+            "organization_id": organization["id"],
+            "file_id": stored_file["id"],
+            "name": "Document ambigu",
+            "kind": "generic",
+        },
+    )
+    assert dataset.status_code == 201, dataset.text
+
+    preview = import_client.post(f"/api/v1/datasets/{dataset.json()['id']}/preview")
+    assert preview.status_code == 422, preview.text
+
+
+def test_piece_jointe_documentaire_est_separee_des_donnees(import_client) -> None:
+    """Un plan PDF se stocke comme document, jamais comme tableau de données."""
+
+    organization = _organization(import_client)
+    pdf = b"%PDF-1.4\n%stub\n"
+
+    document = import_client.post(
+        "/api/v1/documents",
+        data={"organization_id": organization["id"], "description": "Fiche constructeur"},
+        files={"file": ("fiche.pdf", pdf, "application/pdf")},
+    )
+    assert document.status_code == 201, document.text
+    body = document.json()
+    assert body["purpose"] == "document"
+    assert body["description"] == "Fiche constructeur"
+
+    listing = import_client.get(
+        "/api/v1/documents", params={"organization_id": organization["id"]}
+    )
+    assert listing.status_code == 200, listing.text
+    assert listing.json()["total"] == 1
+
+    download = import_client.get(f"/api/v1/files/{body['id']}/download")
+    assert download.status_code == 200
+    assert download.content == pdf
+
+
+def test_import_de_donnees_refuse_un_pdf(import_client) -> None:
+    organization = _organization(import_client)
+
+    response = import_client.post(
+        "/api/v1/files",
+        data={"organization_id": organization["id"]},
+        files={"file": ("plan.pdf", b"%PDF-1.4\n", "application/pdf")},
+    )
+
+    assert response.status_code == 422, response.text
+
+
+def test_piece_jointe_refuse_un_format_non_documentaire(import_client) -> None:
+    organization = _organization(import_client)
+
+    response = import_client.post(
+        "/api/v1/documents",
+        data={"organization_id": organization["id"]},
+        files={"file": ("script.exe", b"MZ", "application/octet-stream")},
+    )
+
+    assert response.status_code == 422, response.text

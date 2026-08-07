@@ -134,7 +134,7 @@ no_implicit_optional = true
 mypy_path = "packages/shared:packages/domain:packages/hydroliquid:packages/tank_transfer:packages/optimization:packages/reporting:packages/validation:apps/api"
 
 [[tool.mypy.overrides]]
-module = ["boto3.*", "botocore.*", "fluids.*", "CoolProp.*", "scipy.*", "pyomo.*", "pandapipes.*", "geoalchemy2.*", "reportlab.*", "matplotlib.*", "pandas.*"]
+module = ["boto3.*", "botocore.*", "openpyxl.*", "fluids.*", "CoolProp.*", "scipy.*", "pyomo.*", "pandapipes.*", "geoalchemy2.*", "reportlab.*", "matplotlib.*", "pandas.*"]
 ignore_missing_imports = true
 
 [tool.coverage.run]

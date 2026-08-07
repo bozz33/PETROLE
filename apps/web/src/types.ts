@@ -609,6 +609,10 @@ export interface StoredFile {
   media_type: string;
   size_bytes: number;
   content_hash: string;
+  /** `dataset` pour une donnée importable, `document` pour une pièce jointe. */
+  purpose: "dataset" | "document";
+  project_id: string | null;
+  description: string | null;
   created_at: string;
 }
 

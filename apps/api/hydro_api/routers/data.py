@@ -26,6 +26,7 @@ from hydro_api.deployment import (
     is_single_organization,
     require_default_organization_id,
 )
+from hydro_api.schemas.core import Page
 from hydro_api.schemas.data import (
     DatasetCreate,
     DatasetImportRead,
@@ -64,7 +65,7 @@ SettingsDependency = Annotated[Settings, Depends(_settings)]
     "/files",
     response_model=StoredFileRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Téléverser un fichier CSV ou XLSX",
+    summary="Téléverser un fichier CSV, XLSX ou JSON",
 )
 async def upload_file(
     organization_id: Annotated[uuid.UUID, Form()],
@@ -86,6 +87,70 @@ async def upload_file(
         content=content,
         max_size_bytes=settings.max_upload_size_bytes,
     )
+
+
+@router.post(
+    "/documents",
+    response_model=StoredFileRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Téléverser une pièce jointe documentaire",
+)
+async def upload_document(
+    organization_id: Annotated[uuid.UUID, Form()],
+    file: Annotated[UploadFile, File()],
+    request: Request,
+    session: DatabaseSession,
+    storage: ObjectStorageDependency,
+    settings: SettingsDependency,
+    project_id: Annotated[uuid.UUID | None, Form()] = None,
+    description: Annotated[str | None, Form()] = None,
+):
+    """Stocke un document consulté tel quel : fiche constructeur, plan, rapport.
+
+    Ce flux est distinct de l'import scientifique : le contenu n'est jamais
+    interprété comme un tableau de données.
+    """
+
+    if is_single_organization(request.app.state.settings):
+        organization_id = require_default_organization_id(request, session)
+    content = await file.read(settings.max_upload_size_bytes + 1)
+    return data_import.store_file(
+        session,
+        storage,
+        organization_id=organization_id,
+        filename=file.filename or "",
+        media_type=file.content_type or "",
+        content=content,
+        max_size_bytes=settings.max_upload_size_bytes,
+        purpose="document",
+        project_id=project_id,
+        description=description,
+    )
+
+
+@router.get(
+    "/documents",
+    response_model=Page[StoredFileRead],
+    summary="Lister les pièces jointes documentaires",
+)
+def list_documents(
+    request: Request,
+    session: DatabaseSession,
+    organization_id: uuid.UUID | None = None,
+    project_id: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    if is_single_organization(request.app.state.settings):
+        organization_id = require_default_organization_id(request, session)
+    items, total = data_import.list_documents(
+        session,
+        organization_id=organization_id,
+        project_id=project_id,
+        limit=limit,
+        offset=offset,
+    )
+    return Page(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get(

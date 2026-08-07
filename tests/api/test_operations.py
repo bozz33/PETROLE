@@ -684,3 +684,56 @@ def test_transfert_change_d_empreinte_avec_le_chemin(operations_client) -> None:
         json=changed,
     )
     assert conflict.status_code == 409, conflict.text
+
+
+def test_export_des_resultats_en_xlsx_csv_et_json(operations_client) -> None:
+    """Le MVP exige PDF, XLSX, CSV et JSON ; seul le PDF existait."""
+
+    organization = _organization(operations_client, slug="exploitant-exports")
+    project = _project(operations_client, organization["id"])
+    canonical = entree_canonique(
+        conduite=pipeline(stations=(station_serie(),)),
+        cas=scenario(imposed_flow_m3_s=0.15, inlet_pressure_pa=5_000_000.0),
+    ).payload()
+    _, calculation = _calculation(operations_client, project["id"], canonical, "EXP")
+
+    workbook = operations_client.get(
+        f"/api/v1/calculations/{calculation['id']}/export", params={"format": "xlsx"}
+    )
+    assert workbook.status_code == 200, workbook.text
+    assert workbook.content[:2] == b"PK"
+    assert "calcul-" in workbook.headers["content-disposition"]
+
+    profile_csv = operations_client.get(
+        f"/api/v1/calculations/{calculation['id']}/export",
+        params={"format": "csv", "section": "profile"},
+    )
+    assert profile_csv.status_code == 200, profile_csv.text
+    text = profile_csv.content.decode("utf-8-sig")
+    assert text.splitlines()[0].startswith("chainage_m;elevation_m")
+
+    document = operations_client.get(
+        f"/api/v1/calculations/{calculation['id']}/export", params={"format": "json"}
+    )
+    assert document.status_code == 200, document.text
+    payload = document.json()
+    assert payload["calculation_id"] == calculation["id"]
+    assert set(payload["sections"]) == {"profile", "segments", "stations", "pumps"}
+    assert payload["sections"]["segments"]
+
+
+def test_export_csv_exige_une_section(operations_client) -> None:
+    """Un fichier plat ne peut pas porter plusieurs tableaux sans ambiguïté."""
+
+    organization = _organization(operations_client, slug="exploitant-exports-csv")
+    project = _project(operations_client, organization["id"])
+    canonical = entree_canonique(
+        cas=scenario(imposed_flow_m3_s=0.15, inlet_pressure_pa=5_000_000.0)
+    ).payload()
+    _, calculation = _calculation(operations_client, project["id"], canonical, "EXPCSV")
+
+    response = operations_client.get(
+        f"/api/v1/calculations/{calculation['id']}/export", params={"format": "csv"}
+    )
+
+    assert response.status_code == 409, response.text

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import math
 import uuid
 from datetime import UTC, datetime
@@ -29,7 +30,20 @@ from hydro_api.schemas.data import DatasetCreate, DatasetMapping
 from hydro_api.storage import ObjectStorage
 from hydro_shared.hashing import canonical_json, sha256_of_bytes
 
-SUPPORTED_EXTENSIONS = {".csv", ".xlsx"}
+SUPPORTED_EXTENSIONS = {".csv", ".xlsx", ".json"}
+
+#: Formats admis comme pièces jointes documentaires. Ces fichiers ne sont jamais
+#: interprétés comme des données : ils sont stockés, hachés et restitués tels quels.
+DOCUMENT_EXTENSIONS: dict[str, str] = {
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".csv": "text/csv",
+    ".txt": "text/plain",
+}
 REQUIRED_FIELDS: dict[str, frozenset[str]] = {
     "profile": frozenset({"chainage_m", "elevation_m"}),
     "pump_curve": frozenset({"flow_m3_s", "head_m"}),
@@ -96,10 +110,40 @@ def _json_value(value: Any) -> Any:
     return value
 
 
+def _rows_from_json(content: bytes, filename: str) -> list[dict[str, Any]]:
+    """Extrait un tableau de lignes d'un document JSON.
+
+    Deux formes sont acceptées : une liste d'objets, ou un objet contenant une
+    unique liste d'objets sous une clé quelconque (``points``, ``rows``,
+    ``items``…). Toute autre forme est refusée plutôt que devinée.
+    """
+
+    try:
+        document = json.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Lecture impossible du fichier {filename} : {exc}") from exc
+
+    candidate: Any = document
+    if isinstance(document, dict):
+        lists = [value for value in document.values() if isinstance(value, list)]
+        if len(lists) != 1:
+            raise ValueError(
+                "Un document JSON doit contenir une liste d'objets, "
+                "directement ou sous une clé unique."
+            )
+        candidate = lists[0]
+
+    if not isinstance(candidate, list) or not candidate:
+        raise ValueError("Le document JSON ne contient aucune ligne exploitable.")
+    if not all(isinstance(item, dict) for item in candidate):
+        raise ValueError("Chaque élément du document JSON doit être un objet.")
+    return [dict(item) for item in candidate]
+
+
 def _read_frame(content: bytes, filename: str, *, max_rows: int) -> pd.DataFrame:
     extension = Path(filename).suffix.lower()
     if extension not in SUPPORTED_EXTENSIONS:
-        raise ValueError("Seuls les fichiers CSV et XLSX sont acceptés.")
+        raise ValueError("Seuls les fichiers CSV, XLSX et JSON sont acceptés.")
     source = io.BytesIO(content)
     try:
         if extension == ".csv":
@@ -110,8 +154,12 @@ def _read_frame(content: bytes, filename: str, *, max_rows: int) -> pd.DataFrame
                 dtype=object,
                 keep_default_na=False,
             )
+        elif extension == ".json":
+            frame = pd.DataFrame(_rows_from_json(content, filename), dtype=object)
         else:
             frame = pd.read_excel(source, dtype=object, engine="openpyxl")
+    except ValueError:
+        raise
     except Exception as exc:
         raise ValueError(f"Lecture impossible du fichier {filename} : {exc}") from exc
     if len(frame.index) > max_rows:
@@ -183,28 +231,49 @@ def store_file(
     media_type: str,
     content: bytes,
     max_size_bytes: int,
+    purpose: str = "dataset",
+    project_id: uuid.UUID | None = None,
+    description: str | None = None,
 ) -> StoredFile:
-    """Stocke un fichier privé après contrôle du nom, du format et de la taille."""
+    """Stocke un fichier privé après contrôle du nom, du format et de la taille.
 
+    Deux usages coexistent : ``dataset`` pour une donnée destinée à l'import
+    scientifique, ``document`` pour une pièce jointe restituée telle quelle. Les
+    formats admis diffèrent, afin qu'un plan PDF ne soit jamais interprété comme
+    un tableau de mesures.
+    """
+
+    if purpose not in {"dataset", "document"}:
+        raise ValueError("L'usage d'un fichier est « dataset » ou « document ».")
     if session.get(Organization, organization_id) is None:
         raise ResourceNotFoundError("Organisation", organization_id)
+    if project_id is not None:
+        project = session.get(Project, project_id)
+        if project is None:
+            raise ResourceNotFoundError("Projet", project_id)
+        if project.organization_id != organization_id:
+            raise ValueError("Le projet rattaché appartient à une autre organisation.")
     safe_name = Path(filename).name.strip()
     if not safe_name:
         raise ValueError("Le nom du fichier est vide.")
     extension = Path(safe_name).suffix.lower()
-    if extension not in SUPPORTED_EXTENSIONS:
-        raise ValueError("Seuls les fichiers CSV et XLSX sont acceptés.")
+    allowed = DOCUMENT_EXTENSIONS if purpose == "document" else SUPPORTED_EXTENSIONS
+    if extension not in allowed:
+        raise ValueError(
+            "Formats acceptés pour une pièce jointe : " + ", ".join(sorted(DOCUMENT_EXTENSIONS))
+            if purpose == "document"
+            else "Seuls les fichiers CSV, XLSX et JSON sont acceptés à l'import."
+        )
     if not content:
         raise ValueError("Le fichier est vide.")
     if len(content) > max_size_bytes:
         raise ValueError(f"Le fichier dépasse la limite autorisée de {max_size_bytes} octets.")
 
     file_id = uuid.uuid4()
-    object_key = f"imports/{organization_id}/{file_id}/{safe_name}"
-    effective_media_type = media_type or (
-        "text/csv"
-        if extension == ".csv"
-        else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    prefix = "documents" if purpose == "document" else "imports"
+    object_key = f"{prefix}/{organization_id}/{file_id}/{safe_name}"
+    effective_media_type = media_type or DOCUMENT_EXTENSIONS.get(
+        extension, "application/octet-stream"
     )
     storage.put_bytes(object_key, content, effective_media_type)
     stored_file = StoredFile(
@@ -216,6 +285,9 @@ def store_file(
         media_type=effective_media_type,
         size_bytes=len(content),
         content_hash=sha256_of_bytes(content),
+        purpose=purpose,
+        project_id=project_id,
+        description=description,
         created_at=utc_now(),
     )
     session.add(stored_file)
@@ -610,3 +682,32 @@ __all__ = [
     "set_mapping",
     "store_file",
 ]
+
+
+def list_documents(
+    session: Session,
+    *,
+    organization_id: uuid.UUID | None,
+    project_id: uuid.UUID | None,
+    limit: int,
+    offset: int,
+) -> tuple[list[StoredFile], int]:
+    """Liste les pièces jointes documentaires, sans mélanger les fichiers d'import."""
+
+    filters = [StoredFile.purpose == "document"]
+    if organization_id is not None:
+        filters.append(StoredFile.organization_id == organization_id)
+    if project_id is not None:
+        filters.append(StoredFile.project_id == project_id)
+
+    total = session.scalar(select(func.count()).select_from(StoredFile).where(*filters)) or 0
+    items = list(
+        session.scalars(
+            select(StoredFile)
+            .where(*filters)
+            .order_by(StoredFile.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        ).all()
+    )
+    return items, total

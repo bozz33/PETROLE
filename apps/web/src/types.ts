@@ -415,6 +415,74 @@ export interface Scenario {
   updated_at: string;
 }
 
+/** Modèles de frottement acceptés par le solveur stationnaire (D-v2 § 5.3). */
+export type FrictionModel = "colebrook_white" | "haaland" | "swamee_jain" | "altshul";
+
+/** Objectifs proposés par l'optimiseur de configurations (D-v2 § 4.10). */
+export type ScenarioObjective =
+  | "min_energy"
+  | "min_cost"
+  | "min_pump_count"
+  | "min_starts"
+  | "max_flow";
+
+/** État imposé à un équipement pour la durée du scénario (D09 § 4). */
+export type EquipmentScenarioStatus =
+  | "available"
+  | "unavailable"
+  | "maintenance"
+  | "bypassed";
+
+export interface PumpOverride {
+  pump_id: string;
+  status: EquipmentScenarioStatus | null;
+  running: boolean | null;
+  speed_ratio: number | null;
+}
+
+export interface StationOverride {
+  station_id: string;
+  status: EquipmentScenarioStatus | null;
+}
+
+export interface SegmentOverride {
+  segment_id: string;
+  status: EquipmentScenarioStatus | null;
+  additional_k: number | null;
+}
+
+export interface SolverOptions {
+  friction_model: FrictionModel;
+  pressure_tolerance_pa: number;
+  flow_tolerance_m3_s: number;
+  mass_balance_tolerance: number;
+  max_iterations: number;
+  profile_step_m: number;
+  store_iterations: boolean;
+  use_quadratic_pump_fit: boolean;
+  max_flow_m3_s: number | null;
+  detect_gravity_zones: boolean;
+  apply_gravity_model: boolean;
+  min_velocity_m_s: number | null;
+  max_velocity_m_s: number | null;
+}
+
+/** Conditions d'étude d'un scénario, alignées sur `ScenarioPayloadInput`. */
+export interface ScenarioPayload {
+  temperature_k: number | null;
+  imposed_flow_m3_s: number | null;
+  inlet_pressure_pa: number | null;
+  outlet_pressure_pa: number | null;
+  inlet_tank_level_m: number | null;
+  outlet_tank_level_m: number | null;
+  pump_overrides: PumpOverride[];
+  station_overrides: StationOverride[];
+  segment_overrides: SegmentOverride[];
+  solver: SolverOptions;
+  objective: ScenarioObjective | null;
+  energy_price_per_joule: number | null;
+}
+
 export interface Calculation {
   id: string;
   job_id: string | null;

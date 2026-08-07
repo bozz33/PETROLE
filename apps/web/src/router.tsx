@@ -15,6 +15,7 @@ import { DonneesPage } from "./pages/DonneesPage";
 import { ModelisationPage } from "./pages/ModelisationPage";
 import { ProjetsPage } from "./pages/ProjetsPage";
 import { RapportsPage } from "./pages/RapportsPage";
+import { ScenariosPage } from "./pages/ScenariosPage";
 import { StockagePage } from "./pages/StockagePage";
 import { TableauBordPage } from "./pages/TableauBordPage";
 import { VisualisationReseauPage } from "./pages/VisualisationReseauPage";
@@ -60,6 +61,12 @@ const librariesRoute = createRoute({
   component: BibliothequesPage,
 });
 
+const scenariosRoute = createRoute({
+  getParentRoute: () => applicationRoute,
+  path: "scenarios",
+  component: ScenariosPage,
+});
+
 const calculationRoute = createRoute({
   getParentRoute: () => applicationRoute,
   path: "calcul",
@@ -102,6 +109,7 @@ const applicationTree = applicationRoute.addChildren([
   modelingRoute,
   networkVisualisationRoute,
   librariesRoute,
+  scenariosRoute,
   calculationRoute,
   storageRoute,
   decisionRoute,

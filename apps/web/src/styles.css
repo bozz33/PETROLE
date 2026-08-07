@@ -1472,3 +1472,34 @@ summary {
     grid-template-columns: 1fr;
   }
 }
+
+/* Regroupement de champs liés, par exemple une condition aux limites. */
+.field-group {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--border, #cdd9d5);
+  border-radius: 12px;
+  background: var(--surface-raised, #fbfdfc);
+}
+
+.field-group > legend {
+  padding: 0 6px;
+  color: var(--foreground-muted, #485650);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+/* Case à cocher alignée horizontalement avec son intitulé. */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+}
+
+.checkbox-label > input[type="checkbox"] {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+}

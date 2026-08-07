@@ -17,6 +17,7 @@ import {
   Network,
   Search,
   Settings,
+  SlidersHorizontal,
   Sun,
   type LucideIcon,
 } from "lucide-react";
@@ -73,6 +74,12 @@ const NAVIGATION: NavigationItem[] = [
     label: "Bibliothèques",
     icon: BookOpen,
     description: "Produits, pompes, vannes et matériaux",
+  },
+  {
+    to: "/scenarios",
+    label: "Scénarios",
+    icon: SlidersHorizontal,
+    description: "Conditions d'étude, équipements et solveur",
   },
   {
     to: "/calcul",
@@ -132,6 +139,11 @@ const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   "/bibliotheques": {
     title: "Bibliothèques techniques",
     subtitle: "Versionner les produits, pompes, vannes, matériaux et accessoires.",
+  },
+  "/scenarios": {
+    title: "Scénarios",
+    subtitle:
+      "Définir les conditions aux limites, l'état des équipements et les options du solveur.",
   },
   "/calcul": {
     title: "Calcul hydraulique",

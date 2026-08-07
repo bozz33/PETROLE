@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { apiRequest, jsonBody } from "../api";
-import { EmptyState, ErrorNotice, Panel, StatusBadge, SuccessNotice } from "../components/Shell";
-import { EXAMPLE_SCENARIO } from "../samples";
+import { EmptyState, ErrorNotice, Panel, StatusBadge } from "../components/Shell";
+import { useNavigation } from "../routing";
 import type {
   Calculation,
   CalculationProfilePoint,
@@ -16,14 +16,10 @@ import type {
 import { formatNumber } from "../types";
 
 export function CalculPage() {
-  const queryClient = useQueryClient();
+  const { navigate } = useNavigation();
   const [projectId, setProjectId] = useState("");
   const [modelId, setModelId] = useState("");
   const [scenarioId, setScenarioId] = useState("");
-  const [scenarioName, setScenarioName] = useState("Régime nominal");
-  const [scenarioPayload, setScenarioPayload] = useState(
-    JSON.stringify(EXAMPLE_SCENARIO, null, 2),
-  );
   const [result, setResult] = useState<CalculationResult | null>(null);
 
   const projectsQuery = useQuery({
@@ -73,21 +69,6 @@ export function CalculPage() {
     setResult(null);
   }, [scenarioId]);
 
-  const scenarioMutation = useMutation({
-    mutationFn: () =>
-      apiRequest<Scenario>("/models/" + modelId + "/scenarios", {
-        method: "POST",
-        body: jsonBody({
-          name: scenarioName,
-          payload: JSON.parse(scenarioPayload) as Record<string, unknown>,
-        }),
-      }),
-    onSuccess: async (scenario) => {
-      setScenarioId(scenario.id);
-      await queryClient.invalidateQueries({ queryKey: ["scenarios", modelId] });
-    },
-  });
-
   const calculationMutation = useMutation({
     mutationFn: async () => {
       const calculation = await apiRequest<Calculation>(
@@ -125,15 +106,11 @@ export function CalculPage() {
     projectsQuery.error ??
     modelsQuery.error ??
     scenariosQuery.error ??
-    scenarioMutation.error ??
     calculationMutation.error;
 
   return (
     <div className="stack">
       {error ? <ErrorNotice error={error} /> : null}
-      {scenarioMutation.isSuccess ? (
-        <SuccessNotice>Le scénario est enregistré et prêt à être calculé.</SuccessNotice>
-      ) : null}
 
       <Panel
         title="Chaîne de calcul"
@@ -196,50 +173,22 @@ export function CalculPage() {
 
       {!scenarios.length && modelId ? (
         <Panel
-          title="Créer le scénario initial"
-          description="Conditions aux limites, options du solveur et états des équipements."
+          title="Aucun scénario sur cette version"
+          description="Les conditions d'étude se saisissent dans un formulaire dédié."
         >
-          <form
-            className="editor-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              scenarioMutation.mutate();
-            }}
-          >
-            <label>
-              Nom du scénario
-              <input
-                value={scenarioName}
-                onChange={(event) => setScenarioName(event.target.value)}
-                required
-              />
-            </label>
-            <label>
-              Paramètres du scénario
-              <textarea
-                className="code-editor"
-                rows={20}
-                value={scenarioPayload}
-                onChange={(event) => setScenarioPayload(event.target.value)}
-                spellCheck={false}
-              />
-            </label>
-            <div className="button-row">
-              <button
-                className="button button-primary"
-                disabled={!modelId || scenarioMutation.isPending}
-              >
-                Enregistrer le scénario
-              </button>
-              <button
-                type="button"
-                className="button button-ghost"
-                onClick={() => setScenarioPayload(JSON.stringify(EXAMPLE_SCENARIO, null, 2))}
-              >
-                Restaurer l'exemple
-              </button>
-            </div>
-          </form>
+          <EmptyState
+            title="Aucun scénario calculable"
+            detail="Renseignez les conditions aux limites, l'état des équipements et les options du solveur dans l'écran « Scénarios »."
+          />
+          <div className="button-row">
+            <button
+              type="button"
+              className="button button-primary"
+              onClick={() => navigate("/scenarios")}
+            >
+              Ouvrir l'écran Scénarios
+            </button>
+          </div>
         </Panel>
       ) : null}
 

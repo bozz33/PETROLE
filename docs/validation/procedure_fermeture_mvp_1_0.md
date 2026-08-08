@@ -87,6 +87,10 @@ scientifique ou la révision de migration publiés par `/api/v1/version`.
 
 Après les derniers commits et avant tout tag final :
 
+`deployment/scripts/vps/deploy.sh` scelle l'image avec le SHA, la référence Git
+et la date UTC du candidat courant. Vérifier que `GET /api/v1/version` publie ce
+SHA avant de lancer cette campagne.
+
 ```bash
 ./deployment/scripts/vps/qualify.sh production
 ```

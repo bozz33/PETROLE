@@ -32,6 +32,14 @@ if (( ${#secret_jwt} < 64 )); then
 fi
 
 cd "${VPS_REPOSITORY_ROOT}"
+export HYDRO_BUILD_GIT_SHA="$(git rev-parse HEAD)"
+export HYDRO_BUILD_REF="$(git symbolic-ref --quiet --short HEAD || git describe --tags --always)"
+export HYDRO_BUILD_DATE="$(date --utc --iso-8601=seconds)"
+
+# Les valeurs exportées priment sur le fichier .env du VPS : chaque image
+# construite par ce script publie ainsi l'identité exacte du candidat déployé
+# via /api/v1/version. Sans ce scellement, une qualification ne pourrait pas
+# prouver quel commit a réellement été servi.
 compose_vps config --quiet
 compose_vps pull --ignore-buildable postgres minio caddy
 compose_vps build api worker web

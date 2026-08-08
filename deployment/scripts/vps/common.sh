@@ -60,6 +60,16 @@ initialiser_contexte_vps() {
     VPS_COMPOSE_ARGUMENTS+=(
         -f "${VPS_REPOSITORY_ROOT}/deployment/docker-compose.vps.yml"
     )
+    if [[ "${VPS_MODE}" == "production" ]]; then
+        # La production PETROLE est isolée de la pile de développement
+        # « hydro-platform » : mêmes sources Compose, mais réseaux, volumes
+        # et conteneurs propres. L'override maintient les services applicatifs
+        # internes et ne publie que le frontend sur la boucle locale.
+        VPS_COMPOSE_ARGUMENTS+=(
+            -f "${VPS_REPOSITORY_ROOT}/deployment/docker-compose.prod-internal.yml"
+            --project-name petrole
+        )
+    fi
 }
 
 compose_vps() {

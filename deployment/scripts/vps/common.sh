@@ -106,6 +106,22 @@ attendre_postgresql() {
 
 attendre_api_locale() {
     local port_api _tentative
+    if [[ "${VPS_MODE}" == "production" ]]; then
+        # L'override de production n'expose volontairement pas l'API sur
+        # l'hôte. Le test de readiness doit donc être exécuté dans le
+        # conteneur applicatif, et non via 127.0.0.1:${API_PORT}.
+        for _tentative in $(seq 1 60); do
+            if compose_vps exec -T api python -c \
+                'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/api/v1/health/ready", timeout=5)' \
+                >/dev/null 2>&1; then
+                return 0
+            fi
+            sleep 2
+        done
+        echo "L'API de production n'est pas prête après 120 secondes." >&2
+        return 1
+    fi
+
     port_api="$(valeur_environnement API_PORT)"
     port_api="${port_api:-8000}"
     for _tentative in $(seq 1 60); do

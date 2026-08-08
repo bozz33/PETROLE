@@ -197,7 +197,7 @@ def test_run_required_scenarios_rejoue_les_quatre_cas(monkeypatch: pytest.Monkey
         for scenario in scenarios
     }
 
-    def fake_run(_: Any, scenario_id: str, __: str) -> dict[str, Any]:
+    def fake_run(_: Any, scenario_id: str, __: str, ___: str) -> dict[str, Any]:
         return calculations[scenario_id]
 
     monkeypatch.setattr(module, "run_calculation", fake_run)
@@ -210,7 +210,11 @@ def test_run_required_scenarios_rejoue_les_quatre_cas(monkeypatch: pytest.Monkey
             for calculation in calculations.values()
         }
     )
-    actual_calculations, results = module.run_required_scenarios(client, scenarios)
+    actual_calculations, results = module.run_required_scenarios(
+        client,
+        scenarios,
+        "model-content-hash",
+    )
     assert set(actual_calculations) == set(module.REQUIRED_SCENARIO_STATUSES)
     assert all(result["result"] for result in results.values())
 

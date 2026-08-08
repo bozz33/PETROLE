@@ -216,12 +216,17 @@ def wait_calculation(
     raise AcceptanceError(f"Le calcul {calculation_id} n'a pas terminé en {timeout_s:.0f} s.")
 
 
-def run_calculation(client: Client, scenario_id: str, label: str) -> dict[str, Any]:
+def run_calculation(
+    client: Client,
+    scenario_id: str,
+    label: str,
+    recipe_run_id: str,
+) -> dict[str, Any]:
     calculation = client.request(
         "POST",
         f"/scenarios/{scenario_id}/calculations",
         {"engine": "long_distance_liquid"},
-        idempotency_key=f"recette-finale-{label}-{scenario_id}",
+        idempotency_key=f"recette-finale-{recipe_run_id}-{label}-{scenario_id}",
     )
     return wait_calculation(client, calculation)
 
@@ -229,6 +234,7 @@ def run_calculation(client: Client, scenario_id: str, label: str) -> dict[str, A
 def run_required_scenarios(
     client: Client,
     scenarios: list[dict[str, Any]],
+    recipe_run_id: str,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     """Rejoue les quatre scénarios de référence et vérifie leur verdict attendu."""
 
@@ -236,7 +242,12 @@ def run_required_scenarios(
     results: dict[str, dict[str, Any]] = {}
     for index, (name, expected_statuses) in enumerate(REQUIRED_SCENARIO_STATUSES.items(), start=1):
         scenario = first_by(scenarios, "name", name)
-        calculation = run_calculation(client, scenario["id"], f"required-{index}")
+        calculation = run_calculation(
+            client,
+            scenario["id"],
+            f"required-{index}",
+            recipe_run_id,
+        )
         status = str(calculation.get("status"))
         if status not in expected_statuses:
             raise AcceptanceError(
@@ -634,6 +645,7 @@ def exercise_transfer(
     nodes: list[dict[str, Any]],
     edges: list[dict[str, Any]],
     assets: list[dict[str, Any]],
+    recipe_run_id: str,
 ) -> dict[str, Any]:
     source = first_by(tanks, "code", "TK-01")
     destination = first_by(tanks, "code", "TK-02")
@@ -675,7 +687,7 @@ def exercise_transfer(
                 "maximum_evaluations": 200,
             },
         },
-        idempotency_key=f"recette-transfer-{model_id}",
+        idempotency_key=f"recette-transfer-{recipe_run_id}-{model_id}",
         timeout=300.0,
     )
     result = transfer.get("result_payload") or {}
@@ -740,6 +752,7 @@ def exercise_optimization(
     *,
     scenario_id: str,
     assets: list[dict[str, Any]],
+    recipe_run_id: str,
 ) -> dict[str, Any]:
     main_codes = sorted(
         item["code"]
@@ -770,7 +783,7 @@ def exercise_optimization(
             "maximum_evaluations": 25,
             "solver": "enumeration",
         },
-        idempotency_key=f"recette-optimization-{scenario_id}",
+        idempotency_key=f"recette-optimization-{recipe_run_id}-{scenario_id}",
         timeout=180.0,
     )
     result = optimization.get("result_payload") or {}
@@ -1004,14 +1017,31 @@ def main() -> int:
     scenarios = page(client, f"/models/{model_id}/scenarios?limit=200&offset=0")
     nominal = first_by(scenarios, "name", "Régime nominal")
     impossible = ensure_impossible_scenario(client, model_id, nominal, assets)
+    # Chaque contenu de modèle doit être réellement recalculé. Sans ce suffixe,
+    # une exécution après modification du réseau pourrait réutiliser les calculs
+    # et le transfert idempotents d'une ancienne géométrie.
+    model = client.request("GET", f"/models/{model_id}")
+    model_content_hash = str(model.get("content_hash") or "")
+    if not model_content_hash:
+        raise AcceptanceError("La version de modèle ne publie pas son content_hash.")
+    recipe_run_id = hashlib.sha256(model_content_hash.encode("utf-8")).hexdigest()[:24]
     scenarios = page(client, f"/models/{model_id}/scenarios?limit=200&offset=0")
     required_scenario_names = set(REQUIRED_SCENARIO_STATUSES) | {IMPOSSIBLE_SCENARIO_NAME}
     present_scenario_names = {str(item.get("name")) for item in scenarios}
     missing_scenarios = sorted(required_scenario_names - present_scenario_names)
     if missing_scenarios:
         raise AcceptanceError("Scénarios obligatoires absents : " + ", ".join(missing_scenarios))
-    scenario_calculations, scenario_results = run_required_scenarios(client, scenarios)
-    impossible_calculation = run_calculation(client, impossible["id"], "impossible")
+    scenario_calculations, scenario_results = run_required_scenarios(
+        client,
+        scenarios,
+        recipe_run_id,
+    )
+    impossible_calculation = run_calculation(
+        client,
+        impossible["id"],
+        "impossible",
+        recipe_run_id,
+    )
     impossible_result = client.request(
         "GET", f"/calculations/{impossible_calculation['id']}/results"
     )
@@ -1031,8 +1061,14 @@ def main() -> int:
         nodes=nodes,
         edges=edges,
         assets=assets,
+        recipe_run_id=recipe_run_id,
     )
-    optimization = exercise_optimization(client, scenario_id=nominal["id"], assets=assets)
+    optimization = exercise_optimization(
+        client,
+        scenario_id=nominal["id"],
+        assets=assets,
+        recipe_run_id=recipe_run_id,
+    )
     comparison = exercise_comparison(
         client,
         project_id=project["id"],

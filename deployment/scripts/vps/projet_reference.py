@@ -29,16 +29,33 @@ PUMPS_PER_STATION = 3
 TANK_COUNT = 10
 
 # Le tracé est dimensionné pour que quinze pompes trouvent un point de
-# fonctionnement acceptable : 200 km en DN600, relief modéré. Un premier jeu de
-# 60 km laissait le débit s'emballer jusqu'à des pertes de charge qui faisaient
-# passer la conduite sous la pression de vapeur. Le moteur le signalait
-# correctement, mais un cas de référence doit être exploitable.
+# fonctionnement acceptable : 200 km en DN600, relief modéré. La première
+# station est volontairement proche du bac amont : avec 32 km sans reprise, la
+# charge hydrostatique du bac ne suffisait pas à protéger l'aspiration contre la
+# cavitation lors d'un transfert HydroLiquid réellement couplé. La longueur
+# totale et le nombre de tronçons restent inchangés ; seule leur répartition est
+# physique pour le cas de référence.
 SEGMENT_LENGTH_M = 2_000.0
+UPSTREAM_SEGMENT_COUNT = SEGMENT_COUNT // (STATION_COUNT + 1)
+UPSTREAM_SEGMENT_LENGTH_M = 125.0
+DOWNSTREAM_SEGMENT_LENGTH_M = (
+    SEGMENT_COUNT * SEGMENT_LENGTH_M - UPSTREAM_SEGMENT_COUNT * UPSTREAM_SEGMENT_LENGTH_M
+) / (SEGMENT_COUNT - UPSTREAM_SEGMENT_COUNT)
 INNER_DIAMETER_M = 0.5810
 OUTER_DIAMETER_M = 0.6096
 WALL_THICKNESS_M = 0.0143
 ROUGHNESS_M = 4.5e-5
 MAWP_PA = 8.0e6
+
+
+def segment_length_m(index: int) -> float:
+    """Retourne la longueur du tronçon zéro-indexé du cas de référence."""
+
+    if not 0 <= index < SEGMENT_COUNT:
+        raise ValueError(f"Indice de tronçon hors limites : {index}")
+    if index < UPSTREAM_SEGMENT_COUNT:
+        return UPSTREAM_SEGMENT_LENGTH_M
+    return DOWNSTREAM_SEGMENT_LENGTH_M
 
 
 class ApiError(RuntimeError):
@@ -109,9 +126,7 @@ def build(client: Client, approver: Client, organization_id: str) -> dict[str, A
             "organization_id": organization_id,
             "name": "Oléoduc de référence — recette MVP",
             "code": "REF-MVP-01",
-            "description": (
-                "Cas de réception : 100 tronçons, 5 stations, 15 pompes et 10 bacs."
-            ),
+            "description": ("Cas de réception : 100 tronçons, 5 stations, 15 pompes et 10 bacs."),
             "project_type": "liquid_pipeline",
         },
     )
@@ -299,6 +314,7 @@ def build(client: Client, approver: Client, organization_id: str) -> dict[str, A
 
     for index in range(SEGMENT_COUNT):
         start, end = nodes[index], nodes[index + 1]
+        length_m = segment_length_m(index)
         client.request(
             "POST",
             f"/models/{model_id}/edges",
@@ -309,14 +325,14 @@ def build(client: Client, approver: Client, organization_id: str) -> dict[str, A
                 "code": f"TR-{index + 1:03d}",
                 "name": f"Tronçon {index + 1:03d}",
                 "sequence": index + 1,
-                "length_m": SEGMENT_LENGTH_M,
+                "length_m": length_m,
                 "inner_diameter_m": INNER_DIAMETER_M,
                 "roughness_m": ROUGHNESS_M,
                 "mawp_pa": MAWP_PA,
                 "status": "available",
                 "profile": [
                     {"chainage_m": 0.0, "elevation_m": start["elevation_m"]},
-                    {"chainage_m": SEGMENT_LENGTH_M, "elevation_m": end["elevation_m"]},
+                    {"chainage_m": length_m, "elevation_m": end["elevation_m"]},
                 ],
                 "fittings": [],
                 "payload": {
@@ -478,11 +494,7 @@ def build(client: Client, approver: Client, organization_id: str) -> dict[str, A
             "Marche en secours",
             "Le premier secours prend le relais de la pompe indisponible.",
             [
-                *[
-                    override
-                    for override in at_rest
-                    if override["pump_id"] != "P-002"
-                ],
+                *[override for override in at_rest if override["pump_id"] != "P-002"],
                 {
                     "pump_id": first_pump,
                     "status": "unavailable",
@@ -495,7 +507,10 @@ def build(client: Client, approver: Client, organization_id: str) -> dict[str, A
         (
             "Débit réduit",
             "Vitesse abaissée sur la première station.",
-            [*at_rest, {"pump_id": first_pump, "status": None, "running": True, "speed_ratio": 0.8}],
+            [
+                *at_rest,
+                {"pump_id": first_pump, "status": None, "running": True, "speed_ratio": 0.8},
+            ],
         ),
     ]
     for name, description, overrides in definitions:

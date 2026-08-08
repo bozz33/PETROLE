@@ -43,12 +43,13 @@ compose_vps --profile qualification run --rm --no-deps qualification-api \
     | tee "${preuves}/politique-postgresql.txt"
 compose_vps --profile qualification run --rm --no-deps qualification-api \
     ruff format --check apps packages tests deployment/scripts/check_test_database_policy.py \
-    deployment/scripts/vps/recette_mvp_finale.py
+    deployment/scripts/vps/projet_reference.py deployment/scripts/vps/recette_mvp_finale.py
 compose_vps --profile qualification run --rm --no-deps qualification-api \
     ruff check apps packages tests deployment/scripts/check_test_database_policy.py \
-    deployment/scripts/vps/recette_mvp_finale.py
+    deployment/scripts/vps/projet_reference.py deployment/scripts/vps/recette_mvp_finale.py
 compose_vps --profile qualification run --rm --no-deps qualification-api \
-    mypy packages apps/api deployment/scripts/vps/recette_mvp_finale.py
+    mypy packages apps/api deployment/scripts/vps/projet_reference.py \
+    deployment/scripts/vps/recette_mvp_finale.py
 bash -n deployment/scripts/vps/close-mvp.sh
 
 # Les tests de persistance utilisent une base PostgreSQL/PostGIS jetable,

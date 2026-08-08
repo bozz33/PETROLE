@@ -1,7 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const outputDir = process.env.PLAYWRIGHT_OUTPUT_DIR ?? "test-results";
+const htmlReportDir = process.env.PLAYWRIGHT_HTML_REPORT_DIR ?? "playwright-report";
+
 export default defineConfig({
   testDir: "./e2e",
+  outputDir,
   timeout: 15_000,
   expect: { timeout: 5_000 },
   fullyParallel: true,
@@ -9,7 +13,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI
-    ? [["line"], ["html", { outputFolder: "playwright-report", open: "never" }]]
+    ? [["line"], ["html", { outputFolder: htmlReportDir, open: "never" }]]
     : "list",
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:4173",

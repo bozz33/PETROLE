@@ -127,9 +127,11 @@ mkdir -p "${preuves}/playwright-results"
 docker run --rm --ipc=host \
     -e E2E_BASE_URL="https://${domaine}" \
     -e PLAYWRIGHT_USE_BUNDLED_CHROMIUM=true \
+    -e PLAYWRIGHT_OUTPUT_DIR=/artifacts/test-results \
+    -e PLAYWRIGHT_HTML_REPORT_DIR=/artifacts/playwright-report \
     -v "${VPS_REPOSITORY_ROOT}/apps/web:/workspace:ro" \
     -v hydro_e2e_node_modules:/workspace/node_modules \
-    -v "${preuves}/playwright-results:/workspace/test-results" \
+    -v "${preuves}/playwright-results:/artifacts" \
     -w /workspace \
     mcr.microsoft.com/playwright:v1.55.1-noble \
     bash -lc 'npm ci && npm run test:e2e'

@@ -125,6 +125,42 @@ def test_compare_builds_refuse_deux_sha_differents() -> None:
         module.compare_builds(primary, secondary, require_secondary=True)
 
 
+def test_scenario_impossible_accepte_une_convergence_non_approvable() -> None:
+    module = load_script()
+    proof = module.assert_impossible_result(
+        {"status": "SIM_CONVERGED_WARN"},
+        {
+            "diagnostics": {"method": "marche directe"},
+            "result": {
+                "physical_approvable": False,
+                "decision_eligible": False,
+                "compliance_status": "non_compliant",
+                "violations": [{"code": "VIOL_PRESSURE_BELOW_VAPOR"}],
+                "warnings": [],
+            },
+        },
+    )
+    assert proof["physical_approvable"] is False
+    assert proof["violation_count"] == 1
+
+
+def test_scenario_impossible_refuse_une_convergence_physiquement_acceptable() -> None:
+    module = load_script()
+    with pytest.raises(module.AcceptanceError, match="physiquement acceptable"):
+        module.assert_impossible_result(
+            {"status": "SIM_CONVERGED_WARN"},
+            {
+                "diagnostics": {"method": "marche directe"},
+                "result": {
+                    "physical_approvable": True,
+                    "decision_eligible": True,
+                    "violations": [],
+                    "warnings": [],
+                },
+            },
+        )
+
+
 def test_compare_builds_compare_aussi_moteur_et_migration() -> None:
     module = load_script()
     primary = FakeClient({("GET", "/version"): version_payload()})
@@ -217,7 +253,11 @@ def test_render_markdown_rappelle_la_porte_humaine() -> None:
         "counts": {"nodes": 101, "edges": 100, "assets": 15, "tanks": 10},
         "network_validation": {"errors": 0, "warnings": 0},
         "gates": {
-            "impossible_scenario": {"status": "SIM_PHYSICAL_LIMIT"},
+            "impossible_scenario": {
+                "status": "SIM_CONVERGED_WARN",
+                "physical_approvable": False,
+                "violation_count": 2,
+            },
             "scenarios": {
                 "Régime nominal": {"status": "SIM_CONVERGED"},
                 "Pompe indisponible": {"status": "SIM_CONVERGED_WARN"},

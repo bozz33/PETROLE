@@ -356,11 +356,6 @@ def ensure_impossible_scenario(
     nominal: dict[str, Any],
     assets: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    scenarios = page(client, f"/models/{model_id}/scenarios?limit=200&offset=0")
-    existing = find_by(scenarios, "name", IMPOSSIBLE_SCENARIO_NAME)
-    if existing:
-        return existing
-
     payload = copy.deepcopy(nominal.get("payload") or {})
     pump_codes = sorted(
         item["code"]
@@ -387,6 +382,34 @@ def ensure_impossible_scenario(
         }
         for code in pump_codes
     ]
+    description = (
+        "Cas de recette volontairement impossible : pression amont sous la pression "
+        "de vapeur et groupe de pompage indisponible."
+    )
+
+    scenarios = page(client, f"/models/{model_id}/scenarios?limit=200&offset=0")
+    existing = find_by(scenarios, "name", IMPOSSIBLE_SCENARIO_NAME)
+    if existing:
+        current_payload = existing.get("payload") or {}
+        expected_pumps = {item["pump_id"] for item in payload["pump_overrides"]}
+        current_unavailable_pumps = {
+            item.get("pump_id")
+            for item in current_payload.get("pump_overrides", [])
+            if isinstance(item, dict)
+            and item.get("status") == "unavailable"
+            and item.get("running") is False
+        }
+        if (
+            current_payload.get("inlet_pressure_pa") == payload["inlet_pressure_pa"]
+            and current_payload.get("imposed_flow_m3_s") == payload["imposed_flow_m3_s"]
+            and expected_pumps <= current_unavailable_pumps
+        ):
+            return existing
+        return client.request(
+            "PATCH",
+            f"/scenarios/{existing['id']}",
+            {"description": description, "payload": payload},
+        )
 
     return client.request(
         "POST",
@@ -394,13 +417,60 @@ def ensure_impossible_scenario(
         {
             "name": IMPOSSIBLE_SCENARIO_NAME,
             "parent_id": nominal["id"],
-            "description": (
-                "Cas de recette volontairement impossible : pression amont sous la pression "
-                "de vapeur et groupe de pompage indisponible."
-            ),
+            "description": description,
             "payload": payload,
         },
     )
+
+
+def assert_impossible_result(
+    calculation: dict[str, Any],
+    calculation_result: dict[str, Any],
+) -> dict[str, Any]:
+    """Vérifie qu'un scénario est non réalisable, même si le solveur a convergé.
+
+    HydroLiquid distingue la convergence numérique de l'acceptabilité physique :
+    un calcul peut atteindre sa solution tout en publiant une violation critique
+    (pression sous la vapeur, cavitation, pression d'aspiration insuffisante…).
+    Dans ce cas le statut est ``SIM_CONVERGED_WARN``, mais le résultat n'est ni
+    physiquement approuvable ni éligible à une décision. C'est un cas de recette
+    non réalisable valide, à condition que ces marqueurs et ses causes soient
+    tous explicitement présents.
+    """
+
+    status = str(calculation.get("status"))
+    result = calculation_result.get("result") or {}
+    violations = result.get("violations") or []
+    warnings = result.get("warnings") or []
+    diagnostics = calculation_result.get("diagnostics") or {}
+    physical_approvable = result.get("physical_approvable")
+    decision_eligible = result.get("decision_eligible")
+    non_approvable_convergence = (
+        status == "SIM_CONVERGED_WARN"
+        and physical_approvable is False
+        and decision_eligible is False
+        and bool(violations)
+    )
+    if status in CONVERGED_STATUSES and not non_approvable_convergence:
+        raise AcceptanceError(
+            "Le scénario volontairement impossible est considéré comme physiquement "
+            "acceptable ; il doit être non convergé, ou SIM_CONVERGED_WARN avec des "
+            "violations critiques et les indicateurs physical_approvable=false / "
+            "decision_eligible=false."
+        )
+    if not diagnostics and not violations and not warnings:
+        raise AcceptanceError(
+            "Le scénario non réalisable ne publie aucune cause exploitable de son échec."
+        )
+    return {
+        "status": status,
+        "physical_approvable": physical_approvable,
+        "decision_eligible": decision_eligible,
+        "compliance_status": result.get("compliance_status"),
+        "violation_count": len(violations),
+        "warning_count": len(warnings),
+        "diagnostics": diagnostics,
+    }
 
 
 def execute_import(
@@ -805,7 +875,12 @@ def render_markdown(summary: dict[str, Any]) -> str:
             "- Baseline et scénarios dégradés : **PASS** — "
             + ", ".join(f"{name} : `{item['status']}`" for name, item in scenarios.items())
         ),
-        f"- 5e scénario non réalisable : **PASS** — statut `{impossible['status']}`",
+        (
+            "- 5e scénario non réalisable : **PASS** — "
+            f"statut `{impossible['status']}`, "
+            f"physiquement approuvable : `{impossible['physical_approvable']}`, "
+            f"violations : {impossible['violation_count']}"
+        ),
         (
             "- Imports profil / pompe / barémage / propriétés : **PASS** — "
             f"{sum(item['accepted_count'] for item in imports.values())} lignes acceptées"
@@ -937,21 +1012,10 @@ def main() -> int:
         raise AcceptanceError("Scénarios obligatoires absents : " + ", ".join(missing_scenarios))
     scenario_calculations, scenario_results = run_required_scenarios(client, scenarios)
     impossible_calculation = run_calculation(client, impossible["id"], "impossible")
-    if impossible_calculation.get("status") in CONVERGED_STATUSES:
-        raise AcceptanceError(
-            "Le scénario volontairement impossible a convergé ; le cas de recette doit être renforcé."
-        )
     impossible_result = client.request(
         "GET", f"/calculations/{impossible_calculation['id']}/results"
     )
-    impossible_diagnostics = impossible_result.get("diagnostics")
-    impossible_messages = ((impossible_result.get("result") or {}).get("violations") or []) + (
-        (impossible_result.get("result") or {}).get("warnings") or []
-    )
-    if not impossible_diagnostics and not impossible_messages:
-        raise AcceptanceError(
-            "Le scénario non réalisable ne publie aucune cause exploitable de son échec."
-        )
+    impossible_proof = assert_impossible_result(impossible_calculation, impossible_result)
 
     imports = exercise_imports(
         client,
@@ -1015,8 +1079,7 @@ def main() -> int:
             "impossible_scenario": {
                 "scenario_id": impossible["id"],
                 "calculation_id": impossible_calculation["id"],
-                "status": impossible_calculation["status"],
-                "diagnostics": impossible_result.get("diagnostics"),
+                **impossible_proof,
             },
             "scenarios": {
                 name: {

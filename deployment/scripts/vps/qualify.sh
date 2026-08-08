@@ -57,6 +57,17 @@ bash -n deployment/scripts/vps/close-mvp.sh
 "${TEST_COMPOSE[@]}" down --volumes --remove-orphans
 "${TEST_COMPOSE[@]}" build migrate-test tests
 "${TEST_COMPOSE[@]}" up --detach postgres-test
+for tentative in $(seq 1 30); do
+    if "${TEST_COMPOSE[@]}" exec -T postgres-test \
+        pg_isready -U petrole_test -d petrole_test >/dev/null 2>&1; then
+        break
+    fi
+    if [[ "${tentative}" -eq 30 ]]; then
+        echo "La base PostgreSQL jetable de qualification n'est pas prête." >&2
+        exit 1
+    fi
+    sleep 1
+done
 "${TEST_COMPOSE[@]}" run --rm --no-deps migrate-test \
     | tee "${preuves}/migrations-test.txt"
 "${TEST_COMPOSE[@]}" run --rm --no-deps migrate-test \

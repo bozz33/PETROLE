@@ -38,6 +38,10 @@ services:
       - type: bind
         source: ..
         target: /workspace
+    # Le workspace est monté depuis l'hôte : la migration doit donc s'exécuter
+    # avec son UID/GID, comme les tests, plutôt qu'avec l'utilisateur interne
+    # de l'image qui peut ne pas lire des fichiers source privés.
+    user: "${QUALIFICATION_UID:-1000}:${QUALIFICATION_GID:-1000}"
     depends_on:
       postgres-test:
         condition: service_healthy

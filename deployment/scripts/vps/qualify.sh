@@ -156,9 +156,16 @@ for specification in "api:${image_api}" "web:${image_web}"; do
         --format json --output "/reports/trivy-${nom}.json" "${image}"
 done
 
+zap_proofs="${preuves}/zap"
+mkdir -p "${zap_proofs}"
+# L'image ZAP s'exécute avec son utilisateur non privilégié. Seul son dossier
+# d'artefacts est rendu inscriptible, afin de conserver les rapports sans
+# ouvrir le reste du répertoire de qualification.
+chmod ugo+rwx "${zap_proofs}"
+
 set +e
 docker run --rm \
-    -v "${preuves}:/zap/wrk/:rw" \
+    -v "${zap_proofs}:/zap/wrk/:rw" \
     ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
     -t "https://${domaine}" -J zap.json -r zap.html
 code_zap=$?
@@ -180,5 +187,5 @@ fi
 
 echo "Qualification VPS terminée : ${preuves}"
 if [[ "${code_zap}" -eq 2 ]]; then
-    echo "OWASP ZAP a produit des avertissements à examiner dans zap.html."
+    echo "OWASP ZAP a produit des avertissements à examiner dans zap/zap.html."
 fi

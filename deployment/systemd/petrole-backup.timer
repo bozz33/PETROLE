@@ -1,0 +1,11 @@
+[Unit]
+Description=Planification quotidienne de la sauvegarde PETROLE
+
+[Timer]
+OnCalendar=*-*-* 00:15:00
+Persistent=true
+RandomizedDelaySec=5m
+Unit=petrole-backup.service
+
+[Install]
+WantedBy=timers.target

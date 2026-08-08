@@ -1,0 +1,14 @@
+[Unit]
+Description=Sauvegarde cohérente PETROLE (PostgreSQL et stockage objet)
+Wants=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/petrole
+ExecStart=/opt/petrole/deployment/scripts/vps/backup.sh production /opt/petrole/deployment/.env.vps /opt/petrole/var/backups-vps
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

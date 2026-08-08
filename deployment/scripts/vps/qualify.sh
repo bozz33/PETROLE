@@ -175,6 +175,22 @@ if [[ "${code_zap}" -eq 1 || "${code_zap}" -ge 3 ]]; then
     exit "${code_zap}"
 fi
 
+backup_proofs="${preuves}/backup"
+mkdir -p "${backup_proofs}"
+"${VPS_SCRIPT_DIR}/backup.sh" "${mode}" "${fichier_env}" "${backup_proofs}" \
+    | tee "${preuves}/backup.log"
+mapfile -t backup_directories < <(
+    find "${backup_proofs}" -mindepth 1 -maxdepth 1 -type d -print | sort
+)
+if [[ "${#backup_directories[@]}" -ne 1 ]]; then
+    echo "La qualification attend exactement une sauvegarde fraîche." >&2
+    exit 1
+fi
+"${VPS_SCRIPT_DIR}/verify-backup-restore.sh" \
+    "${backup_directories[0]}" "${mode}" "${fichier_env}" \
+    "${preuves}/backup-restore.json"
+attendre_api_locale
+
 curl --fail --silent --show-error --max-time 10 \
     "https://${domaine}/api/v1/health/ready" >"${preuves}/ready.json"
 git rev-parse HEAD >"${preuves}/commit.txt"

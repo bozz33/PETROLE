@@ -438,7 +438,7 @@ def test_lecture_des_membres_resiste_a_une_adresse_heritee(secured_api) -> None:
         json={
             "email": "administrateur@exploitant.example",
             "full_name": "Administrateur",
-            "password": "MotDePasseSolide2026",
+            "password": MOT_DE_PASSE_ADMIN,
             "organization_name": "Exploitant héritage",
             "organization_slug": "exploitant-heritage",
         },
@@ -451,7 +451,7 @@ def test_lecture_des_membres_resiste_a_une_adresse_heritee(secured_api) -> None:
         legacy = UserAccount(
             email="exploitation@petrole.local",
             full_name="Compte hérité",
-            password_hash=hash_password("MotDePasseSolide2026"),
+            password_hash=hash_password(MOT_DE_PASSE_ADMIN),
             is_active=True,
         )
         session.add(legacy)

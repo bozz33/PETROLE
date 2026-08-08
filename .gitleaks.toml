@@ -4,3 +4,13 @@ useDefault = true
 [[allowlists]]
 description = "Clé d'idempotence publique et déterministe du test de réseau normalisé"
 regexes = ['''calcul-reseau-normalise-001''']
+
+[[allowlists]]
+description = """
+Mot de passe de jeu d'essai introduit par le commit 56b3554 dans la suite
+d'authentification. Il ne donne accès à rien : chaque exécution des tests crée sa
+propre base jetable. Le code courant réutilise les constantes partagées du
+fichier ; cette exception ne couvre que l'occurrence restée dans l'historique,
+qui ne peut être retirée sans réécrire une branche déjà publiée.
+"""
+regexes = ['''MotDePasseSolide2026''']

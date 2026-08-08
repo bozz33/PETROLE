@@ -7,13 +7,8 @@ from typing import Any
 
 import pytest
 
-
 SCRIPT = (
-    Path(__file__).resolve().parents[1]
-    / "deployment"
-    / "scripts"
-    / "vps"
-    / "recette_mvp_finale.py"
+    Path(__file__).resolve().parents[1] / "deployment" / "scripts" / "vps" / "recette_mvp_finale.py"
 )
 
 
@@ -43,6 +38,22 @@ class FakeClient:
             raise AssertionError(f"Appel inattendu : {key}")
         response = self.responses[key]
         return response(payload) if callable(response) else response
+
+
+def version_payload(
+    *,
+    git_sha: str = "aaaa",
+    scientific_engine_version: str = "hydroliquid-0.1.0",
+    database_migration_version: str = "9f3b6e0d5c17",
+) -> dict[str, str]:
+    return {
+        "application_version": "0.2.0",
+        "git_sha": git_sha,
+        "ref": "main",
+        "build_date": "2026-08-08T00:00:00Z",
+        "scientific_engine_version": scientific_engine_version,
+        "database_migration_version": database_migration_version,
+    }
 
 
 def test_latest_model_choisit_la_version_la_plus_recente() -> None:
@@ -108,32 +119,92 @@ def test_scenario_impossible_force_pression_vapeur_et_pompes_indisponibles() -> 
 
 def test_compare_builds_refuse_deux_sha_differents() -> None:
     module = load_script()
-    primary = FakeClient(
-        {
-            ("GET", "/version"): {
-                "application_version": "0.2.0",
-                "git_sha": "aaaa",
-                "ref": "main",
-                "build_date": "2026-08-08T00:00:00Z",
-                "scientific_engine_version": "hydroliquid-0.1.0",
-                "database_migration_version": "9f3b6e0d5c17",
-            }
-        }
-    )
+    primary = FakeClient({("GET", "/version"): version_payload(git_sha="aaaa")})
+    secondary = FakeClient({("GET", "/version"): version_payload(git_sha="bbbb")})
+    with pytest.raises(module.AcceptanceError, match="même build"):
+        module.compare_builds(primary, secondary, require_secondary=True)
+
+
+def test_compare_builds_compare_aussi_moteur_et_migration() -> None:
+    module = load_script()
+    primary = FakeClient({("GET", "/version"): version_payload()})
     secondary = FakeClient(
         {
-            ("GET", "/version"): {
-                "application_version": "0.2.0",
-                "git_sha": "bbbb",
-                "ref": "main",
-                "build_date": "2026-08-08T00:00:00Z",
-                "scientific_engine_version": "hydroliquid-0.1.0",
-                "database_migration_version": "9f3b6e0d5c17",
-            }
+            ("GET", "/version"): version_payload(
+                scientific_engine_version="hydroliquid-0.2.0",
+                database_migration_version="abcdef012345",
+            )
         }
     )
     with pytest.raises(module.AcceptanceError, match="même build"):
-        module.compare_builds(primary, secondary)
+        module.compare_builds(primary, secondary, require_secondary=True)
+
+
+def test_verify_expected_build_refuse_un_sha_different() -> None:
+    module = load_script()
+    client = FakeClient({("GET", "/version"): version_payload(git_sha="served")})
+    with pytest.raises(module.AcceptanceError, match="commit candidat"):
+        module.verify_expected_build(client, "candidate")
+
+
+def test_run_required_scenarios_rejoue_les_quatre_cas(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = load_script()
+    scenarios = [
+        {"id": f"scenario-{index}", "name": name}
+        for index, name in enumerate(module.REQUIRED_SCENARIO_STATUSES, start=1)
+    ]
+    calculations = {
+        scenario["id"]: {
+            "id": f"calculation-{scenario['id']}",
+            "status": next(iter(module.REQUIRED_SCENARIO_STATUSES[scenario["name"]])),
+        }
+        for scenario in scenarios
+    }
+
+    def fake_run(_: Any, scenario_id: str, __: str) -> dict[str, Any]:
+        return calculations[scenario_id]
+
+    monkeypatch.setattr(module, "run_calculation", fake_run)
+    client = FakeClient(
+        {
+            ("GET", f"/calculations/{calculation['id']}/results"): {
+                "status": calculation["status"],
+                "result": {"flow_m3_s": 0.25},
+            }
+            for calculation in calculations.values()
+        }
+    )
+    actual_calculations, results = module.run_required_scenarios(client, scenarios)
+    assert set(actual_calculations) == set(module.REQUIRED_SCENARIO_STATUSES)
+    assert all(result["result"] for result in results.values())
+
+
+def test_exercise_comparison_archive_les_calculs_rejoues() -> None:
+    module = load_script()
+    calculations = {
+        name: {"id": f"calculation-{index}"}
+        for index, name in enumerate(module.REQUIRED_SCENARIO_STATUSES, start=1)
+    }
+
+    def create(payload: dict[str, Any]) -> dict[str, Any]:
+        ids = payload["calculation_ids"]
+        return {
+            "id": "comparison-1",
+            "content_hash": "sha256:comparison",
+            "result_payload": {
+                "ranked": [{"calculation_id": identifier} for identifier in ids],
+                "recommended_calculation_id": ids[0],
+            },
+        }
+
+    client = FakeClient({("POST", "/projects/project-1/comparisons"): create})
+    comparison = module.exercise_comparison(
+        client,
+        project_id="project-1",
+        calculations=calculations,
+    )
+    assert comparison["ranked_count"] == 4
+    assert comparison["recommended_calculation_id"] == "calculation-1"
 
 
 def test_render_markdown_rappelle_la_porte_humaine() -> None:
@@ -147,6 +218,10 @@ def test_render_markdown_rappelle_la_porte_humaine() -> None:
         "network_validation": {"errors": 0, "warnings": 0},
         "gates": {
             "impossible_scenario": {"status": "SIM_PHYSICAL_LIMIT"},
+            "scenarios": {
+                "Régime nominal": {"status": "SIM_CONVERGED"},
+                "Pompe indisponible": {"status": "SIM_CONVERGED_WARN"},
+            },
             "imports": {
                 "profile": {"accepted_count": 3},
                 "pump_curve": {"accepted_count": 4},
@@ -159,6 +234,14 @@ def test_render_markdown_rappelle_la_porte_humaine() -> None:
                 "balance_residual_m3": 0.0,
             },
             "optimization": {"solver": "enumeration", "status": "completed"},
+            "comparison": {
+                "ranked_count": 4,
+                "recommended_calculation_id": "calculation-1",
+            },
+            "outputs": {
+                "calculation_note": {"id": "report-1"},
+                "exports": {"csv": {}, "json": {}, "xlsx": {}},
+            },
             "same_build": {"status": "passed"},
         },
     }

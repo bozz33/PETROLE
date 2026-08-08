@@ -6,10 +6,12 @@ n'utilise que les interfaces HTTP publiques de PETROLE. Il complète les preuves
 qui ne figuraient pas encore explicitement dans le parcours de référence :
 
 - cinquième scénario volontairement non réalisable ;
+- rejeu de la baseline, des scénarios dégradés et de leur comparaison ;
 - imports de profil, courbe de pompe, barémage et propriétés produit ;
 - transfert bac-à-bac couplé à HydroLiquid et bilan matière ;
 - optimisation bornée avec résultat archivé ;
-- comparaison facultative de l'identité de build entre deux déploiements.
+- note de calcul, rapports opérationnels et exports ;
+- identité de build contrôlée contre le SHA candidat et, si demandé, entre deux déploiements.
 
 Il produit un JSON et un Markdown de preuve. Il ne remplace pas l'acceptation
 humaine : la signature d'un ingénieur métier extérieur reste une porte manuelle.
@@ -33,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import sys
 import time
@@ -47,6 +50,26 @@ PROJECT_CODE_DEFAULT = "REF-MVP-01"
 IMPOSSIBLE_SCENARIO_NAME = "Configuration impossible"
 TERMINAL_CALCULATION_PHASES = {"finished", "failed", "cancelled"}
 CONVERGED_STATUSES = {"SIM_CONVERGED", "SIM_CONVERGED_WARN"}
+REQUIRED_SCENARIO_STATUSES = {
+    "Régime nominal": {"SIM_CONVERGED"},
+    "Pompe indisponible": {"SIM_CONVERGED_WARN"},
+    "Marche en secours": {"SIM_CONVERGED"},
+    "Débit réduit": {"SIM_CONVERGED"},
+}
+BUILD_IDENTITY_FIELDS = (
+    "application_version",
+    "git_sha",
+    "ref",
+    "build_date",
+    "scientific_engine_version",
+    "database_migration_version",
+)
+STABLE_BUILD_IDENTITY_FIELDS = (
+    "application_version",
+    "git_sha",
+    "scientific_engine_version",
+    "database_migration_version",
+)
 
 
 class AcceptanceError(RuntimeError):
@@ -85,9 +108,29 @@ class Client:
                 return json.loads(body) if body else None
         except urllib.error.HTTPError as error:
             body = error.read().decode("utf-8", errors="replace")
-            raise AcceptanceError(
-                f"{method} {path} → HTTP {error.code}: {body}"
-            ) from error
+            raise AcceptanceError(f"{method} {path} → HTTP {error.code}: {body}") from error
+        except urllib.error.URLError as error:
+            raise AcceptanceError(f"{method} {path} → {error}") from error
+
+    def request_bytes(
+        self,
+        method: str,
+        path: str,
+        *,
+        timeout: float = 180.0,
+    ) -> tuple[bytes, str]:
+        """Exécute un téléchargement public/privé sans tenter de le décoder en JSON."""
+
+        request = urllib.request.Request(f"{self.base_url}{path}", method=method)
+        request.add_header("Accept", "application/octet-stream, application/json")
+        if self.token:
+            request.add_header("Authorization", f"Bearer {self.token}")
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return response.read(), response.headers.get_content_type()
+        except urllib.error.HTTPError as error:
+            body = error.read().decode("utf-8", errors="replace")
+            raise AcceptanceError(f"{method} {path} → HTTP {error.code}: {body}") from error
         except urllib.error.URLError as error:
             raise AcceptanceError(f"{method} {path} → {error}") from error
 
@@ -106,10 +149,7 @@ class Client:
             organization_id.encode(),
             b"\r\n",
             f"--{boundary}\r\n".encode(),
-            (
-                'Content-Disposition: form-data; name="file"; '
-                f'filename="{filename}"\r\n'
-            ).encode(),
+            (f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n').encode(),
             f"Content-Type: {media_type}\r\n\r\n".encode(),
             content,
             b"\r\n",
@@ -186,6 +226,130 @@ def run_calculation(client: Client, scenario_id: str, label: str) -> dict[str, A
     return wait_calculation(client, calculation)
 
 
+def run_required_scenarios(
+    client: Client,
+    scenarios: list[dict[str, Any]],
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    """Rejoue les quatre scénarios de référence et vérifie leur verdict attendu."""
+
+    calculations: dict[str, dict[str, Any]] = {}
+    results: dict[str, dict[str, Any]] = {}
+    for index, (name, expected_statuses) in enumerate(REQUIRED_SCENARIO_STATUSES.items(), start=1):
+        scenario = first_by(scenarios, "name", name)
+        calculation = run_calculation(client, scenario["id"], f"required-{index}")
+        status = str(calculation.get("status"))
+        if status not in expected_statuses:
+            raise AcceptanceError(
+                f"Le scénario {name!r} a le statut {status!r}, attendu : "
+                f"{sorted(expected_statuses)!r}."
+            )
+        result = client.request("GET", f"/calculations/{calculation['id']}/results")
+        if not result.get("result"):
+            raise AcceptanceError(f"Le scénario {name!r} n'a produit aucun résultat exploitable.")
+        calculations[name] = calculation
+        results[name] = result
+    return calculations, results
+
+
+def exercise_comparison(
+    client: Client,
+    *,
+    project_id: str,
+    calculations: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Archive le classement des scénarios réellement rejoués."""
+
+    calculation_ids = [
+        calculations[name]["id"] for name in REQUIRED_SCENARIO_STATUSES if name in calculations
+    ]
+    comparison = client.request(
+        "POST",
+        f"/projects/{project_id}/comparisons",
+        {"calculation_ids": calculation_ids},
+        idempotency_key=(
+            "recette-comparison-"
+            + hashlib.sha256("|".join(calculation_ids).encode("utf-8")).hexdigest()[:24]
+        ),
+    )
+    payload = comparison.get("result_payload") or {}
+    ranked = payload.get("ranked") or []
+    recommended = payload.get("recommended_calculation_id")
+    if len(ranked) != len(calculation_ids) or not recommended:
+        raise AcceptanceError(
+            "La comparaison ne publie pas un classement et une recommandation complets."
+        )
+    return {
+        "comparison_id": comparison["id"],
+        "calculation_ids": calculation_ids,
+        "recommended_calculation_id": recommended,
+        "ranked_count": len(ranked),
+        "content_hash": comparison["content_hash"],
+    }
+
+
+def exercise_reports_and_exports(
+    client: Client,
+    *,
+    nominal_calculation_id: str,
+    comparison_id: str,
+    transfer_id: str,
+) -> dict[str, Any]:
+    """Produit les preuves documentaires et les trois formats d'export D04."""
+
+    note = client.request(
+        "POST",
+        f"/calculations/{nominal_calculation_id}/reports",
+        {"report_type": "hydraulic_calculation", "template_version": "rpt-02/1.0"},
+        idempotency_key=f"recette-note-calcul-{nominal_calculation_id}",
+    )
+    operational_specs = (
+        ("scenario_comparison", comparison_id),
+        ("transfer_simulation", transfer_id),
+        ("material_balance", transfer_id),
+    )
+    operational_reports = []
+    for report_type, source_id in operational_specs:
+        report = client.request(
+            "POST",
+            "/reports",
+            {"report_type": report_type, "source_id": source_id},
+            idempotency_key=f"recette-{report_type}-{source_id}",
+        )
+        operational_reports.append(
+            {
+                "id": report["id"],
+                "report_type": report["report_type"],
+                "content_hash": report["content_hash"],
+            }
+        )
+
+    exports = {}
+    for export_format, section in (("xlsx", None), ("json", None), ("csv", "segments")):
+        query = f"format={export_format}"
+        if section:
+            query += f"&section={section}"
+        content, media_type = client.request_bytes(
+            "GET",
+            f"/calculations/{nominal_calculation_id}/export?{query}",
+        )
+        if not content:
+            raise AcceptanceError(f"L'export {export_format} est vide.")
+        exports[export_format] = {
+            "media_type": media_type,
+            "size_bytes": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(),
+        }
+    return {
+        "calculation_note": {
+            "id": note["id"],
+            "content_hash": note["content_hash"],
+            "file_id": note["file_id"],
+        },
+        "operational_reports": operational_reports,
+        "exports": exports,
+    }
+
+
 def ensure_impossible_scenario(
     client: Client,
     model_id: str,
@@ -201,11 +365,12 @@ def ensure_impossible_scenario(
     pump_codes = sorted(
         item["code"]
         for item in assets
-        if str(item.get("code", "")).startswith("P-")
-        and item.get("role") in {"main", "standby"}
+        if str(item.get("code", "")).startswith("P-") and item.get("role") in {"main", "standby"}
     )
     if not pump_codes:
-        raise AcceptanceError("Aucune pompe n'est disponible pour construire le scénario impossible.")
+        raise AcceptanceError(
+            "Aucune pompe n'est disponible pour construire le scénario impossible."
+        )
 
     # La pression d'entrée est volontairement sous la pression de vapeur du fluide
     # de référence. Le cas doit donc être refusé comme physiquement irréalisable,
@@ -279,16 +444,23 @@ def execute_import(
         idempotency_key=f"recette-import-{dataset['id']}",
     )
     if int(imported.get("accepted_count", 0)) <= 0 or int(imported.get("rejected_count", 0)):
+        raise AcceptanceError(f"L'import {name!r} n'est pas entièrement accepté : {imported}.")
+    rows = client.request("GET", f"/datasets/{dataset['id']}/rows?limit=1000&offset=0")
+    accepted_count = int(imported["accepted_count"])
+    if int(rows.get("total", 0)) != accepted_count:
         raise AcceptanceError(
-            f"L'import {name!r} n'est pas entièrement accepté : {imported}."
+            f"L'import {name!r} ne restitue pas toutes ses lignes normalisées : {rows}."
         )
+    if any(item.get("errors") or not item.get("normalized") for item in rows.get("items", [])):
+        raise AcceptanceError(f"L'import {name!r} contient une ligne non normalisée ou en erreur.")
     return {
         "dataset_id": dataset["id"],
         "file_id": stored["id"],
         "row_count": preview["row_count"],
-        "accepted_count": imported["accepted_count"],
+        "accepted_count": accepted_count,
         "rejected_count": imported["rejected_count"],
         "content_hash": imported["content_hash"],
+        "normalized_row_count": rows["total"],
     }
 
 
@@ -305,12 +477,7 @@ def exercise_imports(
         name="Recette — profil altimétrique",
         kind="profile",
         filename="recette-profil.csv",
-        content=(
-            "chainage_m,elevation_m\n"
-            "0,90\n"
-            "100000,72\n"
-            "200000,45\n"
-        ).encode(),
+        content=b"chainage_m,elevation_m\n0,90\n100000,72\n200000,45\n",
         media_type="text/csv",
         mapping={"chainage_m": "chainage_m", "elevation_m": "elevation_m"},
     )
@@ -322,12 +489,12 @@ def exercise_imports(
         kind="pump_curve",
         filename="recette-pompe.csv",
         content=(
-            "flow_m3_s,head_m,efficiency,power_w,npshr_m\n"
-            "0.10,235,0.68,350000,3.0\n"
-            "0.20,210,0.81,560000,4.2\n"
-            "0.30,172,0.84,760000,6.1\n"
-            "0.40,118,0.74,980000,9.4\n"
-        ).encode(),
+            b"flow_m3_s,head_m,efficiency,power_w,npshr_m\n"
+            b"0.10,235,0.68,350000,3.0\n"
+            b"0.20,210,0.81,560000,4.2\n"
+            b"0.30,172,0.84,760000,6.1\n"
+            b"0.40,118,0.74,980000,9.4\n"
+        ),
         media_type="text/csv",
         mapping={
             "flow_m3_s": "flow_m3_s",
@@ -555,28 +722,45 @@ def exercise_optimization(
 
 def build_identity(client: Client) -> dict[str, Any]:
     version = client.request("GET", "/version")
-    return {
-        key: version.get(key)
-        for key in (
-            "git_sha",
-            "git_ref",
-            "build_time",
-            "engine_version",
-            "migration_revision",
+    missing = [key for key in BUILD_IDENTITY_FIELDS if not version.get(key)]
+    if missing:
+        raise AcceptanceError(
+            "L'endpoint /version ne publie pas tous les champs de traçabilité : "
+            + ", ".join(missing)
+            + "."
         )
-        if key in version
-    }
+    return {key: version[key] for key in BUILD_IDENTITY_FIELDS}
 
 
-def compare_builds(primary: Client, secondary: Client | None) -> dict[str, Any]:
-    primary_identity = build_identity(primary)
+def verify_expected_build(client: Client, expected_git_sha: str | None) -> dict[str, Any]:
+    """Empêche d'attribuer une recette à une image qui n'est pas le candidat Git."""
+
+    identity = build_identity(client)
+    if expected_git_sha and identity["git_sha"] != expected_git_sha:
+        raise AcceptanceError(
+            "L'API cible ne sert pas le commit candidat : "
+            f"attendu {expected_git_sha}, obtenu {identity['git_sha']}."
+        )
+    return identity
+
+
+def compare_builds(
+    primary: Client,
+    secondary: Client | None,
+    *,
+    require_secondary: bool,
+) -> dict[str, Any]:
+    primary_identity = verify_expected_build(primary, expected_git_sha=None)
     if secondary is None:
+        if require_secondary:
+            raise AcceptanceError(
+                "La recette de fermeture exige une instance secondaire du même build."
+            )
         return {"status": "not_run", "primary": primary_identity}
-    secondary_identity = build_identity(secondary)
-    stable_keys = ("git_sha", "engine_version", "migration_revision")
+    secondary_identity = verify_expected_build(secondary, expected_git_sha=None)
     differences = {
         key: {"primary": primary_identity.get(key), "secondary": secondary_identity.get(key)}
-        for key in stable_keys
+        for key in STABLE_BUILD_IDENTITY_FIELDS
         if primary_identity.get(key) != secondary_identity.get(key)
     }
     if differences:
@@ -591,8 +775,11 @@ def compare_builds(primary: Client, secondary: Client | None) -> dict[str, Any]:
 def render_markdown(summary: dict[str, Any]) -> str:
     gates = summary["gates"]
     impossible = gates["impossible_scenario"]
+    scenarios = gates["scenarios"]
+    comparison = gates["comparison"]
     transfer = gates["transfer"]
     optimization = gates["optimization"]
+    outputs = gates["outputs"]
     imports = gates["imports"]
     build = gates["same_build"]
     lines = [
@@ -614,6 +801,10 @@ def render_markdown(summary: dict[str, Any]) -> str:
         "",
         "## Portes complémentaires",
         "",
+        (
+            "- Baseline et scénarios dégradés : **PASS** — "
+            + ", ".join(f"{name} : `{item['status']}`" for name, item in scenarios.items())
+        ),
         f"- 5e scénario non réalisable : **PASS** — statut `{impossible['status']}`",
         (
             "- Imports profil / pompe / barémage / propriétés : **PASS** — "
@@ -624,13 +815,20 @@ def render_markdown(summary: dict[str, Any]) -> str:
             f"{transfer['received_volume_m3']:.3f} m³ reçus, "
             f"{transfer['sample_count']} échantillons"
         ),
-        (
-            "- Bilan matière : **PASS** — résidu "
-            f"{transfer['balance_residual_m3']:.6g} m³"
-        ),
+        (f"- Bilan matière : **PASS** — résidu {transfer['balance_residual_m3']:.6g} m³"),
         (
             "- Optimisation : **PASS** — "
             f"solveur `{optimization['solver']}`, statut `{optimization['status']}`"
+        ),
+        (
+            "- Comparaison : **PASS** — "
+            f"{comparison['ranked_count']} calculs classés, recommandation "
+            f"`{comparison['recommended_calculation_id']}`"
+        ),
+        (
+            "- Note, rapports et exports : **PASS** — "
+            f"note `{outputs['calculation_note']['id']}`, "
+            f"formats {', '.join(sorted(outputs['exports']))}"
         ),
         f"- Identité local/serveur : **{build['status'].upper()}**",
         "",
@@ -650,9 +848,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--email", required=True)
     parser.add_argument("--password", required=True)
     parser.add_argument("--project-code", default=PROJECT_CODE_DEFAULT)
+    parser.add_argument(
+        "--expected-git-sha",
+        help="SHA Git exact que l'API primaire doit publier via /version.",
+    )
     parser.add_argument("--secondary-base-url")
     parser.add_argument("--secondary-email")
     parser.add_argument("--secondary-password")
+    parser.add_argument(
+        "--require-same-build",
+        action="store_true",
+        help="Échoue si aucune instance secondaire du même build n'est fournie.",
+    )
     parser.add_argument(
         "--output-dir",
         default="var/validation-vps/recette-mvp-finale",
@@ -665,6 +872,7 @@ def main() -> int:
     args = parse_args()
     client = Client(args.base_url)
     client.login(args.email, args.password)
+    primary_build = verify_expected_build(client, args.expected_git_sha)
 
     secondary: Client | None = None
     if args.secondary_base_url:
@@ -674,6 +882,11 @@ def main() -> int:
             )
         secondary = Client(args.secondary_base_url)
         secondary.login(args.secondary_email, args.secondary_password)
+    elif args.require_same_build:
+        raise AcceptanceError(
+            "--secondary-base-url, --secondary-email et --secondary-password sont requis "
+            "avec --require-same-build."
+        )
 
     organizations = page(client, "/organizations?limit=200&offset=0")
     if len(organizations) != 1:
@@ -706,14 +919,23 @@ def main() -> int:
         )
 
     validation = client.request("POST", f"/models/{model_id}/validate")
-    if validation.get("errors"):
+    if validation.get("errors") or validation.get("warnings"):
         raise AcceptanceError(
-            f"Le réseau de référence contient {len(validation['errors'])} erreur(s)."
+            "Le réseau de référence doit être sans erreur ni avertissement : "
+            f"{len(validation.get('errors') or [])} erreur(s), "
+            f"{len(validation.get('warnings') or [])} avertissement(s)."
         )
 
     scenarios = page(client, f"/models/{model_id}/scenarios?limit=200&offset=0")
     nominal = first_by(scenarios, "name", "Régime nominal")
     impossible = ensure_impossible_scenario(client, model_id, nominal, assets)
+    scenarios = page(client, f"/models/{model_id}/scenarios?limit=200&offset=0")
+    required_scenario_names = set(REQUIRED_SCENARIO_STATUSES) | {IMPOSSIBLE_SCENARIO_NAME}
+    present_scenario_names = {str(item.get("name")) for item in scenarios}
+    missing_scenarios = sorted(required_scenario_names - present_scenario_names)
+    if missing_scenarios:
+        raise AcceptanceError("Scénarios obligatoires absents : " + ", ".join(missing_scenarios))
+    scenario_calculations, scenario_results = run_required_scenarios(client, scenarios)
     impossible_calculation = run_calculation(client, impossible["id"], "impossible")
     if impossible_calculation.get("status") in CONVERGED_STATUSES:
         raise AcceptanceError(
@@ -722,6 +944,14 @@ def main() -> int:
     impossible_result = client.request(
         "GET", f"/calculations/{impossible_calculation['id']}/results"
     )
+    impossible_diagnostics = impossible_result.get("diagnostics")
+    impossible_messages = ((impossible_result.get("result") or {}).get("violations") or []) + (
+        (impossible_result.get("result") or {}).get("warnings") or []
+    )
+    if not impossible_diagnostics and not impossible_messages:
+        raise AcceptanceError(
+            "Le scénario non réalisable ne publie aucune cause exploitable de son échec."
+        )
 
     imports = exercise_imports(
         client,
@@ -739,11 +969,28 @@ def main() -> int:
         assets=assets,
     )
     optimization = exercise_optimization(client, scenario_id=nominal["id"], assets=assets)
-    same_build = compare_builds(client, secondary)
+    comparison = exercise_comparison(
+        client,
+        project_id=project["id"],
+        calculations=scenario_calculations,
+    )
+    outputs = exercise_reports_and_exports(
+        client,
+        nominal_calculation_id=scenario_calculations["Régime nominal"]["id"],
+        comparison_id=comparison["comparison_id"],
+        transfer_id=transfer["transfer_id"],
+    )
+    same_build = compare_builds(
+        client,
+        secondary,
+        require_secondary=args.require_same_build,
+    )
+    primary_build_after = verify_expected_build(client, args.expected_git_sha)
 
     summary = {
         "executed_at": datetime.now(UTC).isoformat(),
         "base_url": args.base_url,
+        "build": {"before": primary_build, "after": primary_build_after},
         "organization": {"id": organization["id"], "name": organization["name"]},
         "project": {"id": project["id"], "code": project["code"], "name": project["name"]},
         "model": {
@@ -758,9 +1005,7 @@ def main() -> int:
             "assets": len(assets),
             "pumps": pump_count,
             "tanks": len(tanks),
-            "scenarios": len(
-                page(client, f"/models/{model_id}/scenarios?limit=200&offset=0")
-            ),
+            "scenarios": len(page(client, f"/models/{model_id}/scenarios?limit=200&offset=0")),
         },
         "network_validation": {
             "errors": len(validation.get("errors") or []),
@@ -773,9 +1018,20 @@ def main() -> int:
                 "status": impossible_calculation["status"],
                 "diagnostics": impossible_result.get("diagnostics"),
             },
+            "scenarios": {
+                name: {
+                    "scenario_id": first_by(scenarios, "name", name)["id"],
+                    "calculation_id": calculation["id"],
+                    "status": calculation["status"],
+                    "result_status": scenario_results[name]["status"],
+                }
+                for name, calculation in scenario_calculations.items()
+            },
             "imports": imports,
             "transfer": transfer,
             "optimization": optimization,
+            "comparison": comparison,
+            "outputs": outputs,
             "same_build": same_build,
         },
         "manual_gate": {

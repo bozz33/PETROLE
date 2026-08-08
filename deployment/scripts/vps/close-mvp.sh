@@ -11,7 +11,7 @@
 #   PETROLE_BASE_URL        défaut : https://petrole.distesage.com/api/v1
 #   PETROLE_PROFILE         défaut : production
 #   PREPARE_REFERENCE       1 pour (re)créer REF-MVP-01, 0 sinon
-#   SECONDARY_BASE_URL      instance locale/de test servant le même build
+#   SECONDARY_BASE_URL      instance locale/de test servant le même build (obligatoire)
 #   SECONDARY_EMAIL
 #   SECONDARY_PASSWORD
 
@@ -24,6 +24,9 @@ cd "${ROOT_DIR}"
 : "${RECETTE_ENGINEER_PASSWORD:?RECETTE_ENGINEER_PASSWORD est requis}"
 : "${RECETTE_APPROVER_EMAIL:?RECETTE_APPROVER_EMAIL est requis}"
 : "${RECETTE_APPROVER_PASSWORD:?RECETTE_APPROVER_PASSWORD est requis}"
+: "${SECONDARY_BASE_URL:?SECONDARY_BASE_URL est requis par le critère D04 local/serveur}"
+: "${SECONDARY_EMAIL:?SECONDARY_EMAIL est requis avec SECONDARY_BASE_URL}"
+: "${SECONDARY_PASSWORD:?SECONDARY_PASSWORD est requis avec SECONDARY_BASE_URL}"
 
 BASE_URL="${PETROLE_BASE_URL:-https://petrole.distesage.com/api/v1}"
 PROFILE="${PETROLE_PROFILE:-production}"
@@ -59,16 +62,12 @@ RECETTE_ARGS=(
   --password "${RECETTE_ENGINEER_PASSWORD}"
   --project-code REF-MVP-01
   --output-dir "${OUTPUT_DIR}"
+  --expected-git-sha "${CANDIDATE_SHA}"
+  --require-same-build
+  --secondary-base-url "${SECONDARY_BASE_URL}"
+  --secondary-email "${SECONDARY_EMAIL}"
+  --secondary-password "${SECONDARY_PASSWORD}"
 )
-if [[ -n "${SECONDARY_BASE_URL:-}" ]]; then
-  : "${SECONDARY_EMAIL:?SECONDARY_EMAIL est requis avec SECONDARY_BASE_URL}"
-  : "${SECONDARY_PASSWORD:?SECONDARY_PASSWORD est requis avec SECONDARY_BASE_URL}"
-  RECETTE_ARGS+=(
-    --secondary-base-url "${SECONDARY_BASE_URL}"
-    --secondary-email "${SECONDARY_EMAIL}"
-    --secondary-password "${SECONDARY_PASSWORD}"
-  )
-fi
 python deployment/scripts/vps/recette_mvp_finale.py "${RECETTE_ARGS[@]}" \
   | tee "${OUTPUT_DIR}/recette.log"
 

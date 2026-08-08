@@ -86,13 +86,13 @@ Choisir une seule décision :
 
 Commentaire de décision :
 
-> 
+>
 
 ## Signature
 
-Nom :  
-Date :  
-Signature / validation électronique :  
+Nom :
+Date :
+Signature / validation électronique :
 
 ## Traçabilité à archiver avec la fiche
 

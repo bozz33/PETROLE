@@ -43,7 +43,8 @@ python deployment/scripts/vps/recette_mvp_finale.py \
   --base-url https://petrole.distesage.com/api/v1 \
   --email "$RECETTE_ENGINEER_EMAIL" \
   --password "$RECETTE_ENGINEER_PASSWORD" \
-  --project-code REF-MVP-01
+  --project-code REF-MVP-01 \
+  --expected-git-sha "$(git rev-parse HEAD)"
 ```
 
 Le script doit terminer avec un code retour nul et produire :
@@ -53,13 +54,13 @@ Le script doit terminer avec un code retour nul et produire :
 
 Il vérifie ou exécute :
 
-1. la taille et la validité topologique du dossier ;
-2. le cinquième scénario volontairement non réalisable ;
-3. les imports de profil, courbe pompe, barémage et propriétés produit ;
-4. un transfert bac-à-bac couplé à HydroLiquid ;
-5. le bilan matière du transfert ;
-6. une optimisation bornée et traçable ;
-7. facultativement, l'identité du build entre deux déploiements.
+1. le SHA exact servi par l'API, la taille et la validité topologique du dossier ;
+2. la baseline, les scénarios pompe indisponible, secours et débit réduit ;
+3. le cinquième scénario volontairement non réalisable et son diagnostic ;
+4. les imports de profil, courbe pompe, barémage et propriétés produit, avec lignage normalisé ;
+5. un transfert bac-à-bac couplé à HydroLiquid et son bilan matière ;
+6. une optimisation bornée, une comparaison persistée et une recommandation ;
+7. la note de calcul, les rapports opérationnels et les exports XLSX, CSV et JSON.
 
 ## 3. Vérifier la même version local / serveur
 
@@ -71,14 +72,16 @@ python deployment/scripts/vps/recette_mvp_finale.py \
   --base-url https://petrole.distesage.com/api/v1 \
   --email "$RECETTE_ENGINEER_EMAIL" \
   --password "$RECETTE_ENGINEER_PASSWORD" \
+  --expected-git-sha "$(git rev-parse HEAD)" \
+  --require-same-build \
   --secondary-base-url http://127.0.0.1:8000/api/v1 \
   --secondary-email "$LOCAL_ENGINEER_EMAIL" \
   --secondary-password "$LOCAL_ENGINEER_PASSWORD"
 ```
 
-La preuve minimale est l'identité du SHA Git publié par `/api/v1/version`.
-La version du noyau scientifique et la révision de migration doivent également
-être consignées dans le rapport final de qualification.
+La recette échoue si l'API primaire ne sert pas le SHA candidat, ou si les deux
+instances diffèrent sur la version applicative, le SHA Git, la version du noyau
+scientifique ou la révision de migration publiés par `/api/v1/version`.
 
 ## 4. Rejouer la qualification complète sur le SHA final
 

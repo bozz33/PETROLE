@@ -75,7 +75,7 @@ export function DonneesPage() {
   const uploadMutation = useMutation({
     mutationFn: async () => {
       if (!file) {
-        throw new Error("Sélectionnez un fichier CSV ou XLSX.");
+        throw new Error("Sélectionnez un fichier CSV, XLSX ou JSON.");
       }
       const form = new FormData();
       form.append("organization_id", organizationId);
@@ -244,10 +244,10 @@ export function DonneesPage() {
             />
           </label>
           <label className="file-field">
-            Fichier CSV ou XLSX
+            Fichier CSV, XLSX ou JSON
             <input
               type="file"
-              accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              accept=".csv,.xlsx,.json,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               required
             />

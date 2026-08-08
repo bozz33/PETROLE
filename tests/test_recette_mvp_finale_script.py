@@ -183,6 +183,35 @@ def test_verify_expected_build_refuse_un_sha_different() -> None:
         module.verify_expected_build(client, "candidate")
 
 
+def test_authenticate_client_accepte_un_jeton_injecte(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = load_script()
+    client = module.Client("https://example.test/api/v1")
+    monkeypatch.setenv("RECETTE_ACCESS_TOKEN", "short-lived-token")
+
+    module.authenticate_client(
+        client,
+        email=None,
+        password=None,
+        access_token_env="RECETTE_ACCESS_TOKEN",
+    )
+
+    assert client.token == "short-lived-token"
+
+
+def test_authenticate_client_refuse_deux_modes(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = load_script()
+    client = module.Client("https://example.test/api/v1")
+    monkeypatch.setenv("RECETTE_ACCESS_TOKEN", "short-lived-token")
+
+    with pytest.raises(module.AcceptanceError, match="incompatible"):
+        module.authenticate_client(
+            client,
+            email="engineer@example.test",
+            password="password",
+            access_token_env="RECETTE_ACCESS_TOKEN",
+        )
+
+
 def test_run_required_scenarios_rejoue_les_quatre_cas(monkeypatch: pytest.MonkeyPatch) -> None:
     module = load_script()
     scenarios = [

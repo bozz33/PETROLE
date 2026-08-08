@@ -37,6 +37,7 @@ import argparse
 import copy
 import hashlib
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -933,8 +934,15 @@ def render_markdown(summary: dict[str, Any]) -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", required=True)
-    parser.add_argument("--email", required=True)
-    parser.add_argument("--password", required=True)
+    parser.add_argument("--email")
+    parser.add_argument("--password")
+    parser.add_argument(
+        "--access-token-env",
+        help=(
+            "Nom d'une variable d'environnement contenant un jeton Bearer court. "
+            "Prévu pour l'automatisation sur un serveur ; incompatible avec --email/--password."
+        ),
+    )
     parser.add_argument("--project-code", default=PROJECT_CODE_DEFAULT)
     parser.add_argument(
         "--expected-git-sha",
@@ -943,6 +951,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--secondary-base-url")
     parser.add_argument("--secondary-email")
     parser.add_argument("--secondary-password")
+    parser.add_argument("--secondary-access-token-env")
     parser.add_argument(
         "--require-same-build",
         action="store_true",
@@ -956,24 +965,55 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def authenticate_client(
+    client: Client,
+    *,
+    email: str | None,
+    password: str | None,
+    access_token_env: str | None,
+) -> None:
+    """Authentifie par session usuelle ou jeton court injecté par le VPS."""
+
+    credentials_provided = bool(email) or bool(password)
+    if credentials_provided and (not email or not password):
+        raise AcceptanceError("--email et --password doivent être fournis ensemble.")
+    if access_token_env and credentials_provided:
+        raise AcceptanceError("--access-token-env est incompatible avec --email/--password.")
+    if access_token_env:
+        access_token = os.environ.get(access_token_env)
+        if not access_token:
+            raise AcceptanceError(f"La variable de jeton {access_token_env!r} est absente ou vide.")
+        client.token = access_token
+        return
+    if email and password:
+        client.login(email, password)
+        return
+    raise AcceptanceError("Une authentification est requise : session ou --access-token-env.")
+
+
 def main() -> int:
     args = parse_args()
     client = Client(args.base_url)
-    client.login(args.email, args.password)
+    authenticate_client(
+        client,
+        email=args.email,
+        password=args.password,
+        access_token_env=args.access_token_env,
+    )
     primary_build = verify_expected_build(client, args.expected_git_sha)
 
     secondary: Client | None = None
     if args.secondary_base_url:
-        if not args.secondary_email or not args.secondary_password:
-            raise AcceptanceError(
-                "--secondary-email et --secondary-password sont requis avec --secondary-base-url."
-            )
         secondary = Client(args.secondary_base_url)
-        secondary.login(args.secondary_email, args.secondary_password)
+        authenticate_client(
+            secondary,
+            email=args.secondary_email,
+            password=args.secondary_password,
+            access_token_env=args.secondary_access_token_env,
+        )
     elif args.require_same_build:
         raise AcceptanceError(
-            "--secondary-base-url, --secondary-email et --secondary-password sont requis "
-            "avec --require-same-build."
+            "--secondary-base-url et son authentification sont requis avec --require-same-build."
         )
 
     organizations = page(client, "/organizations?limit=200&offset=0")

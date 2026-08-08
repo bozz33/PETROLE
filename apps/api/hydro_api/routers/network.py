@@ -22,7 +22,7 @@ from hydro_api.schemas.network import (
     NetworkValidationReport,
 )
 from hydro_api.security import ApplicationAccess, DatabaseSession
-from hydro_api.services import core, network
+from hydro_api.services import core, network, topology
 
 router = APIRouter(tags=["réseau versionné"])
 
@@ -63,6 +63,46 @@ def preview_canonical_sections(
         "equipment": equipment,
         "rules": model.payload.get("rules", {"rule_set_ids": []}),
     }
+
+
+@router.get(
+    "/models/{model_id}/topology",
+    response_model=dict[str, object],
+    summary="Exporter la topologie du réseau au format JSON",
+)
+def export_topology(
+    model_id: uuid.UUID,
+    session: DatabaseSession,
+    access: ApplicationAccess,
+) -> dict[str, object]:
+    """Restitue nœuds, tronçons et équipements sous une forme réimportable."""
+
+    del access
+    model = core.get_model_version(session, model_id)
+    return topology.export_topology(session, model)
+
+
+@router.post(
+    "/models/{model_id}/topology",
+    response_model=dict[str, int],
+    status_code=status.HTTP_201_CREATED,
+    summary="Importer une topologie dans une version de modèle vide",
+)
+def import_topology(
+    model_id: uuid.UUID,
+    document: dict[str, object],
+    session: DatabaseSession,
+    access: ApplicationAccess,
+) -> dict[str, int]:
+    """Recrée un réseau exporté, sans perte, dans une version encore vide."""
+
+    model = core.get_model_version(session, model_id)
+    return topology.import_topology(
+        session,
+        model,
+        dict(document),
+        actor_id=access.user_id,
+    )
 
 
 @router.post(

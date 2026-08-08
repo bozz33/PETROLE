@@ -11,16 +11,29 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import type { NetworkEdge, NetworkNode, NetworkValidationIssue } from "@/types";
+import type {
+  AssetInstance,
+  NetworkEdge,
+  NetworkNode,
+  NetworkValidationIssue,
+} from "@/types";
 
 interface NetworkCanvasProps {
   nodes: NetworkNode[];
   edges: NetworkEdge[];
+  /**
+   * Équipements posés sur le réseau. Le cahier des charges exige que pompes,
+   * vannes, clapets, filtres et instruments soient visibles sur le schéma : les
+   * afficher uniquement dans les tableaux ne suffit pas.
+   */
+  assets?: AssetInstance[];
   interactive?: boolean;
-  /** Anomalies du rapport de validation, signalées directement sur le schéma. */
-  issues?: NetworkValidationIssue[];
+  /** Anomalies bloquantes du rapport de validation, signalées sur le schéma. */
+  errors?: NetworkValidationIssue[];
+  /** Réserves non bloquantes du rapport de validation. */
+  warnings?: NetworkValidationIssue[];
   selectedId?: string | null;
-  onSelect?: (selection: { kind: "node" | "edge"; id: string } | null) => void;
+  onSelect?: (selection: { kind: "node" | "edge" | "asset"; id: string } | null) => void;
   /** Persiste la position d'un nœud déplacé à la souris. */
   onMoveNode?: (nodeId: string, position: { x: number; y: number }) => void;
 }
@@ -35,6 +48,16 @@ const NODE_COLORS: Record<NetworkNode["kind"], string> = {
   offtake: "#A96800",
 };
 
+/** Couleur d'un équipement selon son rôle dans l'exploitation. */
+const ASSET_COLORS: Record<AssetInstance["role"], string> = {
+  main: "#12695A",
+  standby: "#4E7F76",
+  auxiliary: "#6B7C86",
+  isolation: "#8A5A2B",
+  control: "#2F6FED",
+  measurement: "#7A4FA3",
+};
+
 const ERROR_COLOR = "#A43A34";
 const WARNING_COLOR = "#B8770B";
 
@@ -45,7 +68,7 @@ const WARNING_COLOR = "#B8770B";
  * placé selon son rang dans le chaînage, ce qui donne un tracé lisible d'amont
  * en aval au lieu d'un ordre de création arbitraire.
  */
-function layoutPosition(
+export function layoutPosition(
   node: NetworkNode,
   rank: number,
 ): { x: number; y: number } {
@@ -58,7 +81,7 @@ function layoutPosition(
 }
 
 /** Classe les nœuds d'amont en aval en suivant les tronçons. */
-function chainRanks(nodes: NetworkNode[], edges: NetworkEdge[]): Map<string, number> {
+export function chainRanks(nodes: NetworkNode[], edges: NetworkEdge[]): Map<string, number> {
   const ordered = [...edges].sort((a, b) => a.sequence - b.sequence);
   const ranks = new Map<string, number>();
   let cursor = 0;
@@ -81,25 +104,38 @@ function chainRanks(nodes: NetworkNode[], edges: NetworkEdge[]): Map<string, num
   return ranks;
 }
 
+/** Associe chaque objet à la sévérité la plus forte le concernant. */
+export function severityMap(
+  errors: NetworkValidationIssue[],
+  warnings: NetworkValidationIssue[],
+): Map<string, "error" | "warning"> {
+  const map = new Map<string, "error" | "warning">();
+  for (const issue of warnings) {
+    if (issue.object_id) {
+      map.set(issue.object_id, "warning");
+    }
+  }
+  // Une erreur prime toujours sur un avertissement portant sur le même objet.
+  for (const issue of errors) {
+    if (issue.object_id) {
+      map.set(issue.object_id, "error");
+    }
+  }
+  return map;
+}
+
 export function NetworkCanvas({
   nodes,
   edges,
+  assets = [],
   interactive = false,
-  issues = [],
+  errors = [],
+  warnings = [],
   selectedId = null,
   onSelect,
   onMoveNode,
 }: NetworkCanvasProps) {
-  const severityByObject = useMemo(() => {
-    const map = new Map<string, "error" | "warning">();
-    for (const issue of issues) {
-      const current = map.get(issue.object_id);
-      if (issue.severity === "error" || current !== "error") {
-        map.set(issue.object_id, issue.severity === "error" ? "error" : "warning");
-      }
-    }
-    return map;
-  }, [issues]);
+  const severityByObject = useMemo(() => severityMap(errors, warnings), [errors, warnings]);
 
   const ranks = useMemo(() => chainRanks(nodes, edges), [nodes, edges]);
 
@@ -135,6 +171,74 @@ export function NetworkCanvas({
         };
       }),
     [nodes, ranks, selectedId, severityByObject],
+  );
+
+  /**
+   * Les équipements sont rattachés visuellement à leur support : un nœud pour
+   * une pompe de station, un tronçon pour une vanne de ligne. Ils sont disposés
+   * en éventail sous ce support afin de rester lisibles quand plusieurs
+   * équipements partagent le même emplacement.
+   */
+  const assetNodes = useMemo<Node[]>(() => {
+    const perHost = new Map<string, number>();
+    return assets.map((asset) => {
+      const hostId = asset.node_id ?? asset.edge_id ?? "";
+      const rank = perHost.get(hostId) ?? 0;
+      perHost.set(hostId, rank + 1);
+
+      const hostNode = asset.node_id ? nodes.find((item) => item.id === asset.node_id) : null;
+      const hostEdge = asset.edge_id ? edges.find((item) => item.id === asset.edge_id) : null;
+      const anchorRank = hostNode
+        ? (ranks.get(hostNode.id) ?? 0)
+        : hostEdge
+          ? (ranks.get(hostEdge.from_node_id) ?? 0) + 0.5
+          : 0;
+      const anchor = hostNode
+        ? layoutPosition(hostNode, ranks.get(hostNode.id) ?? 0)
+        : { x: 60 + anchorRank * 210, y: 120 };
+
+      const severity = severityByObject.get(asset.id);
+      const selected = asset.id === selectedId;
+      return {
+        id: asset.id,
+        type: "default",
+        position: { x: anchor.x + rank * 26, y: anchor.y + 118 + rank * 46 },
+        selected,
+        draggable: false,
+        connectable: false,
+        data: { label: `${asset.code}` },
+        style: {
+          minWidth: 96,
+          padding: "4px 8px",
+          color: "#ffffff",
+          background: ASSET_COLORS[asset.role],
+          border: severity
+            ? `2px solid ${severity === "error" ? ERROR_COLOR : WARNING_COLOR}`
+            : selected
+              ? "2px solid #F2A516"
+              : "1px dashed rgba(255,255,255,.35)",
+          borderRadius: 8,
+          fontSize: 10,
+          fontWeight: 700,
+          opacity: asset.status === "available" ? 1 : 0.5,
+        },
+      };
+    });
+  }, [assets, edges, nodes, ranks, selectedId, severityByObject]);
+
+  /** Rattache chaque équipement à son support par un trait discret. */
+  const assetLinks = useMemo<Edge[]>(
+    () =>
+      assets
+        .filter((asset) => asset.node_id !== null)
+        .map((asset) => ({
+          id: `lien-${asset.id}`,
+          source: asset.node_id as string,
+          target: asset.id,
+          selectable: false,
+          style: { stroke: "#9BB0B8", strokeWidth: 1.4, strokeDasharray: "4 4" },
+        })),
+    [assets],
   );
 
   const flowEdges = useMemo<Edge[]>(
@@ -189,15 +293,20 @@ export function NetworkCanvas({
   return (
     <div className="h-[520px] overflow-hidden rounded-xl border bg-card">
       <ReactFlow
-        nodes={flowNodes}
-        edges={flowEdges}
+        nodes={[...flowNodes, ...assetNodes]}
+        edges={[...flowEdges, ...assetLinks]}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         nodesDraggable={interactive}
         nodesConnectable={false}
         elementsSelectable
         onNodesChange={interactive ? handleNodesChange : undefined}
-        onNodeClick={(_, node) => onSelect?.({ kind: "node", id: node.id })}
+        onNodeClick={(_, node) =>
+          onSelect?.({
+            kind: assets.some((asset) => asset.id === node.id) ? "asset" : "node",
+            id: node.id,
+          })
+        }
         onEdgeClick={(_, edge) => onSelect?.({ kind: "edge", id: edge.id })}
         onPaneClick={() => onSelect?.(null)}
         minZoom={0.25}

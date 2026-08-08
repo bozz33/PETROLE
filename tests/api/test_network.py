@@ -451,3 +451,78 @@ def test_schema_openapi_expose_reseau_normalise(api_client) -> None:
     assert "/api/v1/models/{model_id}/validate" in paths
     assert "/api/v1/models/{model_id}/clone" in paths
     assert "/api/v1/models/{model_id}/canonical-sections" in paths
+
+
+def test_aller_retour_json_de_la_topologie_est_sans_perte(api_client) -> None:
+    """Un réseau exporté puis réimporté doit redonner exactement le même réseau.
+
+    Le format d'échange relie les objets par leurs codes métier : un import ne
+    doit dépendre d'aucun identifiant technique, qui change à chaque création.
+    """
+
+    client = api_client
+    organization, model = create_model(client)
+    source = create_node(client, model["id"], code="ND-S", kind="source", elevation_m=120.0)
+    station = create_node(client, model["id"], code="ND-P", kind="station", elevation_m=80.0)
+    terminal = create_node(client, model["id"], code="ND-T", kind="terminal", elevation_m=40.0)
+    create_edge(client, model["id"], code="TR-1", sequence=1, start=source, end=station)
+    create_edge(client, model["id"], code="TR-2", sequence=2, start=station, end=terminal)
+
+    pump = create_approved_pump(client, organization["id"])
+    placement = client.post(
+        f"/api/v1/models/{model['id']}/assets",
+        json={
+            "catalog_item_id": pump["id"],
+            "node_id": station["id"],
+            "code": "P-101",
+            "name": "Pompe principale",
+            "role": "main",
+        },
+    )
+    assert placement.status_code == 201, placement.text
+
+    exported = client.get(f"/api/v1/models/{model['id']}/topology")
+    assert exported.status_code == 200, exported.text
+    document = exported.json()
+    assert document["schema_version"] == "hydro-topology/1"
+    assert len(document["nodes"]) == 3
+    assert len(document["edges"]) == 2
+    assert len(document["assets"]) == 1
+
+    target = client.post(
+        f"/api/v1/projects/{model['project_id']}/models",
+        json={"name": "Réseau réimporté", "payload": model["payload"]},
+    )
+    assert target.status_code == 201, target.text
+
+    imported = client.post(f"/api/v1/models/{target.json()['id']}/topology", json=document)
+    assert imported.status_code == 201, imported.text
+    assert imported.json() == {"nodes": 3, "edges": 2, "assets": 1}
+
+    reexported = client.get(f"/api/v1/models/{target.json()['id']}/topology")
+    assert reexported.status_code == 200, reexported.text
+    assert reexported.json() == document
+
+
+def test_import_de_topologie_refuse_un_modele_deja_peuple(api_client) -> None:
+    client = api_client
+    _, model = create_model(client)
+    create_node(client, model["id"], code="ND-A", kind="source", elevation_m=10.0)
+
+    document = client.get(f"/api/v1/models/{model['id']}/topology").json()
+    response = client.post(f"/api/v1/models/{model['id']}/topology", json=document)
+
+    assert response.status_code == 409, response.text
+    assert "déjà un réseau" in response.json()["detail"]
+
+
+def test_import_de_topologie_refuse_un_format_inconnu(api_client) -> None:
+    client = api_client
+    _, model = create_model(client)
+
+    response = client.post(
+        f"/api/v1/models/{model['id']}/topology",
+        json={"schema_version": "hydro-topology/99", "nodes": [], "edges": [], "assets": []},
+    )
+
+    assert response.status_code == 409, response.text

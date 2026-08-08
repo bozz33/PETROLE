@@ -163,6 +163,13 @@ async function installApiMock(page: Page): Promise<void> {
       [`/projects/${project.id}/models`]: pageOf([model]),
       [`/models/${model.id}/nodes`]: pageOf(nodes),
       [`/models/${model.id}/edges`]: pageOf(edges),
+      [`/models/${model.id}/assets`]: pageOf([]),
+      [`/models/${model.id}/validate`]: {
+        model_version_id: model.id,
+        valid: true,
+        errors: [],
+        warnings: [],
+      },
     };
 
     if (path in fixtures) {

@@ -79,6 +79,10 @@ async function installPlatformMock(page: Page): Promise<void> {
       return;
     }
 
+    if (path.endsWith("/validate")) {
+      await respond(route, { model_version_id: "test", valid: true, errors: [], warnings: [] });
+      return;
+    }
     await respond(route, route.request().method() === "GET" ? pageOf() : {});
   });
 }

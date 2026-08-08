@@ -1,15 +1,22 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { OrganizationField } from "../components/OrganizationField";
-import { apiRequest } from "@/api";
+import { apiRequest, jsonBody } from "@/api";
 import { PipelineMap } from "@/components/maps/PipelineMap";
 import { EmptyState, ErrorNotice, Panel, StatusBadge } from "@/components/Shell";
+import {
+  ElementInspector,
+  type EdgePatch,
+  type NodePatch,
+} from "@/features/network-editor/ElementInspector";
 import { NetworkCanvas } from "@/features/network-editor/NetworkCanvas";
 import type {
   ModelVersion,
   NetworkEdge,
   NetworkNode,
+  AssetInstance,
+  NetworkValidationReport,
   Page,
   Project,
 } from "@/types";
@@ -21,6 +28,11 @@ export function VisualisationReseauPage() {
   const [projectId, setProjectId] = useState("");
   const [modelId, setModelId] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("schema");
+  const [selection, setSelection] = useState<{
+    kind: "node" | "edge" | "asset";
+    id: string;
+  } | null>(null);
+  const queryClient = useQueryClient();
 
   const projectsQuery = useQuery({
     queryKey: ["projects", organizationId],
@@ -49,10 +61,51 @@ export function VisualisationReseauPage() {
     enabled: Boolean(modelId),
   });
 
+  const assetsQuery = useQuery({
+    queryKey: ["network-assets", modelId],
+    queryFn: () =>
+      apiRequest<Page<AssetInstance>>(`/models/${modelId}/assets?limit=2000&offset=0`),
+    enabled: Boolean(modelId),
+  });
+
+  const validationQuery = useQuery({
+    queryKey: ["network-validation", modelId],
+    queryFn: () =>
+      apiRequest<NetworkValidationReport>(`/models/${modelId}/validate`, { method: "POST" }),
+    enabled: Boolean(modelId),
+  });
+
+  const invalidateNetwork = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["network-nodes", modelId] }),
+      queryClient.invalidateQueries({ queryKey: ["network-edges", modelId] }),
+      queryClient.invalidateQueries({ queryKey: ["network-validation", modelId] }),
+    ]);
+  };
+
+  const nodePatchMutation = useMutation({
+    mutationFn: ({ nodeId, patch }: { nodeId: string; patch: NodePatch }) =>
+      apiRequest<NetworkNode>(`/nodes/${nodeId}`, {
+        method: "PATCH",
+        body: jsonBody(patch),
+      }),
+    onSuccess: invalidateNetwork,
+  });
+
+  const edgePatchMutation = useMutation({
+    mutationFn: ({ edgeId, patch }: { edgeId: string; patch: EdgePatch }) =>
+      apiRequest<NetworkEdge>(`/edges/${edgeId}`, {
+        method: "PATCH",
+        body: jsonBody(patch),
+      }),
+    onSuccess: invalidateNetwork,
+  });
+
   const projects = projectsQuery.data?.items ?? [];
   const models = modelsQuery.data?.items ?? [];
   const nodes = nodesQuery.data?.items ?? [];
   const edges = edgesQuery.data?.items ?? [];
+  const assets = assetsQuery.data?.items ?? [];
   const selectedModel = models.find((model) => model.id === modelId);
   const mapPoints = nodes
     .filter(
@@ -78,11 +131,25 @@ export function VisualisationReseauPage() {
     }
   }, [modelId, models]);
 
+  const editable = selectedModel?.status === "draft";
+  const validationErrors = validationQuery.data?.errors ?? [];
+  const validationWarnings = validationQuery.data?.warnings ?? [];
+  const issues = [...validationErrors, ...validationWarnings];
+  const selectedNode =
+    selection?.kind === "node" ? (nodes.find((item) => item.id === selection.id) ?? null) : null;
+  const selectedEdge =
+    selection?.kind === "edge" ? (edges.find((item) => item.id === selection.id) ?? null) : null;
+  const selectedAsset =
+    selection?.kind === "asset" ? (assets.find((item) => item.id === selection.id) ?? null) : null;
+
   const error =
     projectsQuery.error ??
     modelsQuery.error ??
     nodesQuery.error ??
-    edgesQuery.error;
+    edgesQuery.error ??
+    assetsQuery.error ??
+    nodePatchMutation.error ??
+    edgePatchMutation.error;
 
   if (error) {
     return <ErrorNotice error={error} />;
@@ -152,7 +219,30 @@ export function VisualisationReseauPage() {
       >
         {viewMode === "schema" ? (
           nodes.length ? (
-            <NetworkCanvas nodes={nodes} edges={edges} />
+            <NetworkCanvas
+              nodes={nodes}
+              edges={edges}
+              assets={assets}
+              interactive={editable}
+              errors={validationErrors}
+              warnings={validationWarnings}
+              selectedId={selection?.id ?? null}
+              onSelect={setSelection}
+              onMoveNode={(nodeId, position) =>
+                nodePatchMutation.mutate({
+                  nodeId,
+                  patch: {
+                    payload: {
+                      ...((nodes.find((item) => item.id === nodeId)?.payload ?? {}) as Record<
+                        string,
+                        unknown
+                      >),
+                      layout: position,
+                    },
+                  } as NodePatch,
+                })
+              }
+            />
           ) : (
             <EmptyState
               title="Réseau non disponible"
@@ -169,6 +259,64 @@ export function VisualisationReseauPage() {
         )}
       </Panel>
 
+      {issues.length ? (
+        <Panel
+          title="Anomalies du réseau"
+          description="Cliquez une anomalie pour sélectionner l'objet concerné sur le schéma."
+        >
+          <ul className="issue-list negative">
+            {issues.map((issue) => (
+              <li key={`${issue.code}-${issue.object_id ?? "modele"}-${issue.message}`}>
+                <strong>{issue.code}</strong>
+                <span>
+                  {issue.object_id ? (
+                    <button
+                      type="button"
+                      className="button button-ghost"
+                      onClick={() => {
+                        const objectId = issue.object_id;
+                        if (!objectId) {
+                          return;
+                        }
+                        if (nodes.some((item) => item.id === objectId)) {
+                          setSelection({ kind: "node", id: objectId });
+                        } else if (edges.some((item) => item.id === objectId)) {
+                          setSelection({ kind: "edge", id: objectId });
+                        } else if (assets.some((item) => item.id === objectId)) {
+                          setSelection({ kind: "asset", id: objectId });
+                        }
+                        setViewMode("schema");
+                      }}
+                    >
+                      {issue.message}
+                    </button>
+                  ) : (
+                    issue.message
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      ) : null}
+
+      <Panel
+        title="Propriétés de l'élément"
+        description="Sélectionnez un nœud ou un tronçon du schéma pour l'inspecter et l'ajuster."
+      >
+        <ElementInspector
+          node={selectedNode}
+          edge={selectedEdge}
+          asset={selectedAsset}
+          nodes={nodes}
+          issues={issues}
+          editable={editable}
+          pending={nodePatchMutation.isPending || edgePatchMutation.isPending}
+          onPatchNode={(nodeId, patch) => nodePatchMutation.mutate({ nodeId, patch })}
+          onPatchEdge={(edgeId, patch) => edgePatchMutation.mutate({ edgeId, patch })}
+        />
+      </Panel>
+
       <div className="resource-summary">
         <div>
           <span>Nœuds</span>
@@ -179,8 +327,20 @@ export function VisualisationReseauPage() {
           <strong>{edges.length}</strong>
         </div>
         <div>
+          <span>Équipements placés</span>
+          <strong>{assets.length}</strong>
+        </div>
+        <div>
           <span>Nœuds géolocalisés</span>
           <strong>{mapPoints.length}</strong>
+        </div>
+        <div>
+          <span>Anomalies détectées</span>
+          <strong>
+            {validationQuery.data
+              ? `${validationErrors.length} erreur(s) · ${validationWarnings.length} avertissement(s)`
+              : "—"}
+          </strong>
         </div>
         <div>
           <span>Longueur cumulée</span>

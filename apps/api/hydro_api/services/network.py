@@ -114,7 +114,7 @@ def get_asset_instance(session: Session, asset_id: uuid.UUID) -> AssetInstance:
     return asset
 
 
-def _model_components(
+def model_components(
     session: Session,
     model_id: uuid.UUID,
 ) -> tuple[list[NetworkNode], list[NetworkEdge], list[AssetInstance]]:
@@ -147,7 +147,7 @@ def _model_components(
 def refresh_model_hash(session: Session, model: ModelVersion) -> str:
     """Inclut réseau et équipements dans l'empreinte de la version."""
 
-    nodes, edges, assets = _model_components(session, model.id)
+    nodes, edges, assets = model_components(session, model.id)
     node_codes = {node.id: node.code for node in nodes}
     edge_codes = {edge.id: edge.code for edge in edges}
     model.content_hash = sha256_of(
@@ -226,7 +226,7 @@ def clone_model_version(
             payload=deepcopy(source.payload),
         ),
     )
-    nodes, edges, assets = _model_components(session, source.id)
+    nodes, edges, assets = model_components(session, source.id)
     scenarios = list(
         session.scalars(
             select(ScenarioRecord)
@@ -751,7 +751,7 @@ def validate_network(session: Session, model_id: uuid.UUID) -> NetworkValidation
     """Contrôle topologie, profils, stations et références de catalogue."""
 
     model = _get_model(session, model_id)
-    nodes, edges, assets = _model_components(session, model_id)
+    nodes, edges, assets = model_components(session, model_id)
     errors: list[NetworkValidationIssue] = []
     warnings: list[NetworkValidationIssue] = []
 
@@ -1078,7 +1078,7 @@ def canonical_sections_from_normalized(
             model_version_id=str(model.id),
             errors=[issue.model_dump(mode="json") for issue in validation.errors],
         )
-    nodes, edges, assets = _model_components(session, model.id)
+    nodes, edges, assets = model_components(session, model.id)
     ordered_edges = sorted(edges, key=lambda item: item.sequence)
     node_by_id = {node.id: node for node in nodes}
     fluid_id = uuid.UUID(str(model.payload["fluid_catalog_item_id"]))
@@ -1293,6 +1293,7 @@ __all__ = [
     "list_asset_instances",
     "list_network_edges",
     "list_network_nodes",
+    "model_components",
     "refresh_model_hash",
     "update_asset_instance",
     "update_network_edge",

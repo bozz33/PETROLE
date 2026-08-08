@@ -31,10 +31,12 @@ ingénieur métier extérieur à l'équipe reste la dernière porte ouverte.
 | Restauration sur base jetable | **35 tables**, tête `9f3b6e0d5c17` |
 | HTTPS public `ready` | HTTP 200 |
 
-L'empreinte scientifique est **inchangée** depuis la campagne du 7 août : la
-refonte du transfert, l'ajout de la voie Pyomo et l'approbation des calculs
-n'ont modifié aucun résultat physique. C'est la propriété que l'empreinte
-reproductible sert précisément à démontrer.
+L'empreinte scientifique est **inchangée** depuis la campagne du 7 août : les
+41 cas couverts par l'attestation produisent exactement les mêmes valeurs. Cela
+démontre que ces cas n'ont pas été affectés par la refonte du transfert, la voie
+Pyomo ni l'approbation des calculs. Cela ne permet pas d'en conclure que tout
+résultat produit par les nouveaux chemins est inchangé : ces chemins sont
+couverts par leurs propres tests, pas par l'attestation.
 
 ## Avertissements ZAP retenus
 
@@ -46,7 +48,7 @@ ne révèle de donnée métier. Ils sont conservés tels quels plutôt que masqu
 
 ## Schéma de base
 
-Quatre migrations ont été appliquées depuis la version précédente :
+Trois migrations ont été appliquées depuis la version précédente :
 
 | Révision | Objet |
 |---|---|

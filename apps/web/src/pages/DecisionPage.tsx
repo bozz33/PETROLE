@@ -288,6 +288,7 @@ export function DecisionPage() {
               Objectif
               <select value={objective} onChange={(event) => setObjective(event.target.value)}>
                 <option value="min_energy">Énergie minimale</option>
+                <option value="min_cost">Coût minimal</option>
                 <option value="min_pump_count">Nombre de pompes minimal</option>
                 <option value="min_starts">Démarrages minimaux</option>
                 <option value="max_flow">Débit maximal</option>

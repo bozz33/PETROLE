@@ -97,10 +97,52 @@ mainteneur, le script s'arrête en signalant que les artefacts ne sont pas sign�
 Générer une clé engage une identité et relève d'une décision humaine. Le tag
 `v0.2.0-rc.1` n'est pas signé ; une release destinée à un tiers devra l'être.
 
+## Parcours métier sur le dossier de référence
+
+Le cas de réception exigé par le cahier des charges a été monté sur l'instance
+de production, uniquement par les interfaces publiques, et déroulé de bout en
+bout avec les deux comptes de recette.
+
+| Étape | Résultat |
+|---|---|
+| Réseau | 101 nœuds, 100 tronçons, 5 stations, 15 pompes, 10 bacs |
+| Validation du réseau | **0 erreur, 0 avertissement** |
+| Régime nominal | `SIM_CONVERGED`, 900 m³/h, **1,8 s** |
+| Pompe indisponible | `SIM_CONVERGED_WARN` — dégradation signalée |
+| Marche en secours | `SIM_CONVERGED` — la redondance rétablit le service |
+| Débit réduit | `SIM_CONVERGED` |
+| Comparaison | 3 calculs classés |
+| Rapport | généré, empreinte `sha256:19439b96…` |
+| Décision de l'approbateur | **approuvée** |
+
+Trois défauts ont été trouvés par ce parcours et corrigés :
+
+1. **Optimisation en expiration de passerelle.** Chaque évaluation étant un
+   calcul hydraulique complet, une recherche large dépassait le délai d'attente
+   d'une requête HTTP. L'exploration est bornée par défaut ; la même requête
+   répond désormais en moins de quatre secondes et le résultat signale une
+   exploration incomplète au lieu de laisser croire à un optimum global.
+2. **Jeu de référence hydrauliquement incohérent.** Les premiers essais
+   descendaient sous la pression de vapeur, puis dépassaient la pression maximale
+   admissible. Le moteur signalait correctement les deux situations ; c'est le
+   dimensionnement du cas qui était fautif, et il a été repris.
+3. **Règle visant une métrique absente.** Une règle portant sur un champ non
+   publié produisait une évaluation en erreur, donc une conformité indéterminée
+   bloquant toute décision. Le comportement est correct ; le jeu de règles a été
+   corrigé.
+
+Ce parcours **ne remplace pas la recette métier** : il fournit à l'ingénieur un
+dossier complet, reproductible et déjà exécuté, qu'il lui revient d'examiner,
+de contester et d'accepter ou non.
+
 ## Ce qui reste ouvert
 
-- **Recette métier** — aucun ingénieur extérieur à l'équipe n'a déroulé le
-  parcours complet. La définition du MVP l'exige explicitement.
+- **Recette métier** — aucun ingénieur extérieur à l'équipe n'a examiné ni
+  accepté le dossier de référence. La définition du MVP l'exige explicitement, et
+  aucune exécution automatisée ne peut en tenir lieu.
+- **Optimisation de grande ampleur** — l'exploration reste synchrone. Une
+  recherche large suppose de relever la borne et d'accepter une réponse lente ;
+  une exécution en tâche de fond, comme pour les calculs, reste à faire.
 - **Données réelles** — aucune courbe constructeur, table de jaugeage certifiée
   ni analyse laboratoire n'est chargée.
 - **Conformité normative** — la matrice clause par clause n'est pas établie ; la

@@ -22,6 +22,13 @@ def test_qualification_execute_une_sauvegarde_et_sa_restauration() -> None:
     assert '"${preuves}/backup-restore.json"' in script
 
 
+def test_sauvegarde_redemarre_aussi_le_proxy_web() -> None:
+    script = (ROOT / "deployment/scripts/vps/backup.sh").read_text()
+
+    assert "for service in api worker minio web; do" in script
+    assert "l'ancienne adresse du conteneur" in script
+
+
 def test_timer_de_sauvegarde_est_quotidien_et_persistant() -> None:
     timer = (ROOT / "deployment/systemd/petrole-backup.timer").read_text()
     service = (ROOT / "deployment/systemd/petrole-backup.service").read_text()

@@ -27,7 +27,10 @@ if [[ -z "${conteneur_postgres}" || -z "${conteneur_minio}" ]]; then
 fi
 
 services_a_redemarrer=()
-for service in api worker minio; do
+# Le proxy nginx interne résout l'adresse Docker de l'API au démarrage. Il doit
+# donc être redémarré avec l'API après un snapshot cohérent, sinon il conserverait
+# l'ancienne adresse du conteneur et servirait des 502 jusqu'au prochain restart.
+for service in api worker minio web; do
     conteneur="$(compose_vps ps --quiet "${service}")"
     if [[ -n "${conteneur}" ]]; then
         services_a_redemarrer+=("${service}")

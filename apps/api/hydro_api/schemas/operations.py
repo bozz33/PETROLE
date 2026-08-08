@@ -282,7 +282,19 @@ class OptimizationCreate(BaseModel):
     energy_price_per_kwh: float | None = Field(default=None, ge=0)
     constraints: OptimizationConstraintsInput = Field(default_factory=OptimizationConstraintsInput)
     maximum_configurations: int = Field(default=100_000, ge=1, le=1_000_000)
-    maximum_evaluations: int | None = Field(default=None, ge=1, le=1_000_000)
+    maximum_evaluations: int | None = Field(
+        default=25,
+        ge=1,
+        le=1_000_000,
+        description=(
+            "Nombre maximal de configurations réellement simulées. Chaque évaluation "
+            "est un calcul hydraulique complet : sur un réseau de cent tronçons, une "
+            "évaluation prend environ deux secondes, si bien qu'une recherche large "
+            "dépasse le délai d'attente d'une requête HTTP. La valeur par défaut tient "
+            "dans ce délai ; l'augmenter suppose d'accepter une réponse plus lente. "
+            "Une valeur nulle lève la borne, au risque d'une expiration côté client."
+        ),
+    )
     solver: Literal["enumeration", "pyomo"] = Field(
         default="enumeration",
         description=(

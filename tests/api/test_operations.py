@@ -814,3 +814,35 @@ def test_approbation_du_calcul_est_distincte_de_celle_du_rapport(operations_clie
         json={"decision": "rejected", "comment": "Changement d'avis."},
     )
     assert replay.status_code == 409, replay.text
+
+
+def test_optimisation_borne_les_evaluations_par_defaut(operations_client) -> None:
+    """Chaque évaluation est une simulation complète : la recherche doit être bornée.
+
+    Sans borne par défaut, une optimisation lancée sur un grand réseau ne rend
+    jamais la main. Le résultat signale alors une exploration incomplète plutôt
+    que de laisser croire à un optimum global.
+    """
+
+    organization = _organization(operations_client, slug="exploitant-bornes")
+    project = _project(operations_client, organization["id"])
+    canonical = entree_canonique(
+        conduite=pipeline(stations=(station_serie(nombre_de_pompes=3),)),
+        cas=scenario(imposed_flow_m3_s=0.15, inlet_pressure_pa=5_000_000.0),
+    ).payload()
+    scenario_record, _ = _calculation(operations_client, project["id"], canonical, "BORNE")
+
+    response = operations_client.post(
+        f"/api/v1/scenarios/{scenario_record['id']}/optimizations",
+        headers={"Idempotency-Key": "optimisation-bornee"},
+        json={
+            "objective": "min_energy",
+            "speed_options": [0.8, 0.9, 1.0],
+            "maximum_evaluations": 4,
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    payload = response.json()["result_payload"]
+    assert payload["evaluated_count"] <= 4
+    assert payload["complete"] is False

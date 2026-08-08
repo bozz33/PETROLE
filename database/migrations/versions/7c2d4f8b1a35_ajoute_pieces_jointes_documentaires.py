@@ -28,9 +28,7 @@ def upgrade() -> None:
     )
     op.add_column("files", sa.Column("project_id", sa.Uuid(as_uuid=True), nullable=True))
     op.add_column("files", sa.Column("description", sa.String(length=1_000), nullable=True))
-    op.create_check_constraint(
-        "purpose_valid", "files", "purpose IN ('dataset', 'document')"
-    )
+    op.create_check_constraint("purpose_valid", "files", "purpose IN ('dataset', 'document')")
     op.create_foreign_key(
         "fk_files_project",
         "files",

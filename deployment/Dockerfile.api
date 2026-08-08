@@ -75,6 +75,11 @@ RUN pip install /tmp/wheels/* \
 # Le WORKDIR /workspace correspond à la racine attendue par script_location.
 COPY alembic.ini ./
 COPY database ./database
+# Les fichiers de migration proviennent parfois d'un répertoire de travail
+# restreint au propriétaire. Alembic est lancé par l'utilisateur non privilégié
+# ``hydro`` lors du déploiement : rendre le code de migration lisible dans
+# l'image évite d'élever ses droits ou d'exécuter la migration en root.
+RUN chmod -R a+rX database
 
 USER hydro
 

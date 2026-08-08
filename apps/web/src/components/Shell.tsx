@@ -159,7 +159,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   },
   "/donnees": {
     title: "Données et imports",
-    subtitle: "Contrôler, mapper et normaliser les fichiers CSV ou XLSX.",
+    subtitle: "Contrôler, mapper et normaliser les fichiers CSV, XLSX ou JSON.",
   },
   "/rapports": {
     title: "Rapports",

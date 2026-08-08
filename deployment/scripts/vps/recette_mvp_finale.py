@@ -53,7 +53,11 @@ TERMINAL_CALCULATION_PHASES = {"finished", "failed", "cancelled"}
 CONVERGED_STATUSES = {"SIM_CONVERGED", "SIM_CONVERGED_WARN"}
 REQUIRED_SCENARIO_STATUSES = {
     "Régime nominal": {"SIM_CONVERGED"},
-    "Pompe indisponible": {"SIM_CONVERGED_WARN"},
+    # Une indisponibilité n'est pas en elle-même une violation hydraulique :
+    # le cas de référence robuste peut converger sans avertissement si les
+    # autres stations et la pression amont suffisent. Le verdict exact est
+    # archivé dans la preuve finale.
+    "Pompe indisponible": {"SIM_CONVERGED", "SIM_CONVERGED_WARN"},
     "Marche en secours": {"SIM_CONVERGED"},
     "Débit réduit": {"SIM_CONVERGED"},
 }

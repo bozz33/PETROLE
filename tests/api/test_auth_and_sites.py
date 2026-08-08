@@ -419,3 +419,54 @@ def test_sites_et_coherence_avec_les_projets(secured_api) -> None:
     )
     assert archived.status_code == 200
     assert archived.json()["status"] == "archived"
+
+
+def test_lecture_des_membres_resiste_a_une_adresse_heritee(secured_api) -> None:
+    """Une adresse persistée hors API ne doit pas rendre la liste illisible.
+
+    La validation stricte s'applique à l'écriture. En lecture, une donnée déjà
+    en base — migration, reprise, script d'exploitation — doit être restituée
+    plutôt que de provoquer une erreur serveur sur une simple consultation.
+    """
+
+    from hydro_api.models import OrganizationMembership, UserAccount
+    from hydro_api.services.auth import hash_password
+
+    client, session_factory = secured_api
+    bootstrap = client.post(
+        "/api/v1/auth/bootstrap",
+        json={
+            "email": "administrateur@exploitant.example",
+            "full_name": "Administrateur",
+            "password": "MotDePasseSolide2026",
+            "organization_name": "Exploitant héritage",
+            "organization_slug": "exploitant-heritage",
+        },
+    )
+    assert bootstrap.status_code == 201, bootstrap.text
+    headers = _headers(bootstrap.json()["access_token"])
+    organization_id = bootstrap.json()["user"]["memberships"][0]["organization_id"]
+
+    with session_factory() as session:
+        legacy = UserAccount(
+            email="exploitation@petrole.local",
+            full_name="Compte hérité",
+            password_hash=hash_password("MotDePasseSolide2026"),
+            is_active=True,
+        )
+        session.add(legacy)
+        session.flush()
+        session.add(
+            OrganizationMembership(
+                organization_id=uuid.UUID(organization_id),
+                user_id=legacy.id,
+                role="viewer",
+            )
+        )
+        session.commit()
+
+    response = client.get(f"/api/v1/organizations/{organization_id}/members", headers=headers)
+
+    assert response.status_code == 200, response.text
+    emails = {member["email"] for member in response.json()}
+    assert "exploitation@petrole.local" in emails

@@ -45,6 +45,13 @@ class LogoutRequest(BaseModel):
     refresh_token: str = Field(min_length=32, max_length=500)
 
 
+#: Une adresse est validée à l'écriture par ``EmailStr``. En lecture, la
+#: restitution reste une chaîne : une donnée déjà persistée — par exemple une
+#: adresse créée hors de l'API — ne doit pas rendre la ressource illisible et
+#: provoquer une erreur serveur sur une simple consultation.
+StoredEmail = str
+
+
 class MembershipRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -58,7 +65,7 @@ class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    email: EmailStr
+    email: StoredEmail
     full_name: str
     is_active: bool
     last_login_at: datetime | None
@@ -89,7 +96,7 @@ class MemberRoleUpdate(BaseModel):
 
 class MemberRead(BaseModel):
     id: uuid.UUID
-    email: EmailStr
+    email: StoredEmail
     full_name: str
     is_active: bool
     role: OrganizationRole

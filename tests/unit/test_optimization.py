@@ -257,7 +257,9 @@ def test_voie_pyomo_retrouve_l_optimum_de_l_enumeration() -> None:
         active = configuration.active_pump_count
         return CandidateEvaluation(
             flow_m3_s=0.05 * max(active, 1),
-            energy_kwh=100.0 - 7.5 * active + 0.5 * sum(ratio for _, ratio in configuration.speed_ratios),
+            energy_kwh=100.0
+            - 7.5 * active
+            + 0.5 * sum(ratio for _, ratio in configuration.speed_ratios),
             cost=None,
             minimum_pressure_pa=300_000.0,
             maximum_pressure_pa=5_000_000.0,

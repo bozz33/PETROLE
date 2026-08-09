@@ -95,7 +95,9 @@ Reste volontairement MANUEL avant v1.0.0-mvp :
   1. examen et signature de docs/validation/acceptation_ingenieur_mvp.md ;
   2. correction de toute réserve S0/S1/S2 ;
   3. désignation de la clé RELEASE_SIGNING_KEY ;
-  4. génération/signature des artefacts et création du tag signé.
+  4. création et vérification du tag signé sur ${CANDIDATE_SHA} ;
+  5. génération/signature des artefacts depuis ce tag ;
+  6. push du tag seulement après vérification des artefacts.
 
-Ne créez pas v1.0.0-mvp tant que ces quatre points ne sont pas fermés.
+Ne créez pas v1.0.0-mvp tant que ces étapes ne sont pas fermées.
 EOF

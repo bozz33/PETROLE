@@ -11,6 +11,11 @@
 # Utilisation :
 #   deployment/scripts/vps/release-artifacts.sh v1.0.0-mvp [dossier-de-sortie]
 #
+# Le tag doit déjà exister, être annoté et signé. Cette règle fait du tag la
+# première ancre cryptographique de la release ; les SBOM et leurs empreintes
+# sont ensuite liés au commit réellement signé, sans dépendre d'un tag léger ou
+# créé après coup.
+#
 # Variables :
 #   RELEASE_SIGNING_KEY  identifiant de clé GPG utilisé pour signer les empreintes.
 
@@ -23,8 +28,20 @@ IMAGES=("petrole-api:latest" "petrole-web:latest")
 mkdir -p "${OUTPUT_DIR}"
 
 echo "== Identité de la release =="
+if ! git rev-parse --verify --quiet "${TAG}^{tag}" >/dev/null; then
+  echo "Le tag ${TAG} doit exister et être annoté/signé avant les artefacts." >&2
+  echo "Créez-le ainsi : git tag -s ${TAG} <sha-candidat> -m '...'" >&2
+  exit 2
+fi
+if ! git verify-tag "${TAG}" >"${OUTPUT_DIR}/tag-verification.txt" 2>&1; then
+  echo "La signature du tag ${TAG} ne peut pas être vérifiée." >&2
+  cat "${OUTPUT_DIR}/tag-verification.txt" >&2
+  exit 2
+fi
+printf '%s\n' "${TAG}" > "${OUTPUT_DIR}/tag.txt"
 git rev-parse "${TAG}^{commit}" > "${OUTPUT_DIR}/commit.txt"
 git show -s --format=%cI "${TAG}^{commit}" > "${OUTPUT_DIR}/date.txt"
+git show -s --format=%cI "${TAG}^{tag}" > "${OUTPUT_DIR}/tag-date.txt"
 echo "Commit : $(cat "${OUTPUT_DIR}/commit.txt")"
 
 echo "== Nomenclature logicielle des images =="
@@ -56,7 +73,7 @@ if [[ -n "${RELEASE_SIGNING_KEY:-}" ]]; then
       --output "${OUTPUT_DIR}/SHA256SUMS.asc" \
       "${OUTPUT_DIR}/SHA256SUMS"
   echo "Empreintes signées par ${RELEASE_SIGNING_KEY}."
-  echo "Signez également le tag : git tag -s ${TAG} -f"
+  echo "Le tag signé ${TAG} et les empreintes sont vérifiés."
 else
   echo "RELEASE_SIGNING_KEY n'est pas défini : les artefacts NE SONT PAS signés."
   echo "Une release destinée à un tiers doit être signée avant diffusion."

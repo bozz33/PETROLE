@@ -140,9 +140,20 @@ La clé de signature doit être désignée par le mainteneur ; elle ne doit jama
 
 ```bash
 export RELEASE_SIGNING_KEY='<identifiant-cle-gpg>'
+CANDIDATE_SHA="$(git rev-parse HEAD)"
+git tag -s v1.0.0-mvp "${CANDIDATE_SHA}" \
+  -m 'PETROLE MVP 1.0 qualifié et accepté'
+git verify-tag v1.0.0-mvp
 deployment/scripts/vps/release-artifacts.sh v1.0.0-mvp
-git tag -s v1.0.0-mvp -m 'PETROLE MVP 1.0 qualifié et accepté'
+gpg --verify var/release/v1.0.0-mvp/SHA256SUMS.asc \
+  var/release/v1.0.0-mvp/SHA256SUMS
+git push origin v1.0.0-mvp
 ```
+
+Le tag est créé localement et vérifié **avant** les SBOM : le script refuse un
+tag absent, léger ou dont la signature ne peut pas être vérifiée. Le push est
+volontairement la dernière étape, après vérification des empreintes et des
+artefacts produits localement.
 
 ## 7. Critère de sortie
 

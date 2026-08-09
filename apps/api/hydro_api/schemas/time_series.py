@@ -97,6 +97,8 @@ class TimeSeriesImportRead(BaseModel):
     row_count: int
     accepted_count: int
     rejected_count: int
+    raw_created_count: int
+    raw_reused_count: int
     errors: list[dict[str, Any]]
     created_at: datetime
     finished_at: datetime | None
@@ -107,6 +109,7 @@ class NormalizedSampleRead(BaseModel):
 
     id: uuid.UUID
     raw_sample_id: uuid.UUID
+    time_series_import_id: uuid.UUID
     dataset_id: uuid.UUID
     dataset_row_id: uuid.UUID | None
     source_timestamp: datetime

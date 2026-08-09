@@ -115,6 +115,12 @@ normalisé → tag explicite**. Il crée les tables `tags`, `samples_raw`,
   de traitement, sans écraser le brut ;
 - l'import est idempotent par `dataset + tag + Idempotency-Key` ; les doublons
   `source + timestamp` restent stockables et seront qualifiés par V1-A3 ;
+- après sa première tentative d'import, un dataset et ses `DatasetRow` sont
+  figés : une correction crée un nouveau dataset rattaché au même fichier, elle
+  ne reconstruit jamais les lignes d'origine ;
+- un reprocessing avec une nouvelle `processing_version` réutilise le même
+  `SampleRaw` pour chaque `tag + DatasetRow` et crée seulement une nouvelle
+  projection `SampleNormalized`, liée à son propre import temporel ;
 - la source de chaque ligne doit correspondre explicitement au `external_name`
   du tag : un dataset multi-capteurs devra être réparti sur ses tags, jamais
   fusionné silencieusement.

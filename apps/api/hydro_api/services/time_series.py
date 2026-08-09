@@ -242,7 +242,9 @@ def _flush_samples(
 ) -> None:
     if raw_samples:
         session.execute(insert(SampleRaw), raw_samples)
+    if normalized_samples:
         session.execute(insert(SampleNormalized), normalized_samples)
+    if raw_samples or normalized_samples:
         raw_samples.clear()
         normalized_samples.clear()
 
@@ -263,7 +265,11 @@ def import_dataset_time_series(
     """
 
     dataset = get_dataset(session, dataset_id)
-    tag = get_measurement_tag(session, tag_id)
+    tag = session.scalar(
+        select(MeasurementTag).where(MeasurementTag.id == tag_id).with_for_update()
+    )
+    if tag is None:
+        raise ResourceNotFoundError("Tag de mesure", tag_id)
     dimension = _assert_dataset_matches_tag(session, dataset=dataset, tag=tag)
     existing = session.scalar(
         select(TimeSeriesImport).where(
@@ -274,6 +280,18 @@ def import_dataset_time_series(
     )
     if existing is not None:
         return existing
+    existing_version = session.scalar(
+        select(TimeSeriesImport).where(
+            TimeSeriesImport.dataset_id == dataset.id,
+            TimeSeriesImport.tag_id == tag.id,
+            TimeSeriesImport.processing_version == processing_version,
+        )
+    )
+    if existing_version is not None:
+        raise ResourceConflictError(
+            "Cette version de traitement existe déjà pour ce dataset et ce tag ; "
+            "réutilisez sa clé d'idempotence ou créez une nouvelle version."
+        )
 
     now = utc_now()
     import_run = TimeSeriesImport(
@@ -293,6 +311,8 @@ def import_dataset_time_series(
         row_count=0,
         accepted_count=0,
         rejected_count=0,
+        raw_created_count=0,
+        raw_reused_count=0,
         errors=[],
         created_at=now,
         finished_at=None,
@@ -303,10 +323,23 @@ def import_dataset_time_series(
     value_column = dataset.mapping.get("fields", {}).get("value")
     raw_samples: list[dict[str, Any]] = []
     normalized_samples: list[dict[str, Any]] = []
+    existing_raw_by_dataset_row: dict[uuid.UUID, uuid.UUID] = {
+        dataset_row_id: raw_sample_id
+        for dataset_row_id, raw_sample_id in session.execute(
+            select(SampleRaw.dataset_row_id, SampleRaw.id).where(
+                SampleRaw.tag_id == tag.id,
+                SampleRaw.dataset_id == dataset.id,
+                SampleRaw.dataset_row_id.is_not(None),
+            )
+        )
+        if dataset_row_id is not None
+    }
     errors: list[dict[str, Any]] = []
     row_count = 0
     accepted_count = 0
     rejected_count = 0
+    raw_created_count = 0
+    raw_reused_count = 0
     for row in session.scalars(
         select(DatasetRow)
         .where(DatasetRow.dataset_id == dataset.id)
@@ -362,29 +395,36 @@ def import_dataset_time_series(
             if isinstance(value_column, str)
             else dataset.mapping.get("constants", {}).get("value")
         )
-        raw_sample_id = uuid.uuid4()
         quality = row.quality
-        raw_samples.append(
-            {
-                "id": raw_sample_id,
-                "tag_id": tag.id,
-                "time_series_import_id": import_run.id,
-                "dataset_id": dataset.id,
-                "dataset_row_id": row.id,
-                "source_timestamp": timestamp,
-                "ingest_timestamp": now,
-                "source_value": source_value,
-                "source_unit": source_unit,
-                "quality": quality,
-                "sequence_number": row.source_row,
-                "raw_payload": row.raw_payload,
-            }
-        )
+        raw_sample_id = existing_raw_by_dataset_row.get(row.id)
+        if raw_sample_id is None:
+            raw_sample_id = uuid.uuid4()
+            existing_raw_by_dataset_row[row.id] = raw_sample_id
+            raw_samples.append(
+                {
+                    "id": raw_sample_id,
+                    "tag_id": tag.id,
+                    "time_series_import_id": import_run.id,
+                    "dataset_id": dataset.id,
+                    "dataset_row_id": row.id,
+                    "source_timestamp": timestamp,
+                    "ingest_timestamp": now,
+                    "source_value": source_value,
+                    "source_unit": source_unit,
+                    "quality": quality,
+                    "sequence_number": row.source_row,
+                    "raw_payload": row.raw_payload,
+                }
+            )
+            raw_created_count += 1
+        else:
+            raw_reused_count += 1
         normalized_samples.append(
             {
                 "id": uuid.uuid4(),
                 "tag_id": tag.id,
                 "raw_sample_id": raw_sample_id,
+                "time_series_import_id": import_run.id,
                 "timestamp": timestamp,
                 "value_si": float(raw_value),
                 "si_unit": si_unit,
@@ -407,6 +447,8 @@ def import_dataset_time_series(
     import_run.row_count = row_count
     import_run.accepted_count = accepted_count
     import_run.rejected_count = rejected_count
+    import_run.raw_created_count = raw_created_count
+    import_run.raw_reused_count = raw_reused_count
     import_run.errors = errors
     import_run.status = "completed" if not rejected_count else "completed_with_errors"
     import_run.finished_at = utc_now()
@@ -422,6 +464,8 @@ def import_dataset_time_series(
             "tag_id": str(tag.id),
             "accepted_count": accepted_count,
             "rejected_count": rejected_count,
+            "raw_created_count": raw_created_count,
+            "raw_reused_count": raw_reused_count,
             "processing_version": processing_version,
         },
     )
@@ -466,6 +510,7 @@ def list_normalized_samples(
             {
                 "id": normalized.id,
                 "raw_sample_id": raw.id,
+                "time_series_import_id": normalized.time_series_import_id,
                 "dataset_id": raw.dataset_id,
                 "dataset_row_id": raw.dataset_row_id,
                 "source_timestamp": raw.source_timestamp,

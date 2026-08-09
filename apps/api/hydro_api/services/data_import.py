@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from sqlalchemy import delete, func, insert, select
+from sqlalchemy import func, insert, select
 from sqlalchemy.orm import Session
 
 from hydro_api.database.base import utc_now
@@ -378,6 +378,11 @@ def preview_dataset(
     """Analyse le fichier et conserve un aperçu borné sans importer de lignes."""
 
     dataset = get_dataset(session, dataset_id)
+    if dataset.status in {"imported", "failed"}:
+        raise ResourceConflictError(
+            "Le dataset est figé après une tentative d'import ; créez un nouveau dataset "
+            "rattaché au même fichier pour démarrer une nouvelle transformation."
+        )
     stored_file = get_file(session, dataset.file_id)
     frame = _read_frame(
         storage.get_bytes(stored_file.object_key),
@@ -408,6 +413,11 @@ def set_mapping(
     """Valide puis fige le mapping de colonnes du jeu de données."""
 
     dataset = get_dataset(session, dataset_id)
+    if dataset.status in {"imported", "failed"}:
+        raise ResourceConflictError(
+            "Le dataset est figé après une tentative d'import ; créez un nouveau dataset "
+            "rattaché au même fichier pour corriger ou versionner sa transformation."
+        )
     if not dataset.preview:
         raise ResourceConflictError("Un aperçu doit être généré avant le mapping.")
     columns = set(dataset.preview.get("columns", []))
@@ -648,14 +658,12 @@ def import_dataset(
     )
     if existing is not None:
         return existing
-    if dataset.status not in {"mapped", "imported", "failed"} or not dataset.mapping:
+    if dataset.status != "mapped" or not dataset.mapping:
         raise ResourceConflictError("Le mapping doit être validé avant l'import.")
 
     stored_file = get_file(session, dataset.file_id)
     content = storage.get_bytes(stored_file.object_key)
     frame = _read_frame(content, stored_file.filename, max_rows=max_rows)
-    session.execute(delete(DatasetRow).where(DatasetRow.dataset_id == dataset.id))
-
     digest = _start_import_hash(stored_file.content_hash, dataset.mapping)
     batch: list[dict[str, Any]] = []
     all_errors: list[dict[str, Any]] = []

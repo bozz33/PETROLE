@@ -87,6 +87,8 @@ def upgrade() -> None:
         sa.Column("row_count", sa.Integer(), nullable=False),
         sa.Column("accepted_count", sa.Integer(), nullable=False),
         sa.Column("rejected_count", sa.Integer(), nullable=False),
+        sa.Column("raw_created_count", sa.Integer(), nullable=False),
+        sa.Column("raw_reused_count", sa.Integer(), nullable=False),
         sa.Column("errors", sa.JSON(), nullable=False),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -119,6 +121,12 @@ def upgrade() -> None:
             "tag_id",
             "idempotency_key",
             name=op.f("uq_ts_import_dataset_tag_key"),
+        ),
+        sa.UniqueConstraint(
+            "dataset_id",
+            "tag_id",
+            "processing_version",
+            name=op.f("uq_ts_import_dataset_tag_version"),
         ),
     )
     op.create_index(
@@ -175,6 +183,11 @@ def upgrade() -> None:
             ondelete="SET NULL",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_samples_raw")),
+        sa.UniqueConstraint(
+            "tag_id",
+            "dataset_row_id",
+            name=op.f("uq_samples_raw_tag_dataset_row"),
+        ),
     )
     op.create_index(
         "ix_samples_raw_tag_source_timestamp",
@@ -191,6 +204,7 @@ def upgrade() -> None:
         "samples_normalized",
         sa.Column("tag_id", sa.Uuid(), nullable=False),
         sa.Column("raw_sample_id", sa.Uuid(), nullable=False),
+        sa.Column("time_series_import_id", sa.Uuid(), nullable=False),
         sa.Column("timestamp", sa.DateTime(timezone=True), nullable=False),
         sa.Column("value_si", sa.Float(), nullable=False),
         sa.Column("si_unit", sa.String(length=80), nullable=False),
@@ -213,6 +227,12 @@ def upgrade() -> None:
             ["raw_sample_id"],
             ["samples_raw.id"],
             name=op.f("fk_samples_normalized_raw_sample_id_samples_raw"),
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["time_series_import_id"],
+            ["time_series_imports.id"],
+            name=op.f("fk_samples_normalized_time_series_import_id_time_series_imports"),
             ondelete="RESTRICT",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_samples_normalized")),

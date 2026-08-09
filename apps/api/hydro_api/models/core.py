@@ -670,6 +670,9 @@ class TimeSeriesImport(UUIDPrimaryKeyMixin, Base):
         UniqueConstraint(
             "dataset_id", "tag_id", "idempotency_key", name="uq_ts_import_dataset_tag_key"
         ),
+        UniqueConstraint(
+            "dataset_id", "tag_id", "processing_version", name="uq_ts_import_dataset_tag_version"
+        ),
         CheckConstraint(
             "status IN ('running', 'completed', 'completed_with_errors', 'failed')",
             name="status_valid",
@@ -700,6 +703,8 @@ class TimeSeriesImport(UUIDPrimaryKeyMixin, Base):
     row_count: Mapped[int] = mapped_column(Integer, nullable=False)
     accepted_count: Mapped[int] = mapped_column(Integer, nullable=False)
     rejected_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    raw_created_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    raw_reused_count: Mapped[int] = mapped_column(Integer, nullable=False)
     errors: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -710,6 +715,7 @@ class SampleRaw(UUIDPrimaryKeyMixin, Base):
 
     __tablename__ = "samples_raw"
     __table_args__ = (
+        UniqueConstraint("tag_id", "dataset_row_id", name="uq_samples_raw_tag_dataset_row"),
         CheckConstraint(
             "quality IN ('good', 'uncertain', 'bad', 'substituted', 'estimated')",
             name="quality_valid",
@@ -773,6 +779,11 @@ class SampleNormalized(UUIDPrimaryKeyMixin, Base):
     raw_sample_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("samples_raw.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    time_series_import_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("time_series_imports.id", ondelete="RESTRICT"),
         nullable=False,
     )
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

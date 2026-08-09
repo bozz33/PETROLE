@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
+
+MEASUREMENT_MAPPING = {
+    "fields": {
+        "timestamp": "timestamp",
+        "value": "pressure",
+        "unit": "unit",
+        "quality": "quality",
+        "source": "source",
+    },
+    "dimensions": {"value": "pressure"},
+}
 
 
 @pytest.fixture
@@ -89,16 +101,7 @@ def _measurement_dataset(
     assert client.post(f"/api/v1/datasets/{dataset['id']}/preview").status_code == 200
     mapped = client.post(
         f"/api/v1/datasets/{dataset['id']}/mappings",
-        json={
-            "fields": {
-                "timestamp": "timestamp",
-                "value": "pressure",
-                "unit": "unit",
-                "quality": "quality",
-                "source": "source",
-            },
-            "dimensions": {"value": "pressure"},
-        },
+        json=MEASUREMENT_MAPPING,
     )
     assert mapped.status_code == 200, mapped.text
     imported = client.post(
@@ -153,6 +156,8 @@ def test_time_series_import_keeps_raw_bad_sample_and_is_idempotent(
     assert first.json()["row_count"] == 3
     assert first.json()["accepted_count"] == 3
     assert first.json()["rejected_count"] == 0
+    assert first.json()["raw_created_count"] == 3
+    assert first.json()["raw_reused_count"] == 0
 
     replay = time_series_client.post(
         f"/api/v1/datasets/{dataset['id']}/time-series-imports",
@@ -161,6 +166,19 @@ def test_time_series_import_keeps_raw_bad_sample_and_is_idempotent(
     )
     assert replay.status_code == 201, replay.text
     assert replay.json()["id"] == first.json()["id"]
+
+    frozen_mapping = time_series_client.post(
+        f"/api/v1/datasets/{dataset['id']}/mappings",
+        json=MEASUREMENT_MAPPING,
+    )
+    assert frozen_mapping.status_code == 409
+    frozen_preview = time_series_client.post(f"/api/v1/datasets/{dataset['id']}/preview")
+    assert frozen_preview.status_code == 409
+    frozen_import = time_series_client.post(
+        f"/api/v1/datasets/{dataset['id']}/imports",
+        headers={"Idempotency-Key": "dataset-time-series-v2"},
+    )
+    assert frozen_import.status_code == 409
 
     listed_tags = time_series_client.get(
         "/api/v1/measurement-tags",
@@ -182,6 +200,38 @@ def test_time_series_import_keeps_raw_bad_sample_and_is_idempotent(
     assert all(sample["source_unit"] == "bar" for sample in body["items"])
     assert body["items"][0]["source_value"] == "10"
     assert body["items"][0]["dataset_id"] == dataset["id"]
+
+    reprocessed = time_series_client.post(
+        f"/api/v1/datasets/{dataset['id']}/time-series-imports",
+        json={"tag_id": tag["id"], "processing_version": "pilot-v1-a2-v2"},
+        headers={"Idempotency-Key": "ts-import-pt-101-v2"},
+    )
+    assert reprocessed.status_code == 201, reprocessed.text
+    assert reprocessed.json()["accepted_count"] == 3
+    assert reprocessed.json()["raw_created_count"] == 0
+    assert reprocessed.json()["raw_reused_count"] == 3
+
+    duplicate_version = time_series_client.post(
+        f"/api/v1/datasets/{dataset['id']}/time-series-imports",
+        json={"tag_id": tag["id"], "processing_version": "pilot-v1-a2-v2"},
+        headers={"Idempotency-Key": "ts-import-pt-101-v2-other-key"},
+    )
+    assert duplicate_version.status_code == 409
+
+    reprocessed_samples = time_series_client.get(
+        f"/api/v1/measurement-tags/{tag['id']}/samples"
+    ).json()
+    assert reprocessed_samples["total"] == 6
+    raw_sample_counts = Counter(sample["raw_sample_id"] for sample in reprocessed_samples["items"])
+    assert set(raw_sample_counts.values()) == {2}
+    assert {sample["processing_version"] for sample in reprocessed_samples["items"]} == {
+        "pilot-v1-a2",
+        "pilot-v1-a2-v2",
+    }
+    assert {sample["time_series_import_id"] for sample in reprocessed_samples["items"]} == {
+        first.json()["id"],
+        reprocessed.json()["id"],
+    }
 
     other_tag = _tag(time_series_client, organization["id"], site["id"], external_name="PT-102")
     mismatched_source = time_series_client.post(

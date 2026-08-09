@@ -50,7 +50,7 @@ compose_vps --profile qualification run --rm --no-deps qualification-api \
 compose_vps --profile qualification run --rm --no-deps qualification-api \
     mypy packages apps/api deployment/scripts/vps/projet_reference.py \
     deployment/scripts/vps/recette_mvp_finale.py
-bash -n deployment/scripts/vps/close-mvp.sh
+bash -n deployment/scripts/vps/close-mvp.sh deployment/scripts/vps/release-artifacts.sh
 
 # Les tests de persistance utilisent une base PostgreSQL/PostGIS jetable,
 # distincte de l'environnement déployé et créée exclusivement par Alembic.

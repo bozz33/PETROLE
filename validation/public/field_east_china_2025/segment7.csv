@@ -1,0 +1,4 @@
+point,mileage_km,spacing_from_previous_km,elevation_m,internal_diameter_m,fluid,density_kg_m3,kinematic_viscosity_m2_s,measured_mainline_flow_m3_h
+Pigging Station 2,355.710,,59.80,0.2731,diesel,847.4,4.72e-6,270
+Valve Chamber 3,367.552,11.842,80.20,0.2731,diesel,847.4,4.72e-6,270
+Pumping Station 2,395.788,28.236,72.50,0.2731,diesel,847.4,4.72e-6,270

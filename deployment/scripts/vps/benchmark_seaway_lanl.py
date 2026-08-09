@@ -5,11 +5,12 @@ Le script n'utilise que l'API publique. Il transforme le cas machine-readable
 `case_seaway.m` de PetroleumModels.jl vers le modèle linéaire normalisé de
 PETROLE, exécute HydroLiquid et produit une preuve JSON comparative.
 
-Nature de la preuve : **rejeu hydraulique de formulation distincte**. Le cas
-LANL est synthétisé à partir d'un système réel et de données publiques ; il ne
-remplace pas des mesures SCADA industrielles confidentielles. Les quatre débits
-publiés servent ici à fixer les conditions limites : ils ne constituent donc
-pas, à eux seuls, une validation indépendante de PETROLE.
+Nature de la preuve : **comparaison cross-solver à point imposé**. Le cas LANL
+est synthétisé à partir d'un système réel et de données publiques ; il ne
+remplace pas des mesures SCADA industrielles confidentielles. Une sortie OPF
+native, figée et versionnée de PetroleumModels.jl fournit les débits, vitesses
+et charges de comparaison. PETROLE rejoue ce point : c'est une vérification
+cross-solver, non une validation prédictive indépendante.
 
 Deux transformations sont explicitement assumées :
 
@@ -43,6 +44,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import os
@@ -55,6 +57,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
 DATA_DIR = ROOT / "validation/public/seaway_lanl"
+NATIVE_REFERENCE_FILE = DATA_DIR / "native_opf_output.json"
 PROJECT_CODE_DEFAULT = "BENCH-SEAWAY-LANL"
 OUTPUT_DEFAULT = ROOT / "var/validation-vps/benchmark-seaway-lanl.json"
 
@@ -71,28 +74,28 @@ LEIBENZON_M = 0.25
 SYNTHETIC_CONNECTOR_LENGTH_M = 1.001
 ASSUMED_MAWP_PA = 10_000_000.0
 SOURCE_PRESSURE_HEAD_M = 190.0
-INLET_FLOW_M3_S = 0.3567
+# Sortie native enregistrée de PetroleumModels.jl, pas les valeurs arrondies du
+# test officiel. Ces conditions limites et vitesses rendent le rejeu PETROLE
+# exactement comparable au point de fonctionnement OPF LANL archivé.
+INLET_FLOW_M3_S = 0.356724281076506
+INJECTION_N9_M3_S = 0.6077287813384165
+OFFTAKE_N15_M3_S = 0.8254530724072793
+INJECTION_N18_M3_S = 0.5787995029407432
+TERMINAL_FLOW_M3_S = 0.7177994929483865
 
-# Allocation reconstruite par bilan de masse à partir des quatre débits publiés
-# dans le test officiel PetroleumModels.jl/test/opf.jl.
-INJECTION_N9_M3_S = 0.6077
-OFFTAKE_N15_M3_S = 0.8255
-INJECTION_N18_M3_S = 0.5789
-TERMINAL_FLOW_M3_S = 0.7178
-
-# Point de fonctionnement transformé, pré-enregistré dans
-# reference_operating_point.csv. Il est dérivé des équations LANL sous allocation
-# fixe, contraintes de charge/pompe/rendement, puis minimisation du coût de pompage.
+# Vitesses de la sortie native, divisées par la vitesse nominale LANL de 50 r/s.
+# `native_opf_output.json` et `reference_operating_point.csv` les rendent
+# auditables et `check_source_dataset()` détecte toute divergence.
 PUMP_SPEED_RATIOS = {
-    "P1": 0.80534824,
-    "P2": 0.80534824,
-    "P4": 0.80534824,
-    "P7": 0.80534824,
-    "P10": 1.04550752,
-    "P12": 1.04547034,
-    "P13": 1.04546422,
-    "P19": 0.97734783,
-    "P21": 0.83155304,
+    "P1": 0.8054030514534964,
+    "P2": 0.8054030514534964,
+    "P4": 0.8054030477643892,
+    "P7": 0.805403053511389,
+    "P10": 1.0455237371209432,
+    "P12": 1.0455237912205992,
+    "P13": 1.0455237912205992,
+    "P19": 0.9773477079236766,
+    "P21": 0.8315529073354597,
 }
 
 # Les nœuds de pompe de longueur nulle du modèle LANL sont regroupés :
@@ -134,12 +137,16 @@ EDGE_LAYOUT = [
     ("L22", 13_620.0, "ST-N22", "TERM-N23", 22),
 ]
 
-REFERENCE_FLOW_BY_PIPE = {3: 0.3567, 9: 0.9644, 15: 0.1389, 22: 0.7178}
+REFERENCE_FLOW_BY_PIPE = {
+    3: 0.356724281076506,
+    9: 0.9644530624149225,
+    15: 0.139,
+    22: 0.7177994929483865,
+}
 
 # Portes définies avant toute exécution. Elles qualifient seulement la bonne
-# exécution du rejeu dans PETROLE ; elles ne confèrent pas de verdict de
-# validation externe, car le point de fonctionnement et les charges de
-# référence sont dérivés des mêmes sorties LANL.
+# exécution du rejeu dans PETROLE ; elles ne confèrent pas de validation
+# prédictive : le point de fonctionnement est fourni par la sortie OPF LANL.
 ACCEPTED_CALCULATION_STATUSES = frozenset({"SIM_CONVERGED", "SIM_CONVERGED_WARN"})
 MAXIMUM_VIOLATION_COUNT = 0
 EXPECTED_WARNING_CODES = frozenset({"WARN_PROPERTY_DEFAULTED", "WARN_PUMP_OFF_BEP"})
@@ -229,6 +236,139 @@ def load_csv(name: str) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
+def operating_point_values(kind: str) -> dict[str, float]:
+    """Charge les valeurs numériques de la référence native enregistrée."""
+
+    return {
+        row["id"]: float(row["value"])
+        for row in load_csv("reference_operating_point.csv")
+        if row["kind"] == kind
+    }
+
+
+def native_opf_reference() -> dict[str, Any]:
+    """Lit et contrôle la sortie native, compacte et figée, de LANL.
+
+    Le solveur LANL expose ici les charges `h` en unités de base (bien que le
+    drapeau de la structure de sortie indique SI). Le cas source définit
+    `base_head=100 m` et le nœud contraint N1 sort à 1.9 : la conversion vers
+    les mètres est donc explicite, vérifiable et jamais implicite.
+    """
+
+    raw = NATIVE_REFERENCE_FILE.read_bytes()
+    record = json.loads(raw)
+    provenance = record.get("provenance") or {}
+    solution = record.get("solution") or {}
+    base_head_m = float(solution.get("base_head") or 0.0)
+    if base_head_m != 100.0:
+        raise BenchmarkError(f"base_head LANL inattendu : {base_head_m} m.")
+    junctions = dict(solution.get("junction") or {})
+    if abs(float(junctions.get("1", {}).get("h", math.nan)) * base_head_m - 190.0) > 1e-9:
+        raise BenchmarkError(
+            "La normalisation de charge LANL ne retrouve pas le nœud contraint N1."
+        )
+
+    heads_m = {
+        f"N{junction_id}": float(item["h"]) * base_head_m for junction_id, item in junctions.items()
+    }
+    pumps = dict(solution.get("pump") or {})
+    pump_source_ids = {
+        "P1": "1",
+        "P2": "2",
+        "P4": "4",
+        "P7": "7",
+        "P10": "10",
+        "P12": "12",
+        "P13": "13",
+        "P19": "19",
+        "P21": "21",
+    }
+    pump_ratios = {
+        code: float(pumps[source_id]["w"]) / 50.0 for code, source_id in pump_source_ids.items()
+    }
+    pipe_flows = {
+        int(pipe_id): float(item["q_pipe"])
+        for pipe_id, item in dict(solution.get("pipe") or {}).items()
+    }
+    producer_source_nodes = {"1": "N1", "2": "N9", "3": "N18"}
+    return {
+        "record_sha256": hashlib.sha256(raw).hexdigest(),
+        "source_commit": provenance.get("source_commit"),
+        "termination_status": record.get("termination_status"),
+        "objective": float(record["objective"]),
+        "base_head_m": base_head_m,
+        "pressure_heads_m": heads_m,
+        "pump_speed_ratios": pump_ratios,
+        "pipe_flows_m3_s": pipe_flows,
+        "producer_flows_m3_s": {
+            producer_source_nodes[producer_id]: float(item["qg"])
+            for producer_id, item in dict(solution.get("producer") or {}).items()
+        },
+        "consumer_flows_m3_s": {
+            "N15": float(solution["consumer"]["1"]["ql"]),
+            "N23": float(solution["consumer"]["2"]["ql"]),
+        },
+    }
+
+
+def verify_native_reference() -> dict[str, Any]:
+    """Empêche toute dérive entre l'artefact LANL, le CSV et l'adaptateur."""
+
+    reference = native_opf_reference()
+    if reference["source_commit"] != "df35cd4999a1289710640a46882de7f665d4b32f":
+        raise BenchmarkError("La révision LANL de la référence native est inattendue.")
+    if reference["termination_status"] not in {"LOCALLY_SOLVED", "OPTIMAL"}:
+        raise BenchmarkError("La référence native LANL n'est pas une solution exploitable.")
+
+    for code, expected in PUMP_SPEED_RATIOS.items():
+        actual = float(reference["pump_speed_ratios"][code])
+        if abs(actual - expected) > 1e-12:
+            raise BenchmarkError(f"Vitesse native incohérente pour {code}: {actual} != {expected}.")
+    for pipe_id, expected in REFERENCE_FLOW_BY_PIPE.items():
+        actual = float(reference["pipe_flows_m3_s"][pipe_id])
+        if abs(actual - expected) > 1e-12:
+            raise BenchmarkError(
+                f"Débit natif incohérent pour pipe {pipe_id}: {actual} != {expected}."
+            )
+    expected_boundary_flows = {
+        "N1": INLET_FLOW_M3_S,
+        "N9": INJECTION_N9_M3_S,
+        "N18": INJECTION_N18_M3_S,
+    }
+    for node, expected in expected_boundary_flows.items():
+        actual = float(reference["producer_flows_m3_s"][node])
+        if abs(actual - expected) > 1e-12:
+            raise BenchmarkError(
+                f"Injection native incohérente pour {node}: {actual} != {expected}."
+            )
+    expected_withdrawals = {"N15": OFFTAKE_N15_M3_S, "N23": TERMINAL_FLOW_M3_S}
+    for node, expected in expected_withdrawals.items():
+        actual = float(reference["consumer_flows_m3_s"][node])
+        if abs(actual - expected) > 1e-12:
+            raise BenchmarkError(f"Soutirage natif incohérent pour {node}: {actual} != {expected}.")
+
+    csv_heads = operating_point_values("pressure_head")
+    for node, expected in reference["pressure_heads_m"].items():
+        if abs(csv_heads[node] - expected) > 1e-9:
+            raise BenchmarkError(
+                f"Charge LANL incohérente pour {node}: {csv_heads[node]} != {expected}."
+            )
+    csv_ratios = operating_point_values("pump_speed_ratio")
+    for code, expected in PUMP_SPEED_RATIOS.items():
+        if abs(csv_ratios[code] - expected) > 1e-12:
+            raise BenchmarkError(
+                f"Vitesse CSV incohérente pour {code}: {csv_ratios[code]} != {expected}."
+            )
+
+    return {
+        "source_commit": reference["source_commit"],
+        "record_sha256": reference["record_sha256"],
+        "termination_status": reference["termination_status"],
+        "objective": reference["objective"],
+        "base_head_m": reference["base_head_m"],
+    }
+
+
 def pump_curve() -> dict[str, Any]:
     """Échantillonne exactement les lois nominales LANL sur le domaine utile."""
 
@@ -278,8 +418,7 @@ def flow_by_pipe() -> dict[int, float]:
 
 
 def reference_pressure_heads() -> dict[str, float]:
-    rows = load_csv("reference_operating_point.csv")
-    return {row["id"]: float(row["value"]) for row in rows if row["kind"] == "pressure_head"}
+    return operating_point_values("pressure_head")
 
 
 def check_source_dataset() -> dict[str, Any]:
@@ -295,6 +434,7 @@ def check_source_dataset() -> dict[str, Any]:
         raise BenchmarkError(f"Longueur LANL inattendue : {total_length_m} m.")
     if len(producers) != 3 or len(consumers) != 2:
         raise BenchmarkError("Le jeu doit contenir 3 producteurs et 2 consommateurs.")
+    native_reference = verify_native_reference()
     balance = INLET_FLOW_M3_S + INJECTION_N9_M3_S + INJECTION_N18_M3_S
     balance -= OFFTAKE_N15_M3_S + TERMINAL_FLOW_M3_S
     if abs(balance) > 1e-12:
@@ -307,6 +447,7 @@ def check_source_dataset() -> dict[str, Any]:
         "consumer_count": len(consumers),
         "physical_pipe_length_m": total_length_m,
         "allocation_balance_m3_s": balance,
+        "native_opf_reference": native_reference,
     }
 
 
@@ -408,10 +549,26 @@ def adapted_topology_summary(topology: dict[str, Any]) -> dict[str, Any]:
     nodes = list(topology.get("nodes") or [])
     edges = list(topology.get("edges") or [])
     assets = list(topology.get("assets") or [])
-    physical_edges = [
-        edge for edge in edges if (edge.get("payload") or {}).get("source_pipe_id") is not None
-    ]
-    connector_edges = [edge for edge in edges if edge not in physical_edges]
+    # L'API expose le sous-ensemble validé de `payload` pour une arête et ne
+    # conserve donc pas la clé d'adaptateur `source_pipe_id`. Les codes L3…L22
+    # sont au contraire un contrat métier persistant, contrôlé ci-dessous.
+    physical_codes = {
+        edge_code
+        for edge_code, _, _, _, source_pipe_id in EDGE_LAYOUT
+        if source_pipe_id is not None
+    }
+    connector_codes = {
+        edge_code for edge_code, _, _, _, source_pipe_id in EDGE_LAYOUT if source_pipe_id is None
+    }
+    physical_edges = [edge for edge in edges if edge.get("code") in physical_codes]
+    connector_edges = [edge for edge in edges if edge.get("code") in connector_codes]
+    persisted_codes = [str(edge.get("code") or "") for edge in edges]
+    if set(persisted_codes) != physical_codes | connector_codes or len(persisted_codes) != len(
+        set(persisted_codes)
+    ):
+        raise BenchmarkError(
+            "Les codes d'arêtes persistés ne correspondent pas à l'adaptateur Seaway."
+        )
     return {
         "node_count": len(nodes),
         "edge_count": len(edges),
@@ -420,10 +577,107 @@ def adapted_topology_summary(topology: dict[str, Any]) -> dict[str, Any]:
         "physical_pipe_length_m": sum(float(edge["length_m"]) for edge in physical_edges),
         "synthetic_connector_count": len(connector_edges),
         "synthetic_connector_length_m": sum(float(edge["length_m"]) for edge in connector_edges),
+        "edge_codes": persisted_codes,
         "node_kind_counts": {
             kind: sum(1 for node in nodes if node.get("kind") == kind)
             for kind in sorted({str(node.get("kind")) for node in nodes})
         },
+    }
+
+
+def persisted_resource_contract(topology: dict[str, Any]) -> dict[str, Any]:
+    """Contrôle les ressources réellement renvoyées par l'API publique.
+
+    Le benchmark ne suppose pas que les champs envoyés au POST survivent tous :
+    il vérifie leur représentation persistée avant de calculer. Cela verrouille
+    la hiérarchie modèle → nœud/arête → équipement attendue par HydroLiquid.
+    """
+
+    nodes = {str(node.get("code")): node for node in list(topology.get("nodes") or [])}
+    edges = {str(edge.get("code")): edge for edge in list(topology.get("edges") or [])}
+    assets = {str(asset.get("code")): asset for asset in list(topology.get("assets") or [])}
+    expected_nodes: dict[str, tuple[str, float]] = {
+        code: (kind, elevation) for code, _, elevation, _, kind in MODEL_LOCATIONS
+    }
+    if set(nodes) != set(expected_nodes):
+        raise BenchmarkError("Les nœuds persistés ne correspondent pas à la topologie Seaway.")
+    for code, node_expected in expected_nodes.items():
+        node = nodes[code]
+        expected_kind, expected_elevation_m = node_expected
+        if node.get("kind") != expected_kind:
+            raise BenchmarkError(f"Type persistant inattendu pour le nœud {code}.")
+        if abs(float(node["elevation_m"]) - expected_elevation_m) > 1e-9:
+            raise BenchmarkError(f"Altitude persistante inattendue pour le nœud {code}.")
+        if node.get("status") != "available":
+            raise BenchmarkError(f"Statut persistant inattendu pour le nœud {code}.")
+
+    expected_edges: dict[str, tuple[float, str, str]] = {
+        code: (length_m, from_code, to_code)
+        for code, length_m, from_code, to_code, _ in EDGE_LAYOUT
+    }
+    if set(edges) != set(expected_edges):
+        raise BenchmarkError("Les arêtes persistées ne correspondent pas à la topologie Seaway.")
+    for code, edge_expected in expected_edges.items():
+        edge = edges[code]
+        expected_length_m, expected_from_code, expected_to_code = edge_expected
+        required_fields = {
+            "from_node_code",
+            "to_node_code",
+            "length_m",
+            "inner_diameter_m",
+            "roughness_m",
+            "mawp_pa",
+            "status",
+            "profile",
+        }
+        missing = required_fields - set(edge)
+        if missing:
+            raise BenchmarkError(f"Champs d'arête absents pour {code}: {sorted(missing)}.")
+        if edge["from_node_code"] != expected_from_code or edge["to_node_code"] != expected_to_code:
+            raise BenchmarkError(f"Hiérarchie d'arête inattendue pour {code}.")
+        if abs(float(edge["length_m"]) - expected_length_m) > 1e-9:
+            raise BenchmarkError(f"Longueur persistante inattendue pour l'arête {code}.")
+        if abs(float(edge["inner_diameter_m"]) - DIAMETER_M) > 1e-12:
+            raise BenchmarkError(f"Diamètre persistant inattendu pour l'arête {code}.")
+        if abs(float(edge["roughness_m"])) > 1e-12 or float(edge["mawp_pa"]) != ASSUMED_MAWP_PA:
+            raise BenchmarkError(f"Paramètres persistants inattendus pour l'arête {code}.")
+        if edge["status"] != "available" or len(list(edge["profile"])) != 2:
+            raise BenchmarkError(f"Profil ou statut persistant inattendu pour l'arête {code}.")
+
+    expected_assets = {
+        pump_id: station_code
+        for station_code, _, _, pump_ids, _ in MODEL_LOCATIONS
+        for pump_id in pump_ids
+    }
+    if set(assets) != set(expected_assets):
+        raise BenchmarkError("Les équipements persistés ne correspondent pas aux neuf pompes LANL.")
+    for code, expected_node_code in expected_assets.items():
+        asset = assets[code]
+        if asset.get("node_code") != expected_node_code:
+            raise BenchmarkError(f"Rattachement hiérarchique inattendu pour la pompe {code}.")
+        if asset.get("role") != "main" or asset.get("status") != "available":
+            raise BenchmarkError(f"Rôle ou statut persistant inattendu pour la pompe {code}.")
+        if asset.get("catalog_code") != "LANL-SEAWAY-PUMP":
+            raise BenchmarkError(f"Catalogue persistant inattendu pour la pompe {code}.")
+
+    return {
+        "verified": True,
+        "node_count": len(nodes),
+        "edge_count": len(edges),
+        "asset_count": len(assets),
+        "required_edge_fields": sorted(
+            {
+                "from_node_code",
+                "to_node_code",
+                "length_m",
+                "inner_diameter_m",
+                "roughness_m",
+                "mawp_pa",
+                "status",
+                "profile",
+            }
+        ),
+        "asset_parent_field": "node_code",
     }
 
 
@@ -604,10 +858,6 @@ def build_model(
                     {"chainage_m": length_m, "elevation_m": end["elevation_m"]},
                 ],
                 "fittings": [],
-                "payload": {
-                    "source_pipe_id": source_pipe_id,
-                    "provenance": "ASSUMPTION" if source_pipe_id is None else "LANL",
-                },
             },
         )
 
@@ -635,6 +885,7 @@ def build_model(
         raise BenchmarkError(f"Le réseau PETROLE transformé n'est pas valide : {validation}")
     topology = engineer.request("GET", f"/models/{model_id}/topology")
     topology_summary = adapted_topology_summary(topology)
+    resource_contract = persisted_resource_contract(topology)
     if topology_summary["physical_pipe_count"] != 13:
         raise BenchmarkError("L'adaptateur PETROLE doit conserver les 13 conduites physiques LANL.")
     if abs(topology_summary["physical_pipe_length_m"] - 969_030.0) > 1e-6:
@@ -646,8 +897,8 @@ def build_model(
         {
             "name": "Allocation LANL de référence — point transformé",
             "description": (
-                "Débits officiels LANL reconstruits par bilan de masse ; vitesses de pompe "
-                "dérivées et déclarées dans reference_operating_point.csv."
+                "Conditions limites et vitesses provenant de l'OPF native LANL, "
+                "figée dans reference_operating_point.csv."
             ),
             "payload": {
                 "temperature_k": 288.15,
@@ -693,6 +944,7 @@ def build_model(
         "scenario": scenario,
         "validation": validation,
         "topology": topology_summary,
+        "resource_contract": resource_contract,
     }
 
 
@@ -748,8 +1000,8 @@ def compare_result(result_payload: dict[str, Any]) -> dict[str, Any]:
     profile = list(result_payload.get("profile") or [])
     locations = chainages()
 
-    # Débits officiels utilisés par le test LANL. Ils ne sont pas tous saisis
-    # directement : N9/N15/N18 changent le débit via les injections/soutirages.
+    # Débits issus de l'OPF native LANL. Ils ne sont pas tous saisis directement
+    # dans PETROLE : N9/N15/N18 changent le débit via les injections/soutirages.
     flow_checks = {
         "pipe_3": (locations["ST-N3"], REFERENCE_FLOW_BY_PIPE[3]),
         "pipe_9": (locations["INJ-N9"], REFERENCE_FLOW_BY_PIPE[9]),
@@ -819,6 +1071,11 @@ def compare_result(result_payload: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
+    cumulative_formula_head_difference_m = sum(
+        float(row["lanl_leibenzon_loss_m"]) - float(row["petrole_altshul_formula_loss_m"])
+        for row in pipe_rows
+    )
+    terminal_pressure_head_difference_m = float(head_rows[-1]["difference_m"])
     return {
         "flow_checks": flow_rows,
         "pressure_head_checkpoints": head_rows,
@@ -831,6 +1088,11 @@ def compare_result(result_payload: dict[str, Any]) -> dict[str, Any]:
         ),
         "max_abs_pipe_formula_difference_percent": max(
             abs(float(row["formula_difference_percent"])) for row in pipe_rows
+        ),
+        "cumulative_formula_head_difference_m": cumulative_formula_head_difference_m,
+        "terminal_pressure_head_difference_m": terminal_pressure_head_difference_m,
+        "terminal_head_difference_unexplained_by_friction_m": (
+            terminal_pressure_head_difference_m - cumulative_formula_head_difference_m
         ),
     }
 
@@ -874,11 +1136,14 @@ def run_benchmark(
     comparison = compare_result(result_payload) if replay_gate["passed"] else None
     return {
         "benchmark": "PUBLIC-SEAWAY-LANL-01",
-        "classification": "complete_pipeline_cross_formulation_replay",
+        "classification": "complete_pipeline_cross_solver_fixed_operating_point",
         "source": {
             "paper": "Khlebnikova et al., AIChE Journal 2021, DOI 10.1002/aic.17124",
             "machine_data": "lanl-ansi/PetroleumModels.jl test/data/case_seaway.m",
             "source_model_is_synthesized": True,
+            "native_opf_record": "validation/public/seaway_lanl/native_opf_output.json",
+            "native_opf_source_commit": source["native_opf_reference"]["source_commit"],
+            "native_opf_record_sha256": source["native_opf_reference"]["record_sha256"],
         },
         "adapter_assumptions": {
             "synthetic_source_station_connector_m": SYNTHETIC_CONNECTOR_LENGTH_M,
@@ -896,6 +1161,7 @@ def run_benchmark(
             "calculation_id": calculation["id"],
         },
         "adapted_petrole_model": built["topology"],
+        "persisted_resource_contract": built["resource_contract"],
         "source_dataset": source,
         "calculation": {
             "status": calculation.get("status"),
@@ -912,14 +1178,18 @@ def run_benchmark(
         "execution_gate": replay_gate,
         "comparison": comparison,
         "interpretation": {
-            "flow_reference_is_official_lanl_test_output": True,
-            "pressure_head_reference_is_derived_from_lanl_equations": True,
-            "independent_validation_verdict": "NOT_EVALUATED",
-            "independent_validation_reason": (
-                "Les débits LANL servent à reconstruire les injections/soutirages et les "
-                "charges/vitesses du fichier reference_operating_point.csv sont DERIVED. "
-                "Une validation cross-solver indépendante exige une sortie native et figée "
-                "de PetroleumModels.jl (pressions nodales, vitesses, puissances)."
+            "native_opf_reference_available": True,
+            "cross_solver_comparison_verdict": "COMPARISON_COMPLETE",
+            "cross_solver_comparison_scope": (
+                "Débits, vitesses et charges proviennent d'une sortie native et versionnée "
+                "de PetroleumModels.jl ; PETROLE rejoue ce point avec Altshul alors que LANL "
+                "emploie Leibenzon. L'écart est publié, sans calibration a posteriori."
+            ),
+            "predictive_validation_verdict": "NOT_EVALUATED",
+            "predictive_validation_reason": (
+                "Les conditions limites et vitesses de pompe sont imposées depuis la sortie "
+                "LANL. Ce rejeu ne prédit donc pas une sortie LANL inconnue, et le modèle "
+                "source reste synthétisé plutôt que mesuré par SCADA terrain."
             ),
             "field_validation": False,
             "certification": False,

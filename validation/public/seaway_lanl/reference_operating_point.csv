@@ -1,33 +1,48 @@
 kind,id,value,unit,provenance
-pump_speed_ratio,P1,0.80534824,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
-pump_speed_ratio,P2,0.80534824,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
-pump_speed_ratio,P4,0.80534824,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
-pump_speed_ratio,P7,0.80534824,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
-pump_speed_ratio,P10,1.04550752,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
-pump_speed_ratio,P12,1.04547034,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
-pump_speed_ratio,P13,1.04546422,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
-pump_speed_ratio,P19,0.97734783,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
-pump_speed_ratio,P21,0.83155304,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
-pressure_head,N1,190.000000,m,LANL slack-node boundary
-pressure_head,N2,357.822937,m,DERIVED LANL equations under fixed operating point
-pressure_head,N3,525.645875,m,DERIVED LANL equations under fixed operating point
-pressure_head,N4,388.265779,m,DERIVED LANL equations under fixed operating point
-pressure_head,N5,556.088717,m,DERIVED LANL equations under fixed operating point
-pressure_head,N6,645.192325,m,DERIVED LANL equations under fixed operating point
-pressure_head,N7,479.580814,m,DERIVED LANL equations under fixed operating point
-pressure_head,N8,647.403751,m,DERIVED LANL equations under fixed operating point
-pressure_head,N9,652.380997,m,DERIVED LANL equations under fixed operating point
-pressure_head,N10,522.959693,m,DERIVED LANL equations under fixed operating point
-pressure_head,N11,739.959693,m,DERIVED LANL equations under fixed operating point
-pressure_head,N12,30.028717,m,DERIVED LANL equations under fixed operating point
-pressure_head,N13,247.007198,m,DERIVED LANL equations under fixed operating point
-pressure_head,N14,463.982139,m,DERIVED LANL equations under fixed operating point
-pressure_head,N15,490.207732,m,DERIVED LANL equations under fixed operating point
-pressure_head,N16,491.080443,m,DERIVED LANL equations under fixed operating point
-pressure_head,N17,492.907501,m,DERIVED LANL equations under fixed operating point
-pressure_head,N18,491.341991,m,DERIVED LANL equations under fixed operating point
-pressure_head,N19,155.882462,m,DERIVED LANL equations under fixed operating point
-pressure_head,N20,372.882462,m,DERIVED LANL equations under fixed operating point
-pressure_head,N21,30.000000,m,DERIVED LANL equations under fixed operating point
-pressure_head,N22,174.000000,m,DERIVED LANL equations under fixed operating point
-pressure_head,N23,231.703922,m,DERIVED LANL equations under fixed operating point
+metadata,source_commit,df35cd4999a1289710640a46882de7f665d4b32f,git_sha,LANL PetroleumModels.jl source revision used for native OPF execution
+metadata,source_result_sha256,e21a474f096c46f71f4bafa0f59bbd424b2750b740e2474aacff57b4e247da05,sha256,SHA-256 of the untrimmed native JSON result archived during benchmark execution
+metadata,julia_version,1.5.4,version,Native OPF execution environment
+metadata,ipopt_version,0.6.5,version,Native OPF execution environment
+objective,opf,-15.428061594560887,dimensionless,NATIVE PetroleumModels.jl OPF output
+injection,N1,0.356724281076506,m3/s,NATIVE PetroleumModels.jl OPF output producer 1
+injection,N9,0.6077287813384165,m3/s,NATIVE PetroleumModels.jl OPF output producer 2
+withdrawal,N15,0.8254530724072793,m3/s,NATIVE PetroleumModels.jl OPF output consumer 1
+injection,N18,0.5787995029407432,m3/s,NATIVE PetroleumModels.jl OPF output producer 3
+withdrawal,N23,0.7177994929483865,m3/s,NATIVE PetroleumModels.jl OPF output consumer 2
+mass_balance,total,1.543252565355666,m3/s,NATIVE PetroleumModels.jl OPF output; total injection equals total withdrawal within floating-point precision
+pipe_flow,3,0.356724281076506,m3/s,NATIVE PetroleumModels.jl OPF output
+pipe_flow,9,0.9644530624149225,m3/s,NATIVE PetroleumModels.jl OPF output
+pipe_flow,15,0.139,m3/s,NATIVE PetroleumModels.jl OPF output
+pipe_flow,22,0.7177994929483865,m3/s,NATIVE PetroleumModels.jl OPF output
+pump_speed_ratio,P1,0.8054030514534964,ratio,NATIVE PetroleumModels.jl OPF output w=40.270152572674824 r/s divided by 50 r/s
+pump_speed_ratio,P2,0.8054030514534964,ratio,NATIVE PetroleumModels.jl OPF output w=40.270152572674824 r/s divided by 50 r/s
+pump_speed_ratio,P4,0.8054030477643892,ratio,NATIVE PetroleumModels.jl OPF output w=40.27015238821946 r/s divided by 50 r/s
+pump_speed_ratio,P7,0.805403053511389,ratio,NATIVE PetroleumModels.jl OPF output w=40.27015267556945 r/s divided by 50 r/s
+pump_speed_ratio,P10,1.0455237371209432,ratio,NATIVE PetroleumModels.jl OPF output w=52.27618685604716 r/s divided by 50 r/s
+pump_speed_ratio,P12,1.0455237912205992,ratio,NATIVE PetroleumModels.jl OPF output w=52.276189561029966 r/s divided by 50 r/s
+pump_speed_ratio,P13,1.0455237912205992,ratio,NATIVE PetroleumModels.jl OPF output w=52.276189561029966 r/s divided by 50 r/s
+pump_speed_ratio,P19,0.9773477079236766,ratio,NATIVE PetroleumModels.jl OPF output w=48.867385396183835 r/s divided by 50 r/s
+pump_speed_ratio,P21,0.8315529073354597,ratio,NATIVE PetroleumModels.jl OPF output w=41.577645366772984 r/s divided by 50 r/s
+pressure_head,N1,190,m,NATIVE PetroleumModels.jl OPF h=1.9 normalized by base_head=100 m
+pressure_head,N2,357.8457804711603,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N3,525.6915609423205,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N4,388.29748179821036,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N5,556.1432606245041,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N6,645.2465236066625,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N7,479.62302719742524,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N8,647.4688085861404,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N9,652.4364020080955,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N10,523.0000365439092,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N11,740,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N12,30,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N13,247.00000118411367,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N14,464.0000033494698,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N15,490.2243668365613,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N16,491.0969172602105,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N17,492.9086359356301,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N18,491.34115264028145,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N19,155.8819026222964,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N20,372.8819047876544,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N21,30,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N22,174.0000064883819,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m
+pressure_head,N23,231.70397217522148,m,NATIVE PetroleumModels.jl OPF h normalized by base_head=100 m

@@ -31,15 +31,29 @@ def test_dataset_public_seaway_est_complet_et_equilibre() -> None:
     assert summary["allocation_balance_m3_s"] == pytest.approx(0.0, abs=1e-12)
 
 
-def test_allocation_reconstruite_retrouve_les_quatre_debits_lanl() -> None:
+def test_allocation_native_retrouve_les_quatre_debits_lanl() -> None:
     module = load_script()
 
     flows = module.flow_by_pipe()
 
-    assert flows[3] == pytest.approx(0.3567)
-    assert flows[9] == pytest.approx(0.9644)
-    assert flows[15] == pytest.approx(0.1389)
-    assert flows[22] == pytest.approx(0.7178)
+    assert flows[3] == pytest.approx(0.356724281076506)
+    assert flows[9] == pytest.approx(0.9644530624149225)
+    assert flows[15] == pytest.approx(0.139)
+    assert flows[22] == pytest.approx(0.7177994929483865)
+
+
+def test_reference_native_verifie_la_sortie_lanl_et_sa_normalisation() -> None:
+    module = load_script()
+
+    reference = module.verify_native_reference()
+    heads = module.reference_pressure_heads()
+
+    assert reference["source_commit"] == "df35cd4999a1289710640a46882de7f665d4b32f"
+    assert reference["termination_status"] == "LOCALLY_SOLVED"
+    assert reference["objective"] == pytest.approx(-15.428061594560887)
+    assert reference["base_head_m"] == pytest.approx(100.0)
+    assert heads["N1"] == pytest.approx(190.0)
+    assert heads["N23"] == pytest.approx(231.70397217522148)
 
 
 def test_courbe_pompe_reproduit_la_loi_quadratique_lanl() -> None:
@@ -157,15 +171,63 @@ def test_resume_adaptateur_distingue_conduites_physiques_et_connecteur() -> None
             "nodes": [{"kind": "source"}, {"kind": "station"}],
             "assets": [{"code": "P1"}],
             "edges": [
-                {"length_m": 1.001, "payload": {"source_pipe_id": None}},
-                {"length_m": 154_000.0, "payload": {"source_pipe_id": 3}},
+                {"code": code, "length_m": length_m, "payload": {}}
+                for code, length_m, _, _, _ in module.EDGE_LAYOUT
             ],
         }
     )
 
     assert summary["node_count"] == 2
     assert summary["asset_count"] == 1
-    assert summary["physical_pipe_count"] == 1
-    assert summary["physical_pipe_length_m"] == pytest.approx(154_000.0)
+    assert summary["physical_pipe_count"] == 13
+    assert summary["physical_pipe_length_m"] == pytest.approx(969_030.0)
     assert summary["synthetic_connector_count"] == 1
     assert summary["synthetic_connector_length_m"] == pytest.approx(1.001)
+
+
+def test_contrat_ressources_persistes_verifie_hierarchie_et_champs_api() -> None:
+    module = load_script()
+    topology = {
+        "nodes": [
+            {
+                "code": code,
+                "kind": kind,
+                "elevation_m": elevation,
+                "status": "available",
+            }
+            for code, _, elevation, _, kind in module.MODEL_LOCATIONS
+        ],
+        "edges": [
+            {
+                "code": code,
+                "from_node_code": from_code,
+                "to_node_code": to_code,
+                "length_m": length_m,
+                "inner_diameter_m": module.DIAMETER_M,
+                "roughness_m": 0.0,
+                "mawp_pa": module.ASSUMED_MAWP_PA,
+                "status": "available",
+                "profile": [{}, {}],
+            }
+            for code, length_m, from_code, to_code, _ in module.EDGE_LAYOUT
+        ],
+        "assets": [
+            {
+                "code": pump_id,
+                "node_code": station_code,
+                "role": "main",
+                "status": "available",
+                "catalog_code": "LANL-SEAWAY-PUMP",
+            }
+            for station_code, _, _, pump_ids, _ in module.MODEL_LOCATIONS
+            for pump_id in pump_ids
+        ],
+    }
+
+    contract = module.persisted_resource_contract(topology)
+
+    assert contract["verified"] is True
+    assert contract["node_count"] == 15
+    assert contract["edge_count"] == 14
+    assert contract["asset_count"] == 9
+    assert contract["asset_parent_field"] == "node_code"

@@ -56,7 +56,9 @@ Fichiers :
 - `pumps.csv` — neuf pompes et leurs contraintes ;
 - `producers.csv` — trois injections ;
 - `consumers.csv` — deux soutirages ;
-- `reference_solution.csv` — sorties de référence et allocation fixe reconstruite ;
+- `reference_solution.csv` — assertions arrondies du test public LANL ;
+- `native_opf_output.json` — enregistrement compact de la sortie OPF LANL effectivement rejouée ;
+- `reference_operating_point.csv` — conditions limites, vitesses et charges extraites de cette sortie native ;
 - `petrole_pump_curve.csv` — échantillonnage de la loi analytique LANL vers la courbe H(Q) PETROLE.
 
 ## Topologie
@@ -75,7 +77,8 @@ une cardinalité faussement attribuée au modèle PETROLE adapté.
 
 ## Référence numérique externe disponible
 
-Le test officiel `PetroleumModels.jl/test/opf.jl` attend notamment :
+Le test officiel `PetroleumModels.jl/test/opf.jl` attend notamment, avec une
+tolérance volontairement large :
 
 - objectif ≈ `-15.429` ;
 - débit pipe 3 ≈ `0.3567 m3/s` ;
@@ -83,23 +86,74 @@ Le test officiel `PetroleumModels.jl/test/opf.jl` attend notamment :
 - débit pipe 15 ≈ `0.1389 m3/s` ;
 - débit pipe 22 ≈ `0.7178 m3/s`.
 
-Comme la topologie est linéaire avec trois injections et deux soutirages, ces quatre débits permettent de reconstruire par bilan de masse une allocation fixe pour un rejeu hydraulique PETROLE :
+La campagne PETROLE exécute aussi le solveur LANL lui-même, à la révision
+`df35cd4999a1289710640a46882de7f665d4b32f`, avec Julia `1.5.4`, Ipopt `0.6.5`
+et le cas exact `test/data/case_seaway.m`. La sortie est `LOCALLY_SOLVED`, avec
+un objectif `-15.428061594560887`. Le record compact, versionné dans
+`native_opf_output.json`, contient les 23 charges, les 13 débits de conduite,
+les neuf vitesses de pompe ainsi que les trois injections et deux soutirages.
 
-- N1 injection : `0.3567 m3/s` ;
-- N9 injection : `0.6077 m3/s` ;
-- N15 soutirage : `0.8255 m3/s` ;
-- N18 injection : `0.5789 m3/s` ;
-- N23 soutirage : `0.7178 m3/s` ;
-- total injecté = total soutiré = `1.5433 m3/s`.
+Les charges `h` de cette sortie sont normalisées explicitement par
+`base_head=100 m` : le nœud contraint N1 donne `1.9 × 100 = 190 m`, exactement
+la contrainte du fichier LANL. Ce point est contrôlé par les tests ; aucune
+conversion implicite ne subsiste.
 
-Cette allocation est marquée **DERIVED** : elle est déduite des sorties de référence, pas directement copiée d'une table du papier. Les débits deviennent alors des **conditions limites d'entrée** du rejeu PETROLE : leur reproduction vérifie la topologie et le bilan matière, mais ne constitue pas une validation indépendante du solveur hydraulique.
+La référence native donne notamment :
 
-Le fichier `reference_operating_point.csv` est également **DERIVED** : les charges et vitesses qu'il contient servent à diagnostiquer l'écart de formulation Leibenzon/Altshul. Elles ne doivent pas être présentées comme des sorties officielles de PetroleumModels.jl.
+- N1 injection : `0.356724281076506 m3/s` ;
+- N9 injection : `0.6077287813384165 m3/s` ;
+- N15 soutirage : `0.8254530724072793 m3/s` ;
+- N18 injection : `0.5787995029407432 m3/s` ;
+- N23 soutirage : `0.7177994929483865 m3/s` ;
+- total injecté = total soutiré = `1.543252565355666 m3/s` à la précision flottante.
 
-Le runner publie donc deux verdicts séparés :
+Le runner réinjecte délibérément ces conditions limites **et** les vitesses OPF
+LANL dans PETROLE. Il compare alors les charges et les pertes à point de
+fonctionnement identique. Les débits ne sont donc pas présentés comme une
+prédiction de PETROLE : ils sont un contrôle de topologie et de bilan matière.
 
-- `execution_gate` — PASS uniquement si HydroLiquid converge, est réalisable et ne porte aucune violation ni avertissement non déclaré. Les seuls avertissements pré-déclarés pour ce cas sont l'absence de pression de vapeur dans la source publique et le fonctionnement hors BEP de certaines pompes au point LANL imposé ; ils restent exposés dans la preuve sous `PASS_WITH_EXPECTED_WARNINGS` ;
-- `independent_validation_verdict` — `NOT_EVALUATED` tant qu'une sortie native, figée et reproductible de PetroleumModels.jl (pressions, vitesses et puissances) n'est pas archivée comme référence externe.
+Le rapport publie trois statuts sans les confondre :
+
+- `execution_gate` — réussite du calcul HydroLiquid uniquement si convergence,
+  faisabilité, zéro violation et aucun avertissement non pré-déclaré ;
+- `cross_solver_comparison_verdict = COMPARISON_COMPLETE` — comparaison
+  reproductible contre les charges/vitesses issues du solveur LANL ;
+- `predictive_validation_verdict = NOT_EVALUATED` — aucune capacité prédictive
+  indépendante n'est revendiquée, puisque le point OPF sert d'entrée au rejeu
+  et que le modèle LANL est synthétisé, non une série SCADA mesurée.
+
+## Exécution PETROLE tracée
+
+Le 9 août 2026, le runner a été exécuté contre l'instance PETROLE servant le
+SHA `dde0481380cd792f20e15eb640bc3acc9d198bd0`. Le projet actif de preuve est
+`BENCH-SEAWAY-LANL-R6` ; les cinq tentatives antérieures, conservées dans
+l'audit applicatif, ont été archivées pour ne pas encombrer le panel.
+
+Le contrat persistant de l'API a été contrôlé avant le calcul : **15 nœuds**,
+**14 arêtes**, **9 équipements**, dont 13 conduites physiques pour
+**969 030 m** et un seul connecteur d'adaptation de 1,001 m. Chaque arête
+renvoie et respecte `from_node_code`, `to_node_code`, `length_m`,
+`inner_diameter_m`, `roughness_m`, `mawp_pa`, `status` et `profile` ; chaque
+pompe est rattachée à son nœud par `node_code`, avec le rôle `main` et le
+catalogue attendu.
+
+HydroLiquid a retourné `SIM_CONVERGED_WARN`, réalisable, avec **zéro violation**.
+Les cinq warnings sont pré-déclarés et non masqués : pression de vapeur absente
+dans la source publique (contrôles vapeur/NPSH non conclusifs) et quatre pompes
+hors BEP au point OPF LANL. La porte d'exécution est donc
+`PASS_WITH_EXPECTED_WARNINGS`, pas un PASS sans réserve.
+
+Les quatre débits comparés sont reproduits avec un écart relatif maximal de
+`0,00000719 %`. La charge terminale PETROLE est supérieure de `39,110990 m` à
+la sortie LANL. Ce n'est pas un écart inexpliqué : Altshul prédit, sur les
+13 conduites, `39,114021 m` de pertes cumulées en moins que Leibenzon ; le
+résidu non expliqué est `-0,003032 m` (environ `0,008 %` de cet écart).
+Le rapport JSON de preuve est conservé sur le VPS dans
+`var/validation-vps/benchmark-seaway-lanl-native.json`.
+
+Cette exécution démontre donc la cohérence de PETROLE sur le réseau complet
+adapté et la traçabilité de sa différence de formulation. Elle ne constitue ni
+une validation prédictive indépendante, ni une certification industrielle.
 
 ## Adaptation scientifique vers PETROLE
 

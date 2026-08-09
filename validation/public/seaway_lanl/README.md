@@ -92,7 +92,7 @@ Le fichier `reference_operating_point.csv` est également **DERIVED** : les char
 
 Le runner publie donc deux verdicts séparés :
 
-- `execution_gate` — PASS uniquement si HydroLiquid converge sans avertissement ni violation ;
+- `execution_gate` — PASS uniquement si HydroLiquid converge, est réalisable et ne porte aucune violation ni avertissement non déclaré. Les seuls avertissements pré-déclarés pour ce cas sont l'absence de pression de vapeur dans la source publique et le fonctionnement hors BEP de certaines pompes au point LANL imposé ; ils restent exposés dans la preuve sous `PASS_WITH_EXPECTED_WARNINGS` ;
 - `independent_validation_verdict` — `NOT_EVALUATED` tant qu'une sortie native, figée et reproductible de PetroleumModels.jl (pressions, vitesses et puissances) n'est pas archivée comme référence externe.
 
 ## Adaptation scientifique vers PETROLE
@@ -123,6 +123,10 @@ Le fichier LANL donne des limites de **charge hydraulique de fonctionnement**, p
 Le script d'adaptation utilisera une valeur **non bloquante et explicitement marquée ASSUMPTION**. Cette valeur ne devra jamais être présentée comme la MAWP du vrai Seaway et sera exclue des conclusions de validation.
 
 La borne source `740 m` correspond, avec `rho=827 kg/m3` et `g=9.8 m/s2`, à environ `5.997 MPa` de pression de charge ; elle sera conservée séparément comme contrainte du benchmark.
+
+### Connecteur source → première station
+
+PETROLE porte les pompes sur un nœud `station`, tandis que LANL représente les pompes par des arêtes de longueur nulle. L'adaptateur insère donc un connecteur source → station de **1,001 m**. Cette longueur est négligeable face aux 969,03 km physiques, mais dépasse la tolérance de recherche de station de 1 m du moteur : avec un connecteur de 1 mm, les pompes de tête étaient appliquées deux fois. La longueur synthétique reste explicitement exclue de la longueur physique du benchmark.
 
 ## Ce que ce cas permettra de vérifier dans PETROLE
 

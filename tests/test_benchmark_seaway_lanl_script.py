@@ -65,7 +65,8 @@ def test_adaptateur_ne_fait_pas_passer_la_mawp_synthetique_pour_une_donnee_terra
 def test_connecteur_source_station_est_negligeable_et_declare() -> None:
     module = load_script()
 
-    assert pytest.approx(0.001) == module.SYNTHETIC_CONNECTOR_LENGTH_M
+    assert pytest.approx(1.001) == module.SYNTHETIC_CONNECTOR_LENGTH_M
+    assert module.SYNTHETIC_CONNECTOR_LENGTH_M > 1.0
     assert module.EDGE_LAYOUT[0][4] is None
     physical = sum(length for _, length, _, _, source_pipe in module.EDGE_LAYOUT if source_pipe)
     assert physical == pytest.approx(969_030.0)
@@ -92,9 +93,9 @@ def test_porte_execution_refuse_non_convergence_et_violations() -> None:
     module = load_script()
 
     verdict = module.execution_gate(
-        {"status": "SIM_CONVERGED_WARN"},
+        {"status": "SIM_NOT_CONVERGED"},
         {
-            "status": "SIM_CONVERGED_WARN",
+            "status": "SIM_NOT_CONVERGED",
             "feasible": False,
             "violations": [{"code": "P_MIN"}],
             "warnings": [{"code": "WARN"}],
@@ -107,8 +108,26 @@ def test_porte_execution_refuse_non_convergence_et_violations() -> None:
         "result_status",
         "feasible",
         "violations",
-        "warnings",
+        "warning_codes",
     }
+
+
+def test_porte_execution_accepte_uniquement_les_avertissements_deja_declares() -> None:
+    module = load_script()
+
+    verdict = module.execution_gate(
+        {"status": "SIM_CONVERGED"},
+        {
+            "status": "SIM_CONVERGED",
+            "feasible": True,
+            "violations": [],
+            "warnings": [{"code": "WARN_PROPERTY_DEFAULTED"}, {"code": "WARN_PUMP_OFF_BEP"}],
+        },
+    )
+
+    assert verdict["passed"] is True
+    assert verdict["status"] == "PASS_WITH_EXPECTED_WARNINGS"
+    assert verdict["unexpected_warning_codes"] == []
 
 
 def test_rejeu_change_le_code_projet_sans_dupliquer_le_catalogue() -> None:

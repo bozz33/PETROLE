@@ -1,0 +1,2 @@
+case_id,measurement_time,measured_flow_m3_h,published_calculated_flow_m3_h,published_relative_error_percent,published_reynolds,beta,m,provenance
+EC07-1401,14:01,270,268.70,0.48,76918,0.0246,0.25,Wang et al. 2025 section 4.2 and Table 2; pressure time series are not published numerically

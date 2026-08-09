@@ -23,7 +23,9 @@ export function HydraulicProfileChart({ points }: { points: CalculationProfilePo
   const option: EChartsOption = {
     grid: { left: 60, right: 24, top: 40, bottom: 48 },
     tooltip: { trigger: "axis" },
-    legend: { bottom: 0 },
+    // La légende ne doit pas partager la marge basse avec le titre de l'axe X :
+    // à cet emplacement, elle masquait « Chaînage (km) » sur les deux graphiques.
+    legend: { top: 0 },
     xAxis: {
       type: "value",
       name: "Chaînage (km)",
@@ -58,7 +60,8 @@ export function PressureDistanceChart({ points }: { points: CalculationProfilePo
   const option: EChartsOption = {
     grid: { left: 60, right: 60, top: 40, bottom: 48 },
     tooltip: { trigger: "axis" },
-    legend: { bottom: 0 },
+    // Même disposition que le profil hydraulique : légende distincte du titre X.
+    legend: { top: 0 },
     xAxis: {
       type: "value",
       name: "Chaînage (km)",

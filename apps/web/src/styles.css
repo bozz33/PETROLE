@@ -536,7 +536,19 @@ a {
 
 .table-wrap {
   width: 100%;
-  overflow-x: auto;
+  /* Une ressource peut contenir des centaines de lignes. Le défilement doit
+     rester dans sa table, sans étirer la page entière. */
+  max-block-size: min(52dvh, 32rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f7f9f8;
 }
 
 table {

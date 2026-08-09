@@ -33,11 +33,21 @@ const BASE: ScenarioPayload = {
 };
 
 describe("contraintes du scénario", () => {
-  it("refuse un problème sans condition", () => {
+  it("guide la création sans alerte technique lorsqu'aucune condition n'est encore saisie", () => {
     const verdict = describeBoundaryConditions(BASE, false);
 
     expect(verdict.valid).toBe(false);
-    expect(verdict.message).toContain("sous-contraint");
+    expect(verdict.kind).toBe("empty");
+    expect(verdict.message).not.toContain("sous-contraint");
+    expect(verdict.message).toContain("Renseignez deux conditions");
+  });
+
+  it("explique la condition manquante après une première saisie", () => {
+    const verdict = describeBoundaryConditions({ ...BASE, imposed_flow_m3_s: 0.2 }, false);
+
+    expect(verdict.valid).toBe(false);
+    expect(verdict.kind).toBe("incomplete");
+    expect(verdict.message).toContain("Il manque une condition");
   });
 
   it("accepte un débit imposé avec une pression amont", () => {
@@ -71,6 +81,7 @@ describe("contraintes du scénario", () => {
     );
 
     expect(verdict.valid).toBe(false);
+    expect(verdict.kind).toBe("overconstrained");
     expect(verdict.message).toContain("sur-contraint");
   });
 

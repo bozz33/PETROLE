@@ -369,8 +369,8 @@ export function ScenariosPage() {
             </div>
 
             <div
-              className={boundary.valid ? "notice" : "notice notice-error"}
-              role={boundary.valid ? undefined : "alert"}
+              className={boundary.kind === "overconstrained" ? "notice notice-error" : "notice"}
+              role={boundary.kind === "overconstrained" ? "alert" : undefined}
             >
               {boundary.message}
             </div>
@@ -381,7 +381,11 @@ export function ScenariosPage() {
             description="État imposé et rapport de vitesse, par équipement du modèle."
           >
             {pumps.length ? (
-              <div className="table-wrap">
+              <div
+                className="table-wrap resource-table-scroll"
+                tabIndex={0}
+                aria-label="Pompes — défilement interne"
+              >
                 <table>
                   <thead>
                     <tr>
@@ -480,7 +484,7 @@ export function ScenariosPage() {
           <div className="content-grid equal">
             <Panel title="Stations" description="Stations disponibles ou contournées.">
               {stations.length ? (
-                <ul className="issue-list">
+                <ul className="issue-list resource-list-scroll" tabIndex={0} aria-label="Stations — défilement interne">
                   {stations.map((station) => {
                     const override = payload.station_overrides.find(
                       (item) => item.station_id === station.code,
@@ -521,7 +525,11 @@ export function ScenariosPage() {
 
             <Panel title="Tronçons" description="Indisponibilités et pertes singulières ajoutées.">
               {edges.length ? (
-                <div className="table-wrap">
+                <div
+                  className="table-wrap resource-table-scroll"
+                  tabIndex={0}
+                  aria-label="Tronçons — défilement interne"
+                >
                   <table>
                     <thead>
                       <tr>
@@ -798,7 +806,11 @@ export function ScenariosPage() {
         description="Chaque scénario est calculable depuis « Calcul hydraulique »."
       >
         {scenarios.length ? (
-          <div className="table-wrap">
+          <div
+            className="table-wrap resource-table-scroll"
+            tabIndex={0}
+            aria-label="Scénarios enregistrés — défilement interne"
+          >
             <table>
               <thead>
                 <tr>
@@ -839,7 +851,7 @@ export function ScenariosPage() {
 export function describeBoundaryConditions(
   payload: ScenarioPayload,
   hasTanks: boolean,
-): { valid: boolean; message: string } {
+): { valid: boolean; kind: "ready" | "empty" | "incomplete" | "overconstrained"; message: string } {
   const inletKnown =
     payload.inlet_pressure_pa !== null || (hasTanks && payload.inlet_tank_level_m !== null);
   const outletKnown =
@@ -849,6 +861,7 @@ export function describeBoundaryConditions(
   if (flowKnown && inletKnown && outletKnown) {
     return {
       valid: false,
+      kind: "overconstrained",
       message:
         "Problème sur-contraint : un débit imposé et deux conditions d'extrémité ne peuvent pas " +
         "être satisfaits simultanément. Retirez une des trois consignes.",
@@ -857,6 +870,7 @@ export function describeBoundaryConditions(
   if (flowKnown && (inletKnown || outletKnown)) {
     return {
       valid: true,
+      kind: "ready",
       message:
         "Problème correctement contraint : débit imposé et " +
         (inletKnown ? "condition amont" : "condition aval") +
@@ -866,16 +880,27 @@ export function describeBoundaryConditions(
   if (!flowKnown && inletKnown && outletKnown) {
     return {
       valid: true,
+      kind: "ready",
       message:
         "Problème correctement contraint : conditions amont et aval imposées. Le moteur " +
         "recherche le débit compatible.",
     };
   }
+  if (!flowKnown && !inletKnown && !outletKnown) {
+    return {
+      valid: false,
+      kind: "empty",
+      message:
+        "Renseignez deux conditions indépendantes : un débit imposé et une condition " +
+        "amont ou aval, ou les conditions amont et aval. Le scénario sera alors calculable.",
+    };
+  }
   return {
     valid: false,
+    kind: "incomplete",
     message:
-      "Problème sous-contraint : le moteur exige exactement deux conditions indépendantes " +
-      "parmi le débit imposé, la condition amont et la condition aval.",
+      "Il manque une condition indépendante. Ajoutez un débit imposé ou une condition " +
+      "à l'autre extrémité pour rendre le scénario calculable.",
   };
 }
 

@@ -259,3 +259,47 @@ test("réduit et restaure la barre latérale", async ({ page }, testInfo) => {
   await page.getByRole("button", { name: "Déployer la barre latérale" }).click();
   await expect(page.locator(".app-shell")).not.toHaveClass(/sidebar-collapsed/);
 });
+
+test("confine les longues ressources de scénarios dans leurs défilements", async ({ page }) => {
+  const longEdges = Array.from({ length: 100 }, (_, index) =>
+    networkEdge(
+      "edge-scenario-" + index,
+      index === 0 ? "node-source" : "node-station",
+      index === 99 ? "node-terminal" : "node-station",
+      "L-" + String(index + 1).padStart(3, "0"),
+      "Tronçon " + String(index + 1),
+      index + 1,
+      10_000,
+    ),
+  );
+  const pumps = Array.from({ length: 15 }, (_, index) => ({
+    id: "pump-" + index,
+    model_version_id: model.id,
+    code: "P-" + String(index + 1).padStart(2, "0"),
+    name: "Pompe " + String(index + 1),
+    role: "main",
+  }));
+
+  await page.route(/\/api\/v1\/models\/model-1\/edges/, (route) => respond(route, pageOf(longEdges)));
+  await page.route(/\/api\/v1\/models\/model-1\/assets/, (route) => respond(route, pageOf(pumps)));
+
+  await page.goto("/scenarios");
+  await expect(page.getByText("Renseignez deux conditions indépendantes")).toBeVisible();
+  await expect(page.locator('[role="alert"]')).toHaveCount(0);
+
+  for (const label of ["Pompes — défilement interne", "Tronçons — défilement interne"]) {
+    const resource = page.getByLabel(label);
+    await expect(resource).toHaveCSS("overflow-y", "auto");
+    const size = await resource.evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    }));
+    expect(size.scrollHeight).toBeGreaterThan(size.clientHeight);
+  }
+
+  const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
+  // Sur mobile le formulaire se présente en une colonne et mesure environ
+  // 4,9 kpx. Ce seuil laisse ce contenu légitime, tout en empêchant les
+  // 100 lignes de tronçons de redevenir un défilement de page géant.
+  expect(bodyHeight).toBeLessThan(6_000);
+});

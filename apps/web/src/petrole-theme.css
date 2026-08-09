@@ -401,6 +401,20 @@ td small,
   color: var(--foreground-muted);
 }
 
+/* Les longues listes métier restent dans leur panneau : seule la ressource
+   dépasse, pas tout l'écran Scénarios. Les tableaux suivent cette règle
+   globalement via .table-wrap. */
+.resource-list-scroll {
+  max-block-size: min(52dvh, 32rem);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.resource-list-scroll {
+  overflow-y: auto;
+  padding-inline-end: 4px;
+}
+
 .button {
   min-height: 36px;
   padding: 8px 13px;

@@ -49,7 +49,7 @@ transitoire, un système SCADA ou un jumeau numérique.
 | Pompes, stations, NPSH, vitesse, énergie | **Implémenté** | `hydro_domain/pumps.py`, `stations.py`, `operations.py` | Données constructeur et calibration pilote |
 | Bacs, barémages, transfert et bilan matière | **Implémenté** | `hydro_tanks`, `operations.py`, rapports RPT-05/RPT-06 | Planification de mouvements et chemins alternatifs |
 | Scénarios, comparaison et optimisation bornée | **Implémenté** | `ScenarioPayloadInput`, `OptimizationCreate`, énumération/Pyomo | Optimisation lourde asynchrone et multi-périodes |
-| Imports CSV/XLSX/JSON et lignage | **Implémenté** | `data_import.py`, données brutes/normalisées/corrigées | Qualité temporelle, statistiques et résidus |
+| Imports CSV/XLSX/JSON et lignage | **Partiel** | `data_import.py`, données brutes/normalisées/corrigées ; le mapping d'unités n'est pas encore appliqué | Conversion SI vérifiable, puis qualité temporelle/statistiques/résidus |
 | Rapports et exports de calcul | **Partiel** | PDF versionné et exports CSV/XLSX/JSON ; pas d'export DOCX ni PNG autonome exposé | Fermer l'interprétation de D04 FR-RPT-001/002 avant promesse contractuelle |
 | Calibration mesure-modèle et analytics historiques | **Partiel** | Les mesures s'importent avec horodatage/qualité ; aucune UI de séries, de résidus, RMSE ou calibration | **Phase 2 — pilote/V1** |
 | Multiproduit, interfaces et mélange | **Planifié** | `batch_reference` est seulement une métadonnée ; aucun suivi de lot | **Phase 4 / V2** |
@@ -69,7 +69,7 @@ méritent un travail identifié.
 
 | Bloc D04 | Implémenté | Partiel | Planifié | Constat / écart restant |
 |---|---:|---:|---:|---|
-| FR-GEN-001..005 — principes généraux | 5 | 0 | 0 | SI, version/méthode/scénario tracés, erreurs structurées, règles séparées du solveur. |
+| FR-GEN-001..005 — principes généraux | 4 | 1 | 0 | **FR-GEN-003** : `hydro_shared.units` sait convertir et conserver une `Measure`, mais le pipeline d'import ne l'emploie pas encore. |
 | FR-PRJ-001..006 — projets et versions | 5 | 1 | 0 | **FR-PRJ-005** : clone/filiation présents ; diff lisible de deux versions absent. |
 | FR-MOD-001..008 — réseau et équipements | 7 | 1 | 0 | **FR-MOD-007** : carte MapLibre présente, mais pas de sélection synchronisée carte ↔ schéma. |
 | FR-FLD-001..005 — produits et propriétés | 4 | 1 | 0 | **FR-FLD-003** : méthode/incertitude présentes dans les points ; date de laboratoire et workflow complet restent à modéliser. |
@@ -77,24 +77,30 @@ méritent un travail identifié.
 | FR-PMP-001..008 — pompes et stations | 8 | 0 | 0 | Courbes, fit/interpolation, configurations, NPSH, puissance et recherche bornée. |
 | FR-TNK-001..008 — bacs et transferts | 6 | 1 | 1 | **FR-TNK-007** : chemin explicite validé, pas de recherche/choix automatique parmi des chemins alternatifs ; **FR-TNK-008** : planning multi-mouvements est LATER. |
 | FR-SCN-001..008 — scénarios et optimisation | 6 | 0 | 2 | Les transitoires et le gaz sont volontairement LATER. |
-| FR-DAT-001..007 — données et analyses | 3 | 2 | 2 | **FR-DAT-004/005** : pas encore de dashboard séries/aberrants ni comparaison mesure-modèle avec RMSE/biais ; SCADA et fuite sont LATER. |
+| FR-DAT-001..007 — données et analyses | 2 | 3 | 2 | **FR-DAT-001** : CSV/XLSX et mapping colonnes sont présents, mais `DatasetMapping` ne déclare pas les unités et `data_import.py` ne convertit pas vers le SI. **FR-DAT-004/005** : pas encore de dashboard séries/aberrants ni comparaison mesure-modèle avec RMSE/biais ; SCADA et fuite sont LATER. |
 | FR-RPT-001..006 — rapports et collaboration | 3 | 3 | 0 | PDF, CSV/XLSX/JSON et RPT-01 à RPT-06 sont présents. À décider/fermer : DOCX si « Word/PDF » signifie les deux formats, image de graphique téléchargeable, logo/langue par organisation. |
 | FR-ADM-001..006 — administration et sécurité | 6 | 0 | 0 | RBAC/audit/sauvegarde-restauration/règles/déploiements séparés ; aucune commande industrielle. |
-| **Total** | **62** | **9** | **5** | Les 5 planifiées sont explicitement hors MVP ; les 9 partielles doivent être arbitrées selon leur priorité contractuelle. |
+| **Total** | **60** | **11** | **5** | Les 5 planifiées sont explicitement hors MVP ; les 11 partielles doivent être arbitrées selon leur priorité contractuelle. |
 
 ### Points MVP à fermer ou à accepter explicitement
 
-1. **Rapports.** Le produit génère actuellement des PDF, pas des DOCX, et ne
+1. **Unités d'import — MUST.** `DatasetMapping` accepte seulement les
+   colonnes et constantes ; un objet `units` fourni est aujourd'hui ignoré par
+   le schéma. Les utilitaires Pint existent, mais aucune conversion ne relie
+   un fichier en km, ft, bar, m³/h ou kW aux champs SI normalisés. Il faut
+   ajouter un mapping par grandeur, convertir avec `hydro_shared.units.to_si`,
+   conserver l'unité/source et rejeter une incompatibilité dimensionnelle.
+2. **Rapports.** Le produit génère actuellement des PDF, pas des DOCX, et ne
    fournit pas un bouton/API d'export PNG distinct des graphiques. Si le slash
    « Word/PDF » de FR-RPT-001 signifie « l'un des deux », le PDF ferme ce point ;
    s'il signifie les deux, il faut rouvrir un petit lot de reporting sur `main`.
-2. **Carte.** La vue carte affiche un tracé lorsque les coordonnées existent,
+3. **Carte.** La vue carte affiche un tracé lorsque les coordonnées existent,
    mais son état de sélection ne se synchronise pas avec React Flow. C'est une
    exigence SHOULD, non une porte MVP.
-3. **Topologie.** Le modèle de données est un graphe, mais la validation et le
+4. **Topologie.** Le modèle de données est un graphe, mais la validation et le
    moteur principal refusent une branche. Cette limite doit rester visible dans
    l'UI, les propositions commerciales et les rapports.
-4. **Mesures.** L'import a le bon lignage (`raw`, `normalized`, `corrected`) et
+5. **Mesures.** L'import a le bon lignage (`raw`, `normalized`, `corrected`) et
    impose `timestamp`, `unit`, `quality`, `source`. Il n'est pas encore un
    produit d'analytics ni de calibration.
 
@@ -120,6 +126,7 @@ connecteur OPC UA isolé.
 
 | Priorité | Lot | Sortie mesurable | Porte de passage |
 |---:|---|---|---|
+| P0 | Corriger le mapping et la conversion des unités | Unit mapping explicite, valeur SI, valeur/unité d'origine, erreurs dimensionnelles et tests CSV/XLSX/JSON | FR-GEN-003 et FR-DAT-001 clos sur un SHA requalifié |
 | P0 | Décision de release MVP | Fiche ingénieur externe, identité de signature, rapport de qualification rattaché au SHA final | Tag signé `v1.0.0-mvp`, sans prétention de certification industrielle |
 | P1 | **Pilote/V1 : calibration et mesures** | Dataset immuable, séparation calibration/validation, résidus, biais, MAE/RMSE, incertitudes et RPT-07/RPT-08 | Un régime non utilisé pour ajuster le modèle est prédit dans la tolérance convenue |
 | P1 | Durcissement pilote | MFA/OIDC, RLS ou contrôle d'accès équivalent démontré, politique de rétention, alerting et revue UX | Architecture et procédures acceptées par l'opérateur |

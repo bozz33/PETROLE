@@ -1,0 +1,12 @@
+kind,id,value,unit,provenance
+objective,opf,-15.429,dimensionless,PetroleumModels.jl test/opf.jl
+pipe_flow,3,0.3567,m3/s,PetroleumModels.jl test/opf.jl
+pipe_flow,9,0.9644,m3/s,PetroleumModels.jl test/opf.jl
+pipe_flow,15,0.1389,m3/s,PetroleumModels.jl test/opf.jl
+pipe_flow,22,0.7178,m3/s,PetroleumModels.jl test/opf.jl
+injection,N1,0.3567,m3/s,derived by mass balance from reference pipe flows
+injection,N9,0.6077,m3/s,derived by mass balance from reference pipe flows
+withdrawal,N15,0.8255,m3/s,derived by mass balance from reference pipe flows
+injection,N18,0.5789,m3/s,derived by mass balance from reference pipe flows
+withdrawal,N23,0.7178,m3/s,derived by mass balance from reference pipe flows
+mass_balance,total,1.5433,m3/s,derived from reconstructed allocation

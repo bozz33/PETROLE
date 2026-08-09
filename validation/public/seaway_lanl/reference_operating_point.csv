@@ -1,0 +1,33 @@
+kind,id,value,unit,provenance
+pump_speed_ratio,P1,0.80534824,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
+pump_speed_ratio,P2,0.80534824,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
+pump_speed_ratio,P4,0.80534824,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
+pump_speed_ratio,P7,0.80534824,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
+pump_speed_ratio,P10,1.04550752,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
+pump_speed_ratio,P12,1.04547034,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
+pump_speed_ratio,P13,1.04546422,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
+pump_speed_ratio,P19,0.97734783,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
+pump_speed_ratio,P21,0.83155304,ratio,DERIVED fixed-flow feasible energy-minimizing operating point from LANL equations
+pressure_head,N1,190.000000,m,LANL slack-node boundary
+pressure_head,N2,357.822937,m,DERIVED LANL equations under fixed operating point
+pressure_head,N3,525.645875,m,DERIVED LANL equations under fixed operating point
+pressure_head,N4,388.265779,m,DERIVED LANL equations under fixed operating point
+pressure_head,N5,556.088717,m,DERIVED LANL equations under fixed operating point
+pressure_head,N6,645.192325,m,DERIVED LANL equations under fixed operating point
+pressure_head,N7,479.580814,m,DERIVED LANL equations under fixed operating point
+pressure_head,N8,647.403751,m,DERIVED LANL equations under fixed operating point
+pressure_head,N9,652.380997,m,DERIVED LANL equations under fixed operating point
+pressure_head,N10,522.959693,m,DERIVED LANL equations under fixed operating point
+pressure_head,N11,739.959693,m,DERIVED LANL equations under fixed operating point
+pressure_head,N12,30.028717,m,DERIVED LANL equations under fixed operating point
+pressure_head,N13,247.007198,m,DERIVED LANL equations under fixed operating point
+pressure_head,N14,463.982139,m,DERIVED LANL equations under fixed operating point
+pressure_head,N15,490.207732,m,DERIVED LANL equations under fixed operating point
+pressure_head,N16,491.080443,m,DERIVED LANL equations under fixed operating point
+pressure_head,N17,492.907501,m,DERIVED LANL equations under fixed operating point
+pressure_head,N18,491.341991,m,DERIVED LANL equations under fixed operating point
+pressure_head,N19,155.882462,m,DERIVED LANL equations under fixed operating point
+pressure_head,N20,372.882462,m,DERIVED LANL equations under fixed operating point
+pressure_head,N21,30.000000,m,DERIVED LANL equations under fixed operating point
+pressure_head,N22,174.000000,m,DERIVED LANL equations under fixed operating point
+pressure_head,N23,231.703922,m,DERIVED LANL equations under fixed operating point

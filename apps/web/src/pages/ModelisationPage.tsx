@@ -44,6 +44,16 @@ const EQUIPMENT_COLLECTIONS: CatalogCollection[] = [
   "materials",
 ];
 
+// Ces sentinelles doivent rester stables pendant le chargement React Query.
+// Un littéral `?? []` crée un nouveau tableau à chaque rendu et peut relancer
+// des effets qui synchronisent les formulaires.
+const EMPTY_PROJECTS: Project[] = [];
+const EMPTY_MODELS: ModelVersion[] = [];
+const EMPTY_NODES: NetworkNode[] = [];
+const EMPTY_EDGES: NetworkEdge[] = [];
+const EMPTY_ASSETS: AssetInstance[] = [];
+const EMPTY_CATALOG_ITEMS: CatalogItem[] = [];
+
 export function ModelisationPage() {
   const queryClient = useQueryClient();
   const [organizationId, setOrganizationId] = useState("");
@@ -140,14 +150,20 @@ export function ModelisationPage() {
     enabled: Boolean(organizationId),
   });
 
-  const projects = projectsQuery.data?.items ?? [];
-  const models = modelsQuery.data?.items ?? [];
-  const nodes = nodesQuery.data?.items ?? [];
-  const edges = edgesQuery.data?.items ?? [];
-  const assets = assetsQuery.data?.items ?? [];
-  const equipment = equipmentQuery.data ?? [];
-  const materials = equipment.filter((item) => item.kind === "material");
-  const placeableEquipment = equipment.filter((item) => item.kind !== "material");
+  const projects = projectsQuery.data?.items ?? EMPTY_PROJECTS;
+  const models = modelsQuery.data?.items ?? EMPTY_MODELS;
+  const nodes = nodesQuery.data?.items ?? EMPTY_NODES;
+  const edges = edgesQuery.data?.items ?? EMPTY_EDGES;
+  const assets = assetsQuery.data?.items ?? EMPTY_ASSETS;
+  const equipment = equipmentQuery.data ?? EMPTY_CATALOG_ITEMS;
+  const materials = useMemo(
+    () => equipment.filter((item) => item.kind === "material"),
+    [equipment],
+  );
+  const placeableEquipment = useMemo(
+    () => equipment.filter((item) => item.kind !== "material"),
+    [equipment],
+  );
   const selectedModel = useMemo(
     () => models.find((model) => model.id === modelId),
     [modelId, models],
@@ -168,38 +184,53 @@ export function ModelisationPage() {
 
   useEffect(() => {
     if (!projectId || !projects.some((project) => project.id === projectId)) {
-      setProjectId(projects[0]?.id ?? "");
+      const nextProjectId = projects[0]?.id ?? "";
+      setProjectId((current) => (current === nextProjectId ? current : nextProjectId));
     }
   }, [projectId, projects]);
 
   useEffect(() => {
     if (!modelId || !models.some((model) => model.id === modelId)) {
-      setModelId(models.find((model) => model.status === "draft")?.id ?? models[0]?.id ?? "");
+      const nextModelId =
+        models.find((model) => model.status === "draft")?.id ?? models[0]?.id ?? "";
+      setModelId((current) => (current === nextModelId ? current : nextModelId));
     }
   }, [modelId, models]);
 
   useEffect(() => {
     if (!edgeFromId || !nodes.some((node) => node.id === edgeFromId)) {
-      setEdgeFromId(nodes[0]?.id ?? "");
+      const nextEdgeFromId = nodes[0]?.id ?? "";
+      setEdgeFromId((current) => (current === nextEdgeFromId ? current : nextEdgeFromId));
     }
     if (!edgeToId || !nodes.some((node) => node.id === edgeToId)) {
-      setEdgeToId(nodes[1]?.id ?? "");
+      const nextEdgeToId = nodes[1]?.id ?? "";
+      setEdgeToId((current) => (current === nextEdgeToId ? current : nextEdgeToId));
     }
     if (assetLocationType === "node" && !nodes.some((node) => node.id === assetLocationId)) {
-      setAssetLocationId(nodes[0]?.id ?? "");
+      const nextAssetLocationId = nodes[0]?.id ?? "";
+      setAssetLocationId((current) =>
+        current === nextAssetLocationId ? current : nextAssetLocationId,
+      );
     }
   }, [assetLocationId, assetLocationType, edgeFromId, edgeToId, nodes]);
 
   useEffect(() => {
     if (assetLocationType === "edge" && !edges.some((edge) => edge.id === assetLocationId)) {
-      setAssetLocationId(edges[0]?.id ?? "");
+      const nextAssetLocationId = edges[0]?.id ?? "";
+      setAssetLocationId((current) =>
+        current === nextAssetLocationId ? current : nextAssetLocationId,
+      );
     }
-    setEdgeSequence(String(edges.length + 1));
+    const nextEdgeSequence = String(edges.length + 1);
+    setEdgeSequence((current) => (current === nextEdgeSequence ? current : nextEdgeSequence));
   }, [assetLocationId, assetLocationType, edges]);
 
   useEffect(() => {
     if (!assetCatalogId || !placeableEquipment.some((item) => item.id === assetCatalogId)) {
-      setAssetCatalogId(placeableEquipment[0]?.id ?? "");
+      const nextAssetCatalogId = placeableEquipment[0]?.id ?? "";
+      setAssetCatalogId((current) =>
+        current === nextAssetCatalogId ? current : nextAssetCatalogId,
+      );
     }
   }, [assetCatalogId, placeableEquipment]);
 
@@ -221,9 +252,13 @@ export function ModelisationPage() {
     }
     const fromElevation = nodes.find((node) => node.id === edgeFromId)?.elevation_m ?? 0;
     const toElevation = nodes.find((node) => node.id === edgeToId)?.elevation_m ?? 0;
-    setEdgeProfile((current) =>
-      current.length > 2 ? current : defaultProfile(length, fromElevation, toElevation),
-    );
+    setEdgeProfile((current) => {
+      if (current.length > 2) {
+        return current;
+      }
+      const nextProfile = defaultProfile(length, fromElevation, toElevation);
+      return sameProfile(current, nextProfile) ? current : nextProfile;
+    });
   }, [edgeFromId, edgeLength, edgeProfile.length, edgeToId, nodes]);
 
   const nodePayloadProblems = validateNodePayload(nodeKind, nodePayload);
@@ -575,4 +610,18 @@ function optionalCoordinate(value: string): number | null {
   }
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Évite de republier le même profil initial à chaque rendu. */
+function sameProfile(left: ProfilePoint[], right: ProfilePoint[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every(
+      (point, index) =>
+        point.chainage_m === right[index]?.chainage_m &&
+        point.elevation_m === right[index]?.elevation_m &&
+        point.latitude === right[index]?.latitude &&
+        point.longitude === right[index]?.longitude,
+    )
+  );
 }

@@ -163,7 +163,9 @@ def summarize_measurement_quality(
         if quality != "bad" and timestamp is not None and value is not None:
             usable_sample_count += 1
             statistics.add(value)
-            first_timestamp = timestamp if first_timestamp is None else min(first_timestamp, timestamp)
+            first_timestamp = (
+                timestamp if first_timestamp is None else min(first_timestamp, timestamp)
+            )
             last_timestamp = timestamp if last_timestamp is None else max(last_timestamp, timestamp)
 
     issues: list[dict[str, Any]] = []

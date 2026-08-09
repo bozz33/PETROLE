@@ -2,10 +2,10 @@
 
 - Statut : **constat de référence, sans effet de certification**
 - Date : 9 août 2026
-- Produit examiné : `main` à `d9c514df06028468864c1264ac2539f7d18efb3b`
-- Qualification VPS associée : `var/validation-vps/20260809T170312Z`
+- Produit examiné : `main` à `6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`
+- Qualification VPS associée : `var/validation-vps/20260809T203305Z`
 - Travaux de validation séparés : PR draft #17, `feat/public-validation-seaway`
-- Documents directeurs : D04, D05, D06, D07, D10, D11, D13, D15, D17 et D20.
+- Documents directeurs : D04, D05, D06, D07, D10, D11, D13, D15, D17, D19 et D20.
 
 Ce document distingue strictement le logiciel présent, la preuve déjà exécutée,
 et les capacités qui restent des phases ultérieures. Une capacité marquée
@@ -86,11 +86,36 @@ méritent un travail identifié.
 ### Écart unités fermé après audit
 
 Le correctif `4c2c86d`, intégré dans `main` par le candidat
-`d9c514df06028468864c1264ac2539f7d18efb3b`, ferme FR-GEN-003 et
+`6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`, ferme FR-GEN-003 et
 FR-DAT-001 : `DatasetMapping` porte les unités et dimensions, les valeurs sont
 converties avec `hydro_shared.units.to_si`, la provenance est conservée et les
 unités incompatibles sont rejetées. La qualification VPS associée couvre ce
 comportement dans ses tests d'import, sans modifier l'arbre Git qualifié.
+
+## Conformité D19 — résultats et graphiques
+
+D19 ne crée pas un nouveau moteur hydraulique : il précise la présentation
+ingénieur des grandeurs déjà calculées par HydroLiquid. Les exigences D04
+FR-LIQ-003, FR-LIQ-005 et FR-LIQ-007 restent couvertes au niveau calcul. Le
+tableau ci-dessous sépare donc cette couverture fonctionnelle de la finition
+visuelle et de l'export autonome attendus pour le pilote/V1.
+
+| Élément D19 | État constaté | Évidence / écart restant |
+|---|---|---|
+| Profil hydraulique : chaînage, terrain et ligne de charge | **Implémenté** | `HydraulicProfileChart` affiche le profil et la HGL à partir des points de profil de calcul. |
+| Pression selon la distance | **Implémenté** | `PressureDistanceChart` affiche la pression et la vitesse le long du chaînage. |
+| Courbe pompe-réseau et point de fonctionnement | **Implémenté** | Les courbes Q-H, rendement, puissance et NPSH sont disponibles dans les graphiques pompes. |
+| Stations et sauts de charge annotés sur le profil | **Partiel** | Les résultats de station contiennent aspiration/refoulement et chaînage ; le profil ne les superpose pas encore de façon complète et lisible. |
+| Enveloppe graphique MAOP/pression minimale et marges | **Partiel** | `mawp_pa` et les marges par tronçon existent dans le modèle et les résultats, mais pas encore sous forme d'enveloppe continue sur les graphiques. |
+| Seuil de pression vapeur et zones gravitaires sur les graphiques | **Partiel** | Le moteur publie `below_vapor_pressure` et `gravity_zones` ; l'UI ne les représente pas encore continûment avec leur légende. |
+| Export PNG autonome des graphiques | **Partiel** | Les graphiques sont visibles dans l'application et les rapports ; il manque un export image versionné et téléchargeable distinct. |
+
+Le script pédagogique `COURSEWORK-460KM-01`, fourni avec ses captures, est un
+bon futur cas de régression visuelle multi-stations : terrain, HGL, pression,
+limite de conduite, seuil vapeur et pompes. Ses données synthétiques ne sont
+ni une mesure terrain ni une preuve de certification. Les conventions de
+pression et la formule de résistance de ce script doivent être rapprochées du
+contrat SI PETROLE avant toute importation automatique.
 
 ### Points MVP restant à fermer ou à accepter explicitement
 
@@ -107,6 +132,9 @@ comportement dans ses tests d'import, sans modifier l'arbre Git qualifié.
 4. **Mesures.** L'import a le bon lignage (`raw`, `normalized`, `corrected`) et
    impose `timestamp`, `unit`, `quality`, `source`. Il n'est pas encore un
    produit d'analytics ni de calibration.
+5. **Présentation D19.** Les graphiques de base sont présents ; les
+   annotations stations, enveloppes MAOP/minimum/vapeur, zones gravitaires et
+   export PNG autonome relèvent du lot résultats ingénieur du pilote/V1.
 
 ## État scientifique et validation externe
 
@@ -132,6 +160,7 @@ connecteur OPC UA isolé.
 |---:|---|---|---|
 | P0 | Décision de release MVP | Fiche ingénieur externe, identité de signature, rapport de qualification rattaché au SHA final | Tag signé `v1.0.0-mvp`, sans prétention de certification industrielle |
 | P1 | **Pilote/V1 : calibration et mesures** | Dataset immuable, séparation calibration/validation, résidus, biais, MAE/RMSE, incertitudes et RPT-07/RPT-08 | Un régime non utilisé pour ajuster le modèle est prédit dans la tolérance convenue |
+| P1 | **Pilote/V1 : résultats ingénieur D19** | Profil avec stations, HGL, enveloppes MAOP/minimum/vapeur, zones et export PNG/PDF traçable | Revue ingénieur des graphiques et rapports RPT-07/RPT-08 réussie |
 | P1 | Durcissement pilote | MFA/OIDC, RLS ou contrôle d'accès équivalent démontré, politique de rétention, alerting et revue UX | Architecture et procédures acceptées par l'opérateur |
 | P1 | Fermer les choix MVP partiels | Décision documentée sur DOCX/PNG, carte, chemins alternatifs et diff de version | Aucun écart MUST ambigu dans l'offre ou la recette contractuelle |
 | P2 | Multiproduit + thermique si le pilote le justifie | Modèle de lots/interfaces et bilan thermique validé sur benchmarks | Sources, domaine et validation séparés avant activation |

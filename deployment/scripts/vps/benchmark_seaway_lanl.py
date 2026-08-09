@@ -308,7 +308,7 @@ def check_source_dataset() -> dict[str, Any]:
 def next_project_code(engineer: Client, requested_code: str) -> str:
     """Évite qu'un rejeu laisse le benchmark bloqué par un code déjà utilisé."""
 
-    projects = page(engineer, "/projects?include_archived=true&limit=500&offset=0")
+    projects = page(engineer, "/projects?include_archived=true&limit=200&offset=0")
     codes = {str(project.get("code", "")) for project in projects}
     if requested_code not in codes:
         return requested_code

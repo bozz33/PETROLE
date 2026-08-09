@@ -118,7 +118,7 @@ def test_rejeu_change_le_code_projet_sans_dupliquer_le_catalogue() -> None:
         def request(self, method, path, payload=None, **kwargs):
             assert (method, path) == (
                 "GET",
-                "/projects?include_archived=true&limit=500&offset=0",
+                "/projects?include_archived=true&limit=200&offset=0",
             )
             return {
                 "items": [

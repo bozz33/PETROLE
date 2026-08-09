@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from hydro_shared.units import Dimension
+
 DatasetKind = Literal["profile", "pump_curve", "strapping", "measurements", "generic"]
 
 
@@ -41,8 +43,18 @@ class DatasetCreate(BaseModel):
 class DatasetMapping(BaseModel):
     """Correspondance entre champs canoniques et colonnes du fichier."""
 
+    model_config = ConfigDict(extra="forbid")
+
     fields: dict[str, str] = Field(default_factory=dict)
     constants: dict[str, str | float | int | None] = Field(default_factory=dict)
+    #: Unité source fixe par champ numérique. Sans déclaration, l'unité SI du
+    #: champ est retenue explicitement. Pour une mesure dont l'unité varie par
+    #: ligne, mappez le champ canonique ``unit`` vers la colonne correspondante.
+    units: dict[str, str] = Field(default_factory=dict)
+    #: Dimension d'un champ numérique générique. Aujourd'hui seule la valeur
+    #: d'un dataset ``measurements`` en a besoin : ``value`` seul ne permet pas
+    #: de distinguer une pression d'un débit ou d'une température.
+    dimensions: dict[str, Dimension] = Field(default_factory=dict)
 
 
 class DatasetRead(BaseModel):

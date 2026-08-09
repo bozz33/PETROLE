@@ -28,7 +28,9 @@ from hydro_api.models import (
 )
 from hydro_api.schemas.data import DatasetCreate, DatasetMapping
 from hydro_api.storage import ObjectStorage
+from hydro_shared.errors import DimensionalityMismatchError, UnknownUnitError
 from hydro_shared.hashing import canonical_json, sha256_of_bytes
+from hydro_shared.units import SI_UNITS, Dimension, to_si
 
 SUPPORTED_EXTENSIONS = {".csv", ".xlsx", ".json"}
 
@@ -65,6 +67,18 @@ NUMERIC_FIELDS = frozenset(
         "value",
     }
 )
+FIELD_DIMENSIONS: dict[str, Dimension] = {
+    "chainage_m": Dimension.LENGTH,
+    "elevation_m": Dimension.ELEVATION,
+    "flow_m3_s": Dimension.VOLUMETRIC_FLOW,
+    "head_m": Dimension.HEAD,
+    "efficiency": Dimension.DIMENSIONLESS,
+    "power_w": Dimension.POWER,
+    "npshr_m": Dimension.HEAD,
+    "level_m": Dimension.LENGTH,
+    "volume_m3": Dimension.VOLUME,
+}
+UNIT_METADATA_KEY = "_units"
 QUALITY_CODES = frozenset({"good", "uncertain", "bad", "substituted", "estimated"})
 IMPORT_BATCH_SIZE = 5_000
 
@@ -406,6 +420,46 @@ def set_mapping(
         raise ValueError(
             "Champs canoniques obligatoires non mappés : " + ", ".join(missing_fields) + "."
         )
+    numeric_provided = provided & NUMERIC_FIELDS
+    invalid_unit_targets = sorted(set(mapping.units) - numeric_provided)
+    if invalid_unit_targets:
+        raise ValueError(
+            "Une unité ne peut être déclarée que pour un champ numérique mappé : "
+            + ", ".join(invalid_unit_targets)
+            + "."
+        )
+    invalid_dimension_targets = sorted(set(mapping.dimensions) - numeric_provided)
+    if invalid_dimension_targets:
+        raise ValueError(
+            "Une dimension ne peut être déclarée que pour un champ numérique mappé : "
+            + ", ".join(invalid_dimension_targets)
+            + "."
+        )
+    unsupported_dimensions = sorted(set(mapping.dimensions) - {"value"})
+    if unsupported_dimensions:
+        raise ValueError(
+            "Une dimension explicite est actuellement admise uniquement pour le champ value : "
+            + ", ".join(unsupported_dimensions)
+            + "."
+        )
+    if dataset.kind == "measurements" and "value" not in mapping.dimensions:
+        raise ValueError(
+            "Un jeu de mesures doit déclarer dimensions.value afin de normaliser "
+            "la valeur vers le SI (par exemple pressure ou volumetric_flow)."
+        )
+    for target, source_unit in mapping.units.items():
+        source_unit = source_unit.strip()
+        if not source_unit:
+            raise ValueError(f"L'unité déclarée pour {target} est vide.")
+        dimension = (
+            mapping.dimensions[target] if target == "value" else FIELD_DIMENSIONS.get(target)
+        )
+        if dimension is None:
+            raise ValueError(f"Aucune dimension ne peut être déduite pour le champ {target}.")
+        try:
+            to_si(1.0, source_unit, dimension)
+        except (UnknownUnitError, DimensionalityMismatchError) as exc:
+            raise ValueError(exc.message) from exc
     dataset.mapping = mapping.model_dump(mode="json")
     dataset.status = "mapped"
     session.flush()
@@ -481,6 +535,54 @@ def _normalize_row(
                     "message": "Le code qualité est inconnu.",
                 }
             )
+
+    unit_metadata: dict[str, dict[str, str]] = {}
+    declared_units = mapping.get("units", {})
+    declared_dimensions = mapping.get("dimensions", {})
+    for target in NUMERIC_FIELDS & normalized.keys():
+        dimension = FIELD_DIMENSIONS.get(target)
+        if target == "value":
+            raw_dimension = declared_dimensions.get(target)
+            try:
+                dimension = Dimension(str(raw_dimension)) if raw_dimension is not None else None
+            except ValueError:
+                dimension = None
+        if dimension is None or not isinstance(normalized.get(target), int | float):
+            continue
+
+        raw_unit = declared_units.get(target)
+        if raw_unit is None and target == "value":
+            candidate = normalized.get("unit")
+            raw_unit = candidate.strip() if isinstance(candidate, str) else None
+        source_unit = str(raw_unit).strip() if raw_unit is not None else SI_UNITS[dimension]
+        if not source_unit:
+            errors.append(
+                {
+                    "row": source_row,
+                    "field": target,
+                    "code": "MISSING_UNIT",
+                    "message": f"L'unité source du champ {target} est obligatoire.",
+                }
+            )
+            continue
+        try:
+            normalized[target] = to_si(float(normalized[target]), source_unit, dimension)
+        except (UnknownUnitError, DimensionalityMismatchError) as exc:
+            errors.append(
+                {
+                    "row": source_row,
+                    "field": target,
+                    "code": exc.code,
+                    "message": exc.message,
+                }
+            )
+            continue
+        unit_metadata[target] = {
+            "source_unit": source_unit,
+            "si_unit": SI_UNITS[dimension],
+        }
+    if unit_metadata:
+        normalized[UNIT_METADATA_KEY] = unit_metadata
     return normalized, errors
 
 

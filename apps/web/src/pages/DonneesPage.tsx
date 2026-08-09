@@ -49,6 +49,32 @@ const REQUIRED_FIELDS: Record<DatasetKind, Set<string>> = {
   generic: new Set(),
 };
 
+const DEFAULT_UNITS: Record<DatasetKind, Record<string, string>> = {
+  profile: { chainage_m: "m", elevation_m: "m" },
+  pump_curve: {
+    flow_m3_s: "m ** 3 / s",
+    head_m: "m",
+    efficiency: "dimensionless",
+    power_w: "W",
+    npshr_m: "m",
+  },
+  strapping: { level_m: "m", volume_m3: "m ** 3" },
+  measurements: {},
+  generic: {},
+};
+
+const MEASUREMENT_DIMENSIONS = [
+  ["pressure", "Pression"],
+  ["volumetric_flow", "Débit volumique"],
+  ["mass_flow", "Débit massique"],
+  ["temperature", "Température"],
+  ["density", "Masse volumique"],
+  ["length", "Niveau / longueur"],
+  ["volume", "Volume"],
+  ["power", "Puissance"],
+  ["energy", "Énergie"],
+] as const;
+
 export function DonneesPage() {
   const [organizationId, setOrganizationId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -58,6 +84,8 @@ export function DonneesPage() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
   const [preview, setPreview] = useState<DatasetPreview | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [units, setUnits] = useState<Record<string, string>>(DEFAULT_UNITS.profile);
+  const [measurementDimension, setMeasurementDimension] = useState("pressure");
   const [importResult, setImportResult] = useState<DatasetImport | null>(null);
 
   const projectsQuery = useQuery({
@@ -104,6 +132,8 @@ export function DonneesPage() {
         { method: "POST" },
       );
       setPreview(dataPreview);
+      setUnits(DEFAULT_UNITS[kind]);
+      setMeasurementDimension("pressure");
       const proposed: Record<string, string> = {};
       for (const [field] of FIELD_LABELS[kind]) {
         const exact = dataPreview.columns.find(
@@ -125,6 +155,12 @@ export function DonneesPage() {
           fields: Object.fromEntries(
             Object.entries(mapping).filter(([, column]) => Boolean(column)),
           ),
+          units: Object.fromEntries(
+            Object.entries(units).filter(
+              ([field, unit]) => Boolean(mapping[field]) && Boolean(unit.trim()),
+            ),
+          ),
+          dimensions: kind === "measurements" ? { value: measurementDimension } : {},
         }),
       }),
     onSuccess: setDataset,
@@ -224,8 +260,11 @@ export function DonneesPage() {
             <select
               value={kind}
               onChange={(event) => {
-                setKind(event.target.value as DatasetKind);
+                const nextKind = event.target.value as DatasetKind;
+                setKind(nextKind);
                 setMapping({});
+                setUnits(DEFAULT_UNITS[nextKind]);
+                setMeasurementDimension("pressure");
               }}
             >
               <option value="profile">Profil altimétrique</option>
@@ -293,6 +332,50 @@ export function DonneesPage() {
                 </label>
               ))}
             </div>
+
+            {FIELD_LABELS[kind].some(([field]) => field !== "unit" && field !== "quality" && field !== "source" && field !== "timestamp") ? (
+              <fieldset className="field-group">
+                <legend>Unités source</legend>
+                <p className="field-help">
+                  Les valeurs sont converties en unités SI à l'import. L'unité déclarée reste associée à la ligne normalisée.
+                </p>
+                <div className="form-grid three">
+                  {FIELD_LABELS[kind]
+                    .filter(([field]) => !["unit", "quality", "source", "timestamp"].includes(field))
+                    .map(([field, label]) => (
+                      <label key={field}>
+                        {label}
+                        {kind === "measurements" && field === "value" ? (
+                          <small>Provient de la colonne mappée « Unité ».</small>
+                        ) : null}
+                        <input
+                          value={units[field] ?? ""}
+                          placeholder={kind === "measurements" && field === "value" ? "unité par ligne" : "m"}
+                          disabled={kind === "measurements" && field === "value"}
+                          onChange={(event) =>
+                            setUnits((current) => ({ ...current, [field]: event.target.value }))
+                          }
+                        />
+                      </label>
+                    ))}
+                  {kind === "measurements" ? (
+                    <label>
+                      Grandeur mesurée
+                      <select
+                        value={measurementDimension}
+                        onChange={(event) => setMeasurementDimension(event.target.value)}
+                      >
+                        {MEASUREMENT_DIMENSIONS.map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
+              </fieldset>
+            ) : null}
 
             <div className="preview-meta">
               <strong>{formatNumber(preview.row_count, 0)} lignes détectées</strong>

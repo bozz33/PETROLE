@@ -245,7 +245,7 @@ def test_import_hash_streaming_matches_canonical_hash() -> None:
     """Garantit que le traitement par lots ne change pas l'identité du jeu importé."""
 
     file_hash = "sha256:fichier"
-    mapping = {"units": {"Débit": "m3/s"}, "fields": {"flow_m3_s": "Débit"}}
+    mapping = {"units": {"flow_m3_s": "m3/s"}, "fields": {"flow_m3_s": "Débit"}}
     rows = [
         {"flow_m3_s": 0.125, "quality": "good"},
         {"flow_m3_s": 0.25, "quality": "estimé"},
@@ -259,6 +259,169 @@ def test_import_hash_streaming_matches_canonical_hash() -> None:
 
     expected = sha256_of({"file_hash": file_hash, "mapping": mapping, "rows": rows})
     assert f"sha256:{digest.hexdigest()}" == expected
+
+
+def test_import_convertit_les_unites_declarees_vers_si(import_client) -> None:
+    """Un profil en km/ft reste traçable mais est normalisé en mètre."""
+
+    organization = _organization(import_client)
+    stored_file = _upload(
+        import_client,
+        organization["id"],
+        "profil-unites.csv",
+        b"PK_km,Altitude_ft\n0,0\n1.25,328.0839895\n",
+        "text/csv",
+    )
+    dataset = import_client.post(
+        "/api/v1/datasets",
+        json={
+            "organization_id": organization["id"],
+            "file_id": stored_file["id"],
+            "name": "Profil avec unités source",
+            "kind": "profile",
+        },
+    ).json()
+    import_client.post(f"/api/v1/datasets/{dataset['id']}/preview")
+    mapping = import_client.post(
+        f"/api/v1/datasets/{dataset['id']}/mappings",
+        json={
+            "fields": {"chainage_m": "PK_km", "elevation_m": "Altitude_ft"},
+            "units": {"chainage_m": "km", "elevation_m": "ft"},
+        },
+    )
+    assert mapping.status_code == 200, mapping.text
+
+    imported = import_client.post(
+        f"/api/v1/datasets/{dataset['id']}/imports",
+        headers={"Idempotency-Key": "profil-unites-v1"},
+    )
+    assert imported.status_code == 201, imported.text
+    assert imported.json()["accepted_count"] == 2
+
+    rows = import_client.get(f"/api/v1/datasets/{dataset['id']}/rows").json()["items"]
+    normalized = rows[1]["normalized"]
+    assert normalized["chainage_m"] == pytest.approx(1_250.0)
+    assert normalized["elevation_m"] == pytest.approx(100.0)
+    assert normalized["_units"] == {
+        "chainage_m": {"source_unit": "km", "si_unit": "m"},
+        "elevation_m": {"source_unit": "ft", "si_unit": "m"},
+    }
+    assert rows[1]["raw"] == {"PK_km": "1.25", "Altitude_ft": "328.0839895"}
+
+
+def test_mapping_refuse_une_unite_incompatible(import_client) -> None:
+    organization = _organization(import_client)
+    stored_file = _upload(
+        import_client,
+        organization["id"],
+        "profil.csv",
+        b"PK,Altitude\n0,120\n",
+        "text/csv",
+    )
+    dataset = import_client.post(
+        "/api/v1/datasets",
+        json={
+            "organization_id": organization["id"],
+            "file_id": stored_file["id"],
+            "name": "Profil unité erronée",
+            "kind": "profile",
+        },
+    ).json()
+    import_client.post(f"/api/v1/datasets/{dataset['id']}/preview")
+
+    response = import_client.post(
+        f"/api/v1/datasets/{dataset['id']}/mappings",
+        json={
+            "fields": {"chainage_m": "PK", "elevation_m": "Altitude"},
+            "units": {"chainage_m": "bar"},
+        },
+    )
+    assert response.status_code == 422
+    assert "n'est pas compatible" in response.json()["detail"]
+
+
+def test_mesure_normalise_la_valeur_avec_unite_variable(import_client) -> None:
+    organization = _organization(import_client)
+    stored_file = _upload(
+        import_client,
+        organization["id"],
+        "pressions.csv",
+        b"Horodatage;Pression;Unite;Qualite;Capteur\n2026-08-09T12:00:00Z;12.5;bar;good;PT-101\n",
+        "text/csv",
+    )
+    dataset = import_client.post(
+        "/api/v1/datasets",
+        json={
+            "organization_id": organization["id"],
+            "file_id": stored_file["id"],
+            "name": "Pression terrain",
+            "kind": "measurements",
+        },
+    ).json()
+    import_client.post(f"/api/v1/datasets/{dataset['id']}/preview")
+    mapping = import_client.post(
+        f"/api/v1/datasets/{dataset['id']}/mappings",
+        json={
+            "fields": {
+                "timestamp": "Horodatage",
+                "value": "Pression",
+                "unit": "Unite",
+                "quality": "Qualite",
+                "source": "Capteur",
+            },
+            "dimensions": {"value": "pressure"},
+        },
+    )
+    assert mapping.status_code == 200, mapping.text
+
+    imported = import_client.post(
+        f"/api/v1/datasets/{dataset['id']}/imports",
+        headers={"Idempotency-Key": "pression-v1"},
+    )
+    assert imported.status_code == 201, imported.text
+    assert imported.json()["accepted_count"] == 1
+    row = import_client.get(f"/api/v1/datasets/{dataset['id']}/rows").json()["items"][0]
+    assert row["normalized"]["value"] == pytest.approx(1_250_000.0)
+    assert row["normalized"]["_units"]["value"] == {
+        "source_unit": "bar",
+        "si_unit": "Pa",
+    }
+
+
+def test_mesure_exige_une_dimension_pour_la_valeur(import_client) -> None:
+    organization = _organization(import_client)
+    stored_file = _upload(
+        import_client,
+        organization["id"],
+        "mesure.csv",
+        b"t;v;u;q;s\n2026-08-09T12:00:00Z;1;bar;good;PT-101\n",
+        "text/csv",
+    )
+    dataset = import_client.post(
+        "/api/v1/datasets",
+        json={
+            "organization_id": organization["id"],
+            "file_id": stored_file["id"],
+            "name": "Mesure sans grandeur",
+            "kind": "measurements",
+        },
+    ).json()
+    import_client.post(f"/api/v1/datasets/{dataset['id']}/preview")
+
+    response = import_client.post(
+        f"/api/v1/datasets/{dataset['id']}/mappings",
+        json={
+            "fields": {
+                "timestamp": "t",
+                "value": "v",
+                "unit": "u",
+                "quality": "q",
+                "source": "s",
+            },
+        },
+    )
+    assert response.status_code == 422
+    assert "dimensions.value" in response.json()["detail"]
 
 
 def test_import_accepte_un_document_json(import_client) -> None:

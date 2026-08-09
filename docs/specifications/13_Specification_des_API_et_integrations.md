@@ -230,6 +230,14 @@ La pagination peut évoluer après validation et mise en forme finale dans Micro
 
 | GET /files/{id}/download | Téléchargement autorisé et audité |
 
+Le payload de `POST /datasets/{id}/mappings` distingue `fields` (colonne
+source), `constants`, `units` (unité source fixe par champ numérique) et
+`dimensions` (grandeur d'une valeur générique de mesure). Chaque valeur
+numérique normalisée est convertie en SI ; le fichier brut, la valeur source et
+l'unité source restent conservés dans le lignage. Une unité incompatible est
+rejetée avant import et une mesure doit déclarer sa grandeur, afin qu'une valeur
+en bar ne puisse jamais être interprétée comme un débit.
+
 
 
 # 8. Rapports

@@ -34,9 +34,10 @@ from hydro_api.schemas.data import (
     DatasetPreview,
     DatasetRead,
     DatasetRowsRead,
+    MeasurementQualitySummary,
     StoredFileRead,
 )
-from hydro_api.services import data_import
+from hydro_api.services import data_import, measurement_quality
 from hydro_api.storage import ObjectStorageDependency
 
 router = APIRouter(tags=["Données"])
@@ -279,6 +280,20 @@ def read_dataset_rows(
         offset=offset,
     )
     return DatasetRowsRead(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get(
+    "/datasets/{dataset_id}/quality-summary",
+    response_model=MeasurementQualitySummary,
+    summary="Synthétiser la qualité d'un jeu de mesures",
+)
+def read_measurement_quality_summary(
+    dataset_id: uuid.UUID,
+    session: DatabaseSession,
+):
+    """Expose les contrôles DQ-007/DQ-008 sans modifier les données importées."""
+
+    return measurement_quality.summarize_measurement_quality(session, dataset_id)
 
 
 @router.get(

@@ -147,3 +147,25 @@ def test_rejeu_change_le_code_projet_sans_dupliquer_le_catalogue() -> None:
             }
 
     assert module.next_project_code(ProjectsClient(), "BENCH-SEAWAY-LANL") == "BENCH-SEAWAY-LANL-R3"
+
+
+def test_resume_adaptateur_distingue_conduites_physiques_et_connecteur() -> None:
+    module = load_script()
+
+    summary = module.adapted_topology_summary(
+        {
+            "nodes": [{"kind": "source"}, {"kind": "station"}],
+            "assets": [{"code": "P1"}],
+            "edges": [
+                {"length_m": 1.001, "payload": {"source_pipe_id": None}},
+                {"length_m": 154_000.0, "payload": {"source_pipe_id": 3}},
+            ],
+        }
+    )
+
+    assert summary["node_count"] == 2
+    assert summary["asset_count"] == 1
+    assert summary["physical_pipe_count"] == 1
+    assert summary["physical_pipe_length_m"] == pytest.approx(154_000.0)
+    assert summary["synthetic_connector_count"] == 1
+    assert summary["synthetic_connector_length_m"] == pytest.approx(1.001)

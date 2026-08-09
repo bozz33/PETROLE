@@ -396,6 +396,37 @@ def execution_gate(calculation: dict[str, Any], result_payload: dict[str, Any]) 
     }
 
 
+def adapted_topology_summary(topology: dict[str, Any]) -> dict[str, Any]:
+    """Distingue les cardinalités LANL de la représentation PETROLE.
+
+    Les nœuds de pompe LANL sont reliés par des arêtes de longueur nulle. Ils
+    sont condensés en stations PETROLE : l'adaptateur ne doit donc jamais
+    laisser entendre que les 23 jonctions source existent telles quelles dans
+    le modèle persisté.
+    """
+
+    nodes = list(topology.get("nodes") or [])
+    edges = list(topology.get("edges") or [])
+    assets = list(topology.get("assets") or [])
+    physical_edges = [
+        edge for edge in edges if (edge.get("payload") or {}).get("source_pipe_id") is not None
+    ]
+    connector_edges = [edge for edge in edges if edge not in physical_edges]
+    return {
+        "node_count": len(nodes),
+        "edge_count": len(edges),
+        "asset_count": len(assets),
+        "physical_pipe_count": len(physical_edges),
+        "physical_pipe_length_m": sum(float(edge["length_m"]) for edge in physical_edges),
+        "synthetic_connector_count": len(connector_edges),
+        "synthetic_connector_length_m": sum(float(edge["length_m"]) for edge in connector_edges),
+        "node_kind_counts": {
+            kind: sum(1 for node in nodes if node.get("kind") == kind)
+            for kind in sorted({str(node.get("kind")) for node in nodes})
+        },
+    }
+
+
 def create_catalog(
     engineer: Client,
     approver: Client,
@@ -602,6 +633,12 @@ def build_model(
     validation = engineer.request("POST", f"/models/{model_id}/validate")
     if not validation.get("valid"):
         raise BenchmarkError(f"Le réseau PETROLE transformé n'est pas valide : {validation}")
+    topology = engineer.request("GET", f"/models/{model_id}/topology")
+    topology_summary = adapted_topology_summary(topology)
+    if topology_summary["physical_pipe_count"] != 13:
+        raise BenchmarkError("L'adaptateur PETROLE doit conserver les 13 conduites physiques LANL.")
+    if abs(topology_summary["physical_pipe_length_m"] - 969_030.0) > 1e-6:
+        raise BenchmarkError("La longueur physique LANL a été altérée par l'adaptateur PETROLE.")
 
     scenario = engineer.request(
         "POST",
@@ -655,6 +692,7 @@ def build_model(
         "model": model,
         "scenario": scenario,
         "validation": validation,
+        "topology": topology_summary,
     }
 
 
@@ -857,6 +895,7 @@ def run_benchmark(
             "scenario_id": built["scenario"]["id"],
             "calculation_id": calculation["id"],
         },
+        "adapted_petrole_model": built["topology"],
         "source_dataset": source,
         "calculation": {
             "status": calculation.get("status"),

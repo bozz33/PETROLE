@@ -67,6 +67,12 @@ La chaîne est :
 
 Injections : N1, N9, N18. Soutirages : N15, N23.
 
+Dans PETROLE, cette topologie source devient **15 nœuds**, **14 tronçons** et
+**9 équipements de pompage** : les 13 conduites physiques totalisent toujours
+969,03 km, auxquels s'ajoute uniquement le connecteur synthétique source →
+station. Les 23 jonctions LANL restent donc une cardinalité de la source, pas
+une cardinalité faussement attribuée au modèle PETROLE adapté.
+
 ## Référence numérique externe disponible
 
 Le test officiel `PetroleumModels.jl/test/opf.jl` attend notamment :

@@ -22,6 +22,10 @@ import type {
 } from "../types";
 import { formatNumber } from "../types";
 
+// Référence stable pendant le chargement : un littéral [] recréé à chaque rendu
+// ferait redéclencher l'effet qui synchronise la sélection des calculs.
+const EMPTY_CALCULATIONS: Calculation[] = [];
+
 export function DecisionPage() {
   const [projectId, setProjectId] = useState("");
   const [modelId, setModelId] = useState("");
@@ -83,7 +87,7 @@ export function DecisionPage() {
   const projects = projectsQuery.data?.items ?? [];
   const models = modelsQuery.data?.items ?? [];
   const scenarios = scenariosQuery.data?.items ?? [];
-  const calculations = calculationsQuery.data?.items ?? [];
+  const calculations = calculationsQuery.data?.items ?? EMPTY_CALCULATIONS;
   const pumps = (assetsQuery.data?.items ?? []).filter(
     (asset) => asset.role === "main" || asset.role === "standby",
   );
@@ -107,7 +111,7 @@ export function DecisionPage() {
   }, [scenarioId, scenarios]);
 
   useEffect(() => {
-    setCalculationIds((selected) => selected.filter((id) => calculations.some((item) => item.id === id)));
+    setCalculationIds((selected) => retainExistingCalculationIds(selected, calculations));
   }, [calculations]);
 
   const comparisonMutation = useMutation({
@@ -569,6 +573,19 @@ function multiply(value: number | null, factor: number): number | null {
 
 function toggle(values: string[], value: string): string[] {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+}
+
+/**
+ * Évite une mise à jour d'état lorsque le résultat de la synchronisation est
+ * identique. C'est indispensable pendant le chargement des calculs, lorsque
+ * la page peut se rendre plusieurs fois avant que la requête ne soit résolue.
+ */
+export function retainExistingCalculationIds(
+  selected: string[],
+  calculations: Calculation[],
+): string[] {
+  const next = selected.filter((id) => calculations.some((item) => item.id === id));
+  return next.length === selected.length ? selected : next;
 }
 
 /** Rend lisible le motif de rejet renvoyé par l'optimiseur. */

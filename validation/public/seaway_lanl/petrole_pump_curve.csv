@@ -1,0 +1,6 @@
+flow_m3_s,head_m,efficiency,power_w,reference_speed_rpm,derivation
+0.8,217.92,0.8352,1843433.371,3000,LANL H=276.8-92Q^2 and eta law at nominal speed
+0.9,202.28,0.8613,1866688.538,3000,LANL H=276.8-92Q^2 and eta law at nominal speed
+1.0,184.8,0.87,1875916.778,3000,LANL H=276.8-92Q^2 and eta law at nominal speed
+1.1,165.48,0.8613,1866442.452,3000,LANL H=276.8-92Q^2 and eta law at nominal speed
+1.2,144.32,0.8352,1831252.093,3000,LANL H=276.8-92Q^2 and eta law at nominal speed

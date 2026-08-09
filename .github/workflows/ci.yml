@@ -45,16 +45,48 @@ jobs:
       - name: Vérifier le typage
         run: mypy packages apps/api
 
+      - name: Construire l'environnement PostgreSQL jetable
+        run: docker compose -f deployment/docker-compose.test.yml build migrate-test tests
+
+      - name: Démarrer PostgreSQL/PostGIS de test
+        run: |
+          QUALIFICATION_UID=$(id -u) QUALIFICATION_GID=$(id -g) \
+            docker compose -f deployment/docker-compose.test.yml up -d --wait postgres-test
+
+      - name: Appliquer les migrations de test
+        run: |
+          QUALIFICATION_UID=$(id -u) QUALIFICATION_GID=$(id -g) \
+            docker compose -f deployment/docker-compose.test.yml run --rm --no-deps migrate-test
+
       - name: Exécuter les tests avec couverture
         run: |
-          pytest -p no:cacheprovider \
-            -m "not slow" \
-            --cov=packages \
-            --cov=apps/api \
-            --cov-report=term-missing:skip-covered \
-            --cov-report=xml \
-            --cov-fail-under=80 \
-            -q
+          QUALIFICATION_UID=$(id -u) QUALIFICATION_GID=$(id -g) \
+            docker compose -f deployment/docker-compose.test.yml run --rm --no-deps tests \
+              pytest -p no:cacheprovider \
+                -m "not slow" \
+                --cov=packages \
+                --cov=apps/api \
+                --cov-report=term-missing:skip-covered \
+                --cov-report=xml \
+                -q
+
+      - name: Vérifier la couverture globale de lignes
+        run: |
+          python - <<'PY'
+          from xml.etree import ElementTree
+
+          line_rate = float(ElementTree.parse("coverage.xml").getroot().attrib["line-rate"])
+          assert line_rate >= 0.65, f"Couverture globale insuffisante : {line_rate:.1%} < 65.0%"
+          print(f"Couverture globale de lignes : {line_rate:.1%}")
+          PY
+
+      - name: Vérifier la couverture du noyau de calcul
+        run: |
+          QUALIFICATION_UID=$(id -u) QUALIFICATION_GID=$(id -g) \
+            docker compose -f deployment/docker-compose.test.yml run --rm --no-deps tests \
+              coverage report \
+                --include='packages/domain/*,packages/hydroliquid/*,packages/tank_transfer/*,packages/optimization/*' \
+                --fail-under=80
 
       - name: Générer le dossier de validation
         run: |
@@ -72,6 +104,10 @@ jobs:
             var/validation/preuve.json
           if-no-files-found: error
           retention-days: 30
+
+      - name: Arrêter la base de test
+        if: always()
+        run: docker compose -f deployment/docker-compose.test.yml down --remove-orphans
 
   frontend:
     name: TypeScript et interface web

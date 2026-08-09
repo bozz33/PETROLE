@@ -140,13 +140,21 @@ jobs:
       - name: Refuser les vulnérabilités hautes ou critiques
         run: npm audit --audit-level=high
 
-      - name: Installer Chromium pour Playwright
-        run: npx playwright install --with-deps chromium
-
-      - name: Exécuter les parcours Playwright
-        env:
-          PLAYWRIGHT_USE_BUNDLED_CHROMIUM: "true"
-        run: npm run test:e2e
+      - name: Exécuter les parcours Playwright dans l'image verrouillée
+        # L'image doit suivre exactement @playwright/test dans package-lock.json.
+        # Elle évite les variations de Chromium ou de bibliothèques système des
+        # runners GitHub tout en conservant les rapports sur le workspace.
+        run: |
+          docker run --rm --ipc=host \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace/apps/web \
+            -e CI=true \
+            -e PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+            -e PLAYWRIGHT_USE_BUNDLED_CHROMIUM=true \
+            -e PLAYWRIGHT_OUTPUT_DIR=/workspace/apps/web/test-results \
+            -e PLAYWRIGHT_HTML_REPORT_DIR=/workspace/apps/web/playwright-report \
+            mcr.microsoft.com/playwright:v1.55.1-noble \
+            npm run test:e2e
 
       - name: Archiver le diagnostic Playwright
         if: failure()

@@ -31,9 +31,10 @@ def test_aucun_candidat_bloque_n_est_promu_en_pass_predictif() -> None:
     registry = load_registry()
 
     for candidate in registry["candidates"]:
-        if candidate["eligibility_status"].startswith("BLOCKED") or candidate[
-            "eligibility_status"
-        ] == "SUPPORTING_ONLY":
+        if (
+            candidate["eligibility_status"].startswith("BLOCKED")
+            or candidate["eligibility_status"] == "SUPPORTING_ONLY"
+        ):
             assert candidate["blockers"]
             assert candidate["predictive_validation_verdict"] == "NOT_EVALUATED"
 

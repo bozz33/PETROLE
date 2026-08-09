@@ -5,9 +5,11 @@ Le script n'utilise que l'API publique. Il transforme le cas machine-readable
 `case_seaway.m` de PetroleumModels.jl vers le modèle linéaire normalisé de
 PETROLE, exécute HydroLiquid et produit une preuve JSON comparative.
 
-Nature de la preuve : **cross-solver / cross-formulation**. Le cas LANL est
-synthétisé à partir d'un système réel et de données publiques ; il ne remplace
-pas des mesures SCADA industrielles confidentielles.
+Nature de la preuve : **rejeu hydraulique de formulation distincte**. Le cas
+LANL est synthétisé à partir d'un système réel et de données publiques ; il ne
+remplace pas des mesures SCADA industrielles confidentielles. Les quatre débits
+publiés servent ici à fixer les conditions limites : ils ne constituent donc
+pas, à eux seuls, une validation indépendante de PETROLE.
 
 Deux transformations sont explicitement assumées :
 
@@ -128,6 +130,20 @@ EDGE_LAYOUT = [
 ]
 
 REFERENCE_FLOW_BY_PIPE = {3: 0.3567, 9: 0.9644, 15: 0.1389, 22: 0.7178}
+
+# Portes définies avant toute exécution. Elles qualifient seulement la bonne
+# exécution du rejeu dans PETROLE ; elles ne confèrent pas de verdict de
+# validation externe, car le point de fonctionnement et les charges de
+# référence sont dérivés des mêmes sorties LANL.
+ACCEPTED_CALCULATION_STATUSES = frozenset({"SIM_CONVERGED"})
+MAXIMUM_VIOLATION_COUNT = 0
+MAXIMUM_WARNING_COUNT = 0
+EXECUTION_GATE = {
+    "accepted_statuses": sorted(ACCEPTED_CALCULATION_STATUSES),
+    "require_feasible": True,
+    "maximum_violation_count": MAXIMUM_VIOLATION_COUNT,
+    "maximum_warning_count": MAXIMUM_WARNING_COUNT,
+}
 
 
 class BenchmarkError(RuntimeError):
@@ -258,11 +274,7 @@ def flow_by_pipe() -> dict[int, float]:
 
 def reference_pressure_heads() -> dict[str, float]:
     rows = load_csv("reference_operating_point.csv")
-    return {
-        row["id"]: float(row["value"])
-        for row in rows
-        if row["kind"] == "pressure_head"
-    }
+    return {row["id"]: float(row["value"]) for row in rows if row["kind"] == "pressure_head"}
 
 
 def check_source_dataset() -> dict[str, Any]:
@@ -293,15 +305,93 @@ def check_source_dataset() -> dict[str, Any]:
     }
 
 
+def next_project_code(engineer: Client, requested_code: str) -> str:
+    """Évite qu'un rejeu laisse le benchmark bloqué par un code déjà utilisé."""
+
+    projects = page(engineer, "/projects?include_archived=true&limit=500&offset=0")
+    codes = {str(project.get("code", "")) for project in projects}
+    if requested_code not in codes:
+        return requested_code
+    index = 2
+    while f"{requested_code}-R{index}" in codes:
+        index += 1
+    return f"{requested_code}-R{index}"
+
+
+def create_or_reuse_catalog_item(
+    engineer: Client,
+    approver: Client,
+    *,
+    collection: str,
+    organization_id: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Réutilise une version approuvée plutôt que de dupliquer le catalogue.
+
+    Les codes de catalogue sont uniques par organisation et famille. Cette
+    fonction rend un rejeu résilient après une interruption partielle, sans
+    contourner l'approbation métier de l'API.
+    """
+
+    items = page(
+        engineer,
+        f"/catalog/{collection}?organization_id={organization_id}&limit=500&offset=0",
+    )
+    matches = [item for item in items if item.get("code") == payload["code"]]
+    if matches:
+        item = max(matches, key=lambda value: int(value.get("version_number", 0)))
+        if item.get("status") != "approved":
+            item = approver.request("POST", f"/catalog/items/{item['id']}/approve")
+        return item
+    item = engineer.request("POST", f"/catalog/{collection}", payload)
+    return approver.request("POST", f"/catalog/items/{item['id']}/approve")
+
+
+def execution_gate(calculation: dict[str, Any], result_payload: dict[str, Any]) -> dict[str, Any]:
+    """Évalue explicitement le rejeu avant toute interprétation scientifique.
+
+    Un JSON de calcul non vide ne signifie pas qu'un cas est physiquement
+    réalisable. Cette porte est volontairement stricte pour qu'un avertissement,
+    une violation ou une non-convergence ne soit jamais présenté comme un
+    benchmark réussi.
+    """
+
+    calculation_status = str(calculation.get("status") or "")
+    result_status = str(result_payload.get("status") or calculation_status)
+    violation_count = len(result_payload.get("violations") or [])
+    warning_count = len(result_payload.get("warnings") or [])
+    checks = {
+        "calculation_status": calculation_status in ACCEPTED_CALCULATION_STATUSES,
+        "result_status": result_status in ACCEPTED_CALCULATION_STATUSES,
+        "feasible": bool(result_payload.get("feasible")),
+        "violations": violation_count <= MAXIMUM_VIOLATION_COUNT,
+        "warnings": warning_count <= MAXIMUM_WARNING_COUNT,
+    }
+    failures = [name for name, passed in checks.items() if not passed]
+    return {
+        "status": "PASS" if not failures else "FAIL",
+        "criteria": EXECUTION_GATE,
+        "checks": checks,
+        "calculation_status": calculation_status,
+        "result_status": result_status,
+        "feasible": bool(result_payload.get("feasible")),
+        "violation_count": violation_count,
+        "warning_count": warning_count,
+        "failures": failures,
+    }
+
+
 def create_catalog(
     engineer: Client,
     approver: Client,
     organization_id: str,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    fluid = engineer.request(
-        "POST",
-        "/catalog/fluids",
-        {
+    fluid = create_or_reuse_catalog_item(
+        engineer,
+        approver,
+        collection="fluids",
+        organization_id=organization_id,
+        payload={
             "organization_id": organization_id,
             "code": "LANL-SEAWAY-CRUDE",
             "name": "Crude oil — LANL Seaway benchmark",
@@ -319,12 +409,13 @@ def create_catalog(
             },
         },
     )
-    approver.request("POST", f"/catalog/items/{fluid['id']}/approve")
 
-    pump = engineer.request(
-        "POST",
-        "/catalog/pumps",
-        {
+    pump = create_or_reuse_catalog_item(
+        engineer,
+        approver,
+        collection="pumps",
+        organization_id=organization_id,
+        payload={
             "organization_id": organization_id,
             "code": "LANL-SEAWAY-PUMP",
             "name": "Variable-speed pump — LANL Seaway",
@@ -341,12 +432,13 @@ def create_catalog(
             },
         },
     )
-    approver.request("POST", f"/catalog/items/{pump['id']}/approve")
 
-    material = engineer.request(
-        "POST",
-        "/catalog/materials",
-        {
+    material = create_or_reuse_catalog_item(
+        engineer,
+        approver,
+        collection="materials",
+        organization_id=organization_id,
+        payload={
             "organization_id": organization_id,
             "code": "LANL-SEAWAY-PIPE-ASSUMPTION",
             "name": "Conduite benchmark — MAWP non publiée",
@@ -362,7 +454,6 @@ def create_catalog(
             },
         },
     )
-    approver.request("POST", f"/catalog/items/{material['id']}/approve")
     return fluid, pump, material
 
 
@@ -387,13 +478,14 @@ def build_model(
     organization_id: str,
     project_code: str,
 ) -> dict[str, Any]:
+    resolved_project_code = next_project_code(engineer, project_code)
     project = engineer.request(
         "POST",
         "/projects",
         {
             "organization_id": organization_id,
             "name": "Benchmark public — Seaway LANL",
-            "code": project_code,
+            "code": resolved_project_code,
             "description": (
                 "Cas complet de pétrole brut provenant de PetroleumModels.jl. "
                 "Cross-solver benchmark, pas données SCADA du vrai Seaway."
@@ -681,7 +773,9 @@ def compare_result(result_payload: dict[str, Any]) -> dict[str, Any]:
         "max_abs_flow_relative_error_percent": max(
             abs(float(row["relative_error_percent"])) for row in flow_rows
         ),
-        "max_abs_pressure_head_difference_m": max(abs(float(row["difference_m"])) for row in head_rows),
+        "max_abs_pressure_head_difference_m": max(
+            abs(float(row["difference_m"])) for row in head_rows
+        ),
         "max_abs_pipe_formula_difference_percent": max(
             abs(float(row["formula_difference_percent"])) for row in pipe_rows
         ),
@@ -696,12 +790,11 @@ def run_benchmark(
     expected_git_sha: str | None,
 ) -> dict[str, Any]:
     version = engineer.request("GET", "/version")
-    if expected_git_sha:
-        actual_sha = str((version.get("build") or {}).get("git_sha", ""))
-        if actual_sha != expected_git_sha:
-            raise BenchmarkError(
-                f"L'API sert {actual_sha!r}, pas le SHA attendu {expected_git_sha!r}."
-            )
+    actual_sha = str(version.get("git_sha") or "")
+    if not actual_sha:
+        raise BenchmarkError("L'endpoint /version ne publie pas git_sha à la racine.")
+    if expected_git_sha and actual_sha != expected_git_sha:
+        raise BenchmarkError(f"L'API sert {actual_sha!r}, pas le SHA attendu {expected_git_sha!r}.")
 
     organizations = page(engineer, "/organizations?limit=20&offset=0")
     if len(organizations) != 1:
@@ -724,10 +817,11 @@ def run_benchmark(
     if not result_payload:
         raise BenchmarkError(f"Le calcul ne contient aucun résultat : {result}")
 
-    comparison = compare_result(result_payload)
+    replay_gate = execution_gate(calculation, result_payload)
+    comparison = compare_result(result_payload) if replay_gate["status"] == "PASS" else None
     return {
         "benchmark": "PUBLIC-SEAWAY-LANL-01",
-        "classification": "cross_solver_complete_pipeline",
+        "classification": "complete_pipeline_cross_formulation_replay",
         "source": {
             "paper": "Khlebnikova et al., AIChE Journal 2021, DOI 10.1002/aic.17124",
             "machine_data": "lanl-ansi/PetroleumModels.jl test/data/case_seaway.m",
@@ -761,10 +855,18 @@ def run_benchmark(
             "violation_count": len(result_payload.get("violations") or []),
             "warning_count": len(result_payload.get("warnings") or []),
         },
+        "execution_gate": replay_gate,
         "comparison": comparison,
         "interpretation": {
             "flow_reference_is_official_lanl_test_output": True,
             "pressure_head_reference_is_derived_from_lanl_equations": True,
+            "independent_validation_verdict": "NOT_EVALUATED",
+            "independent_validation_reason": (
+                "Les débits LANL servent à reconstruire les injections/soutirages et les "
+                "charges/vitesses du fichier reference_operating_point.csv sont DERIVED. "
+                "Une validation cross-solver indépendante exige une sortie native et figée "
+                "de PetroleumModels.jl (pressions nodales, vitesses, puissances)."
+            ),
             "field_validation": False,
             "certification": False,
         },
@@ -809,10 +911,12 @@ def main() -> int:
         expected_git_sha=args.expected_git_sha,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     print(json.dumps(report, ensure_ascii=False, indent=2))
     print(f"Preuve écrite dans {args.output}")
-    return 0
+    return 0 if report["execution_gate"]["status"] == "PASS" else 2
 
 
 if __name__ == "__main__":

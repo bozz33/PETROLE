@@ -67,7 +67,7 @@ La chaîne est :
 
 Injections : N1, N9, N18. Soutirages : N15, N23.
 
-## Référence numérique indépendante
+## Référence numérique externe disponible
 
 Le test officiel `PetroleumModels.jl/test/opf.jl` attend notamment :
 
@@ -86,7 +86,14 @@ Comme la topologie est linéaire avec trois injections et deux soutirages, ces q
 - N23 soutirage : `0.7178 m3/s` ;
 - total injecté = total soutiré = `1.5433 m3/s`.
 
-Cette allocation est marquée **DERIVED** : elle est déduite des sorties de référence, pas directement copiée d'une table du papier.
+Cette allocation est marquée **DERIVED** : elle est déduite des sorties de référence, pas directement copiée d'une table du papier. Les débits deviennent alors des **conditions limites d'entrée** du rejeu PETROLE : leur reproduction vérifie la topologie et le bilan matière, mais ne constitue pas une validation indépendante du solveur hydraulique.
+
+Le fichier `reference_operating_point.csv` est également **DERIVED** : les charges et vitesses qu'il contient servent à diagnostiquer l'écart de formulation Leibenzon/Altshul. Elles ne doivent pas être présentées comme des sorties officielles de PetroleumModels.jl.
+
+Le runner publie donc deux verdicts séparés :
+
+- `execution_gate` — PASS uniquement si HydroLiquid converge sans avertissement ni violation ;
+- `independent_validation_verdict` — `NOT_EVALUATED` tant qu'une sortie native, figée et reproductible de PetroleumModels.jl (pressions, vitesses et puissances) n'est pas archivée comme référence externe.
 
 ## Adaptation scientifique vers PETROLE
 

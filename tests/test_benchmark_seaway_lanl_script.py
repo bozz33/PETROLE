@@ -65,7 +65,66 @@ def test_adaptateur_ne_fait_pas_passer_la_mawp_synthetique_pour_une_donnee_terra
 def test_connecteur_source_station_est_negligeable_et_declare() -> None:
     module = load_script()
 
-    assert module.SYNTHETIC_CONNECTOR_LENGTH_M == pytest.approx(0.001)
+    assert pytest.approx(0.001) == module.SYNTHETIC_CONNECTOR_LENGTH_M
     assert module.EDGE_LAYOUT[0][4] is None
     physical = sum(length for _, length, _, _, source_pipe in module.EDGE_LAYOUT if source_pipe)
     assert physical == pytest.approx(969_030.0)
+
+
+def test_version_api_lit_le_sha_racine_et_refuse_un_candidat_different() -> None:
+    module = load_script()
+
+    class ClientVersion:
+        def request(self, method, path, payload=None, **kwargs):
+            assert (method, path) == ("GET", "/version")
+            return {"git_sha": "served"}
+
+    with pytest.raises(module.BenchmarkError, match="pas le SHA attendu"):
+        module.run_benchmark(
+            ClientVersion(),
+            ClientVersion(),
+            project_code="AUDIT",
+            expected_git_sha="candidate",
+        )
+
+
+def test_porte_execution_refuse_non_convergence_et_violations() -> None:
+    module = load_script()
+
+    verdict = module.execution_gate(
+        {"status": "SIM_CONVERGED_WARN"},
+        {
+            "status": "SIM_CONVERGED_WARN",
+            "feasible": False,
+            "violations": [{"code": "P_MIN"}],
+            "warnings": [{"code": "WARN"}],
+        },
+    )
+
+    assert verdict["status"] == "FAIL"
+    assert set(verdict["failures"]) == {
+        "calculation_status",
+        "result_status",
+        "feasible",
+        "violations",
+        "warnings",
+    }
+
+
+def test_rejeu_change_le_code_projet_sans_dupliquer_le_catalogue() -> None:
+    module = load_script()
+
+    class ProjectsClient:
+        def request(self, method, path, payload=None, **kwargs):
+            assert (method, path) == (
+                "GET",
+                "/projects?include_archived=true&limit=500&offset=0",
+            )
+            return {
+                "items": [
+                    {"code": "BENCH-SEAWAY-LANL"},
+                    {"code": "BENCH-SEAWAY-LANL-R2"},
+                ]
+            }
+
+    assert module.next_project_code(ProjectsClient(), "BENCH-SEAWAY-LANL") == "BENCH-SEAWAY-LANL-R3"

@@ -1,0 +1,10 @@
+station,pump_count,rotation_rpm,inlet_temperature_c,outlet_temperature_c,inlet_pressure_mpa,outlet_pressure_mpa,published_mass_flow_kg_s,provenance
+1,3,2890,42.12,44.66,0.44,5.63,459.32,PUBLISHED
+2,,,40.19,41.43,3.96,3.73,581.43,PUBLISHED
+3,2,2982,38.30,39.71,0.98,4.75,497.25,PUBLISHED
+4,2,2890,37.30,39.20,0.98,4.85,667.72,PUBLISHED
+5,2,2443,37.25,38.70,1.15,5.31,497.84,PUBLISHED
+6,2,2723,36.27,43.44,0.89,4.44,499.51,PUBLISHED
+7,2,2525,37.30,41.67,1.69,5.29,509.60,PUBLISHED
+8,,,36.74,41.00,2.73,2.72,482.93,PUBLISHED
+9,,,36.41,,0.32,,,PUBLISHED

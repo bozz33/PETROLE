@@ -616,6 +616,174 @@ class DatasetImport(UUIDPrimaryKeyMixin, Base):
     dataset: Mapped[Dataset] = relationship(back_populates="imports")
 
 
+class MeasurementTag(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Métadonnée stable d'une grandeur mesurée sur un site.
+
+    Un tag appartient au site, et éventuellement à une instance d'équipement.
+    Les échantillons restent séparés de cette métadonnée pour pouvoir évoluer
+    vers un stockage temporel spécialisé sans changer l'identifiant métier.
+    """
+
+    __tablename__ = "tags"
+    __table_args__ = (
+        UniqueConstraint("site_id", "external_name", name="uq_tags_site_external_name"),
+        CheckConstraint(
+            "measurement_type IN "
+            "('pressure', 'flow', 'level', 'temperature', 'status', 'vibration', 'energy')",
+            name="measurement_type_valid",
+        ),
+        CheckConstraint("status IN ('active', 'archived')", name="status_valid"),
+        Index("ix_tags_organization_site", "organization_id", "site_id"),
+        Index("ix_tags_asset_instance", "asset_instance_id"),
+    )
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    site_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("sites.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    asset_instance_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("asset_instances.id", ondelete="RESTRICT"),
+    )
+    external_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    measurement_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    dimension: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_unit: Mapped[str] = mapped_column(String(80), nullable=False)
+    si_unit: Mapped[str] = mapped_column(String(80), nullable=False)
+    source: Mapped[str] = mapped_column(String(160), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    metadata_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+
+
+class TimeSeriesImport(UUIDPrimaryKeyMixin, Base):
+    """Journal idempotent d'une ingestion temporelle issue d'un dataset gelé."""
+
+    __tablename__ = "time_series_imports"
+    __table_args__ = (
+        UniqueConstraint(
+            "dataset_id", "tag_id", "idempotency_key", name="uq_ts_import_dataset_tag_key"
+        ),
+        CheckConstraint(
+            "status IN ('running', 'completed', 'completed_with_errors', 'failed')",
+            name="status_valid",
+        ),
+        Index("ix_ts_imports_dataset_created", "dataset_id", "created_at"),
+        Index("ix_ts_imports_tag_created", "tag_id", "created_at"),
+    )
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    dataset_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("datasets.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    tag_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("tags.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    processing_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False)
+    source_hash: Mapped[str] = mapped_column(String(71), nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    accepted_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    rejected_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    errors: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SampleRaw(UUIDPrimaryKeyMixin, Base):
+    """Échantillon source immuable, avant toute normalisation de valeur."""
+
+    __tablename__ = "samples_raw"
+    __table_args__ = (
+        CheckConstraint(
+            "quality IN ('good', 'uncertain', 'bad', 'substituted', 'estimated')",
+            name="quality_valid",
+        ),
+        CheckConstraint(
+            "sequence_number IS NULL OR sequence_number >= 0",
+            name="sequence_nonnegative",
+        ),
+        Index("ix_samples_raw_tag_source_timestamp", "tag_id", "source_timestamp"),
+        Index("ix_samples_raw_import_sequence", "time_series_import_id", "sequence_number"),
+    )
+
+    tag_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("tags.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    time_series_import_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("time_series_imports.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    dataset_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("datasets.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    dataset_row_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("dataset_rows.id", ondelete="SET NULL"),
+    )
+    source_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ingest_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source_value: Mapped[Any] = mapped_column(JSON, nullable=False)
+    source_unit: Mapped[str] = mapped_column(String(80), nullable=False)
+    quality: Mapped[str] = mapped_column(String(20), nullable=False)
+    sequence_number: Mapped[int | None] = mapped_column(Integer)
+    raw_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
+class SampleNormalized(UUIDPrimaryKeyMixin, Base):
+    """Échantillon numérique SI dérivé et versionné d'un brut immuable."""
+
+    __tablename__ = "samples_normalized"
+    __table_args__ = (
+        UniqueConstraint(
+            "raw_sample_id", "processing_version", name="uq_samples_normalized_raw_version"
+        ),
+        CheckConstraint(
+            "quality IN ('good', 'uncertain', 'bad', 'substituted', 'estimated')",
+            name="quality_valid",
+        ),
+        Index("ix_samples_normalized_tag_timestamp", "tag_id", "timestamp"),
+    )
+
+    tag_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("tags.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    raw_sample_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("samples_raw.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    value_si: Mapped[float] = mapped_column(Float, nullable=False)
+    si_unit: Mapped[str] = mapped_column(String(80), nullable=False)
+    quality: Mapped[str] = mapped_column(String(20), nullable=False)
+    processing_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    processing_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class BackgroundJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """Tâche persistante prise en charge atomiquement par un processus de calcul."""
 

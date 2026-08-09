@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import (
@@ -26,6 +27,7 @@ from hydro_api.deployment import (
     is_single_organization,
     require_default_organization_id,
 )
+from hydro_api.errors import ResourceConflictError
 from hydro_api.schemas.core import Page
 from hydro_api.schemas.data import (
     DatasetCreate,
@@ -37,7 +39,14 @@ from hydro_api.schemas.data import (
     MeasurementQualitySummary,
     StoredFileRead,
 )
-from hydro_api.services import data_import, measurement_quality
+from hydro_api.schemas.time_series import (
+    MeasurementTagCreate,
+    MeasurementTagRead,
+    NormalizedSampleRead,
+    TimeSeriesDatasetImportCreate,
+    TimeSeriesImportRead,
+)
+from hydro_api.services import data_import, measurement_quality, time_series
 from hydro_api.storage import ObjectStorageDependency
 
 router = APIRouter(tags=["Données"])
@@ -199,6 +208,87 @@ def create_dataset(data: DatasetCreate, request: Request, session: DatabaseSessi
     return data_import.create_dataset(session, data)
 
 
+@router.post(
+    "/measurement-tags",
+    response_model=MeasurementTagRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Créer un tag de mesure de site",
+)
+def create_measurement_tag(
+    data: MeasurementTagCreate,
+    request: Request,
+    session: DatabaseSession,
+):
+    """Crée la racine hiérarchique site → tag des séries Pilote/V1."""
+
+    data = bind_default_organization(request, session, data)
+    return time_series.create_measurement_tag(session, data)
+
+
+@router.get(
+    "/measurement-tags",
+    response_model=Page[MeasurementTagRead],
+    summary="Lister les tags de mesure",
+)
+def list_measurement_tags(
+    organization_id: uuid.UUID,
+    request: Request,
+    session: DatabaseSession,
+    site_id: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    if is_single_organization(request.app.state.settings):
+        organization_id = require_default_organization_id(request, session)
+    items, total = time_series.list_measurement_tags(
+        session,
+        organization_id=organization_id,
+        site_id=site_id,
+        limit=limit,
+        offset=offset,
+    )
+    return Page(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get(
+    "/measurement-tags/{tag_id}",
+    response_model=MeasurementTagRead,
+    summary="Lire un tag de mesure",
+)
+def read_measurement_tag(tag_id: uuid.UUID, session: DatabaseSession):
+    return time_series.get_measurement_tag(session, tag_id)
+
+
+@router.get(
+    "/measurement-tags/{tag_id}/samples",
+    response_model=Page[NormalizedSampleRead],
+    summary="Lire les échantillons SI d'un tag",
+)
+def list_measurement_tag_samples(
+    tag_id: uuid.UUID,
+    session: DatabaseSession,
+    start_timestamp: datetime | None = None,
+    end_timestamp: datetime | None = None,
+    limit: Annotated[int, Query(ge=1, le=5_000)] = 500,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    if (
+        start_timestamp is not None
+        and end_timestamp is not None
+        and start_timestamp > end_timestamp
+    ):
+        raise ResourceConflictError("La borne de début doit précéder la borne de fin.")
+    items, total = time_series.list_normalized_samples(
+        session,
+        tag_id=tag_id,
+        start_timestamp=start_timestamp,
+        end_timestamp=end_timestamp,
+        limit=limit,
+        offset=offset,
+    )
+    return Page(items=items, total=total, limit=limit, offset=offset)
+
+
 @router.get(
     "/datasets/{dataset_id}",
     response_model=DatasetRead,
@@ -260,6 +350,36 @@ def run_import(
         idempotency_key=idempotency_key,
         max_rows=settings.max_import_rows,
     )
+
+
+@router.post(
+    "/datasets/{dataset_id}/time-series-imports",
+    response_model=TimeSeriesImportRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Projeter un dataset de mesures vers une série temporelle",
+)
+def import_dataset_time_series(
+    dataset_id: uuid.UUID,
+    data: TimeSeriesDatasetImportCreate,
+    idempotency_key: IdempotencyKey,
+    session: DatabaseSession,
+):
+    return time_series.import_dataset_time_series(
+        session,
+        dataset_id=dataset_id,
+        tag_id=data.tag_id,
+        idempotency_key=idempotency_key,
+        processing_version=data.processing_version,
+    )
+
+
+@router.get(
+    "/time-series-imports/{import_id}",
+    response_model=TimeSeriesImportRead,
+    summary="Lire un import temporel",
+)
+def read_time_series_import(import_id: uuid.UUID, session: DatabaseSession):
+    return time_series.get_time_series_import(session, import_id)
 
 
 @router.get(

@@ -101,6 +101,29 @@ Une mesure `quality=bad` reste conservée et visible, mais elle n'entre pas dans
 
 La comparaison mesure-modèle ne démarre pas avant que la persistance temporelle D12 soit définie et que la correspondance tag ↔ actif/grandeur soit explicite. Le champ `source` d'un CSV ne doit pas être assimilé silencieusement à un capteur industriel approuvé.
 
+## 5.1 État V1-A2 — implémentation en cours
+
+Le premier flux temporel reste volontairement **fichier hors ligne → dataset
+normalisé → tag explicite**. Il crée les tables `tags`, `samples_raw`,
+`samples_normalized` et `time_series_imports` :
+
+- un tag appartient à une organisation et à un site ; son rattachement à un
+  équipement est facultatif mais vérifié contre le même site ;
+- les échantillons bruts conservent horodatage source, heure d'ingestion,
+  valeur/unité d'origine, qualité, séquence, dataset et ligne source ;
+- les échantillons normalisés conservent la valeur SI, l'unité SI et une version
+  de traitement, sans écraser le brut ;
+- l'import est idempotent par `dataset + tag + Idempotency-Key` ; les doublons
+  `source + timestamp` restent stockables et seront qualifiés par V1-A3 ;
+- la source de chaque ligne doit correspondre explicitement au `external_name`
+  du tag : un dataset multi-capteurs devra être réparti sur ses tags, jamais
+  fusionné silencieusement.
+
+Les endpoints sont `POST/GET /measurement-tags`,
+`POST /datasets/{dataset_id}/time-series-imports` et
+`GET /measurement-tags/{tag_id}/samples`. Ils ne constituent pas un connecteur
+SCADA et n'acceptent pas encore d'écriture temps réel.
+
 ## 6. Porte avant calibration
 
 La calibration ne démarre pas avant :

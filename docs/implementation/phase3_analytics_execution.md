@@ -1,6 +1,6 @@
 # Phase 3 — Data analytics
 
-Statut : contrat d’implémentation post-MVP, non certifiant.
+Statut : fondations d’implémentation post-MVP, non certifiantes.
 
 Base logicielle de travail : `6d18ef39d16c2dd9ae34128ccf6d87f4788e19bc` (V1-B1), avant intégration finale dans `main`.
 
@@ -35,9 +35,9 @@ Sous-lots :
 - absence de seuil industriel arbitraire codé en dur ;
 - les résultats sont des aides à l’analyse, pas des alarmes de sécurité.
 
-## 4. Première implémentation P3-A
+## 4. Fondations déjà codées
 
-Créer une API d’agrégation temporelle par tag et `processing_version` :
+### P3-A — agrégations et tendances
 
 - fenêtre temporelle explicite ;
 - filtre qualité ;
@@ -48,15 +48,33 @@ Créer une API d’agrégation temporelle par tag et `processing_version` :
 - pente de tendance uniquement si le nombre de points est suffisant ;
 - lignage vers le tag, la version de traitement et la plage source.
 
-## 5. Porte avant P3-D prévisions
+### P3-D — baseline de prévision contrôlée
 
-Les prévisions ne démarrent pas avant :
+- split chronologique strict `train / validation / test` ;
+- ajustement OLS uniquement sur `train` ;
+- aucune réutilisation de validation/test pour réajuster le modèle ;
+- MAE, RMSE et biais calculés séparément sur les trois jeux ;
+- rejet d’un split qui crée une fuite temporelle ;
+- modèle linéaire utilisé comme baseline explicable, pas comme prédicteur industriel validé.
+
+### P3-E — maintenance conditionnelle non-sûreté
+
+- baseline statistique versionnée avec unité SI et provenance ;
+- écart normalisé par rapport à la baseline ;
+- seuils `watch` et `investigate` fournis explicitement par le contexte métier ;
+- aucun seuil industriel par défaut ;
+- aucune commande, alarme procédé ou ordre automatique de maintenance.
+
+## 5. Porte avant publication P3-D/P3-E
+
+Les capacités prédictives/conditionnelles ne deviennent publiables sur un pilote qu’après :
 
 - données terrain suffisantes ;
 - horizon métier convenu ;
 - baseline naïve documentée ;
 - protocole train/validation/test figé ;
 - métriques choisies avant observation du test ;
+- seuils conditionnels justifiés et approuvés ;
 - revue ingénieur des variables et limites d’usage.
 
 ## 6. Hors portée

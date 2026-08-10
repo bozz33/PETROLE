@@ -50,9 +50,7 @@ class PilotTestEvidence:
     def __post_init__(self) -> None:
         if self.status in {PilotEvidenceStatus.PASS, PilotEvidenceStatus.FAIL}:
             if self.evidence_ref is None or not self.evidence_ref.strip():
-                raise ValueError(
-                    "Un test exécuté PASS/FAIL doit référencer une preuve archivée."
-                )
+                raise ValueError("Un test exécuté PASS/FAIL doit référencer une preuve archivée.")
         if self.evidence_ref is not None and not self.evidence_ref.strip():
             raise ValueError("Une référence de preuve ne peut pas être vide.")
         if self.note is not None and not self.note.strip():

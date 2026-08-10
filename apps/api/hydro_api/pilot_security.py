@@ -51,7 +51,9 @@ def evaluate_pilot_security(
         blockers.append("L'authentification doit être activée pour le pilote.")
     jwt_secret = settings.jwt_secret.get_secret_value()
     if len(jwt_secret) < 32 or jwt_secret.startswith("development-"):
-        blockers.append("Le secret JWT du pilote doit être privé, non-développement et >= 32 caractères.")
+        blockers.append(
+            "Le secret JWT du pilote doit être privé, non-développement et >= 32 caractères."
+        )
     if not _FULL_GIT_SHA.fullmatch(settings.build_git_sha):
         blockers.append("Le déploiement pilote doit publier un SHA Git complet de 40 caractères.")
 

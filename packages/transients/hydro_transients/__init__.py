@@ -1,5 +1,13 @@
 """Fondations du moteur transitoire liquide PETROLE."""
 
+from hydro_transients.events import (
+    BoundaryKind,
+    BoundarySchedulePoint,
+    BoundaryValueSchedule,
+    ScheduleInterpolation,
+    ScheduledBoundary,
+    simulate_scheduled_boundary_pipe,
+)
 from hydro_transients.moc import (
     MocPipeGrid,
     MocStateSnapshot,
@@ -34,12 +42,17 @@ from hydro_transients.results import (
 
 __all__ = [
     "BatchSequence",
+    "BoundaryKind",
+    "BoundarySchedulePoint",
+    "BoundaryValueSchedule",
     "MocPipeGrid",
     "MocStateSnapshot",
     "NodeTransientEnvelope",
     "ProductBatch",
     "ProductInterface",
     "ProductPropertyTables",
+    "ScheduleInterpolation",
+    "ScheduledBoundary",
     "TemperaturePropertyPoint",
     "TemperaturePropertyTable",
     "TotalHeadPressureResult",
@@ -54,4 +67,5 @@ __all__ = [
     "mean_velocity_full_pipe",
     "pressure_from_total_head",
     "simulate_fixed_head_pipe",
+    "simulate_scheduled_boundary_pipe",
 ]

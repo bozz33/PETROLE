@@ -30,7 +30,9 @@ def _normalize_boundary(timestamp: datetime | None) -> datetime | None:
     return timestamp.astimezone(UTC)
 
 
-def _population_statistics(values: list[float]) -> tuple[float | None, float | None, float | None, float | None]:
+def _population_statistics(
+    values: list[float],
+) -> tuple[float | None, float | None, float | None, float | None]:
     if not values:
         return None, None, None, None
     minimum = min(values)
@@ -69,10 +71,15 @@ def _linear_trend(records: list[tuple[datetime, float]]) -> dict[str, Any]:
             "end_timestamp": ordered[-1][0],
         }
 
-    slope = math.fsum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys, strict=True)) / denominator
+    slope = (
+        math.fsum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys, strict=True))
+        / denominator
+    )
     intercept = y_mean - slope * x_mean
     predictions = [intercept + slope * x for x in xs]
-    residual_sum_squares = math.fsum((y - prediction) ** 2 for y, prediction in zip(ys, predictions, strict=True))
+    residual_sum_squares = math.fsum(
+        (y - prediction) ** 2 for y, prediction in zip(ys, predictions, strict=True)
+    )
     total_sum_squares = math.fsum((y - y_mean) ** 2 for y in ys)
     r_squared = (
         1.0
@@ -112,7 +119,11 @@ def analyze_time_series(
 
     normalized_start = _normalize_boundary(start_timestamp)
     normalized_end = _normalize_boundary(end_timestamp)
-    if normalized_start is not None and normalized_end is not None and normalized_start > normalized_end:
+    if (
+        normalized_start is not None
+        and normalized_end is not None
+        and normalized_start > normalized_end
+    ):
         raise ResourceConflictError("La borne de début doit précéder la borne de fin.")
 
     tag = get_measurement_tag(session, tag_id)

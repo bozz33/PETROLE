@@ -4,6 +4,7 @@ Le paquet est volontairement séparé de ``hydroliquid`` : un réseau gaz ne doi
 pas être modélisé en remplaçant simplement la densité d'un liquide.
 """
 
+from hydro_gas.composition import GasComponentFraction, GasComposition
 from hydro_gas.compressor_map import (
     CompressorMap,
     CompressorMapPoint,
@@ -18,6 +19,8 @@ __all__ = [
     "CompressorMapPoint",
     "CompressorOperatingPoint",
     "CompressorSpeedLine",
+    "GasComponentFraction",
+    "GasComposition",
     "GasState",
     "gas_density_from_z",
     "interpolate_compressor_map",

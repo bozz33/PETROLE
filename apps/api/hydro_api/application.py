@@ -15,6 +15,7 @@ from starlette.responses import Response
 from hydro_api import __version__
 from hydro_api.config import Settings, get_settings
 from hydro_api.errors import ResourceConflictError, ResourceNotFoundError
+from hydro_api.routers.analytics import router as analytics_router
 from hydro_api.routers.auth import router as auth_router
 from hydro_api.routers.catalog import router as catalog_router
 from hydro_api.routers.data import router as data_router
@@ -104,10 +105,6 @@ def create_application(settings: Settings | None = None) -> FastAPI:
                 )
                 raise
             response.headers["X-Correlation-ID"] = correlation_id
-            # L'API transporte potentiellement des éléments d'exploitation et
-            # d'authentification : elle ne doit pas être mise en cache par un
-            # navigateur ou un proxy partagé. Les en-têtes de défense restent
-            # applicables aussi aux réponses d'erreur générées par FastAPI.
             response.headers.setdefault("Cache-Control", "no-store")
             response.headers.setdefault("X-Content-Type-Options", "nosniff")
             response.headers.setdefault("X-Frame-Options", "DENY")
@@ -212,6 +209,11 @@ def create_application(settings: Settings | None = None) -> FastAPI:
     )
     application.include_router(
         data_router,
+        prefix="/api/v1",
+        dependencies=protected_dependencies,
+    )
+    application.include_router(
+        analytics_router,
         prefix="/api/v1",
         dependencies=protected_dependencies,
     )

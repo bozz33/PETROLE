@@ -38,7 +38,9 @@ class CalibrationReportData:
             raise ValueError("Le statut de validation terrain est obligatoire.")
 
 
-def _metric_rows(calibration: ErrorMetrics, validation: ErrorMetrics) -> tuple[tuple[object, ...], ...]:
+def _metric_rows(
+    calibration: ErrorMetrics, validation: ErrorMetrics
+) -> tuple[tuple[object, ...], ...]:
     return (
         ("Échantillons", calibration.sample_count, validation.sample_count),
         ("MAE SI", calibration.mae_si, validation.mae_si),

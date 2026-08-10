@@ -32,7 +32,11 @@ def test_phase3_analytics_buckets_exclude_bad_without_mutation(
 
     site = analytics_client.post(
         "/api/v1/sites",
-        json={"organization_id": organization_id, "name": "Site Analytics", "code": "SITE-AN"},
+        json={
+            "organization_id": organization_id,
+            "name": "Site Analytics",
+            "code": "SITE-AN",
+        },
     )
     assert site.status_code == 201, site.text
     site_id = site.json()["id"]
@@ -135,7 +139,8 @@ def test_phase3_analytics_buckets_exclude_bad_without_mutation(
     assert body["excluded_sample_count"] == 1
     assert body["si_unit"] == "Pa"
     assert [bucket["sample_count"] for bucket in body["buckets"]] == [2, 1]
-    assert [bucket["completeness_ratio"] for bucket in body["buckets"]] == pytest.approx([1.0, 0.5])
+    completeness = [bucket["completeness_ratio"] for bucket in body["buckets"]]
+    assert completeness == pytest.approx([1.0, 0.5])
     assert body["buckets"][0]["mean_value_si"] == pytest.approx(1_050_000.0)
     assert body["buckets"][1]["mean_value_si"] == pytest.approx(1_300_000.0)
     assert body["trend"]["sample_count"] == 3
@@ -146,8 +151,12 @@ def test_phase3_analytics_buckets_exclude_bad_without_mutation(
         params=analytics_params,
     )
     assert json_export.status_code == 200, json_export.text
-    assert json_export.headers["content-disposition"] == 'attachment; filename="analytics.json"'
-    assert json_export.headers["x-content-sha256"] == hashlib.sha256(json_export.content).hexdigest()
+    assert json_export.headers["content-disposition"] == (
+        'attachment; filename="analytics.json"'
+    )
+    assert json_export.headers["x-content-sha256"] == hashlib.sha256(
+        json_export.content
+    ).hexdigest()
     exported_json = json_export.json()
     assert exported_json["export_version"] == "phase3-analytics/1.0"
     assert exported_json["processing_version"] == "phase3-test-v1"
@@ -163,7 +172,9 @@ def test_phase3_analytics_buckets_exclude_bad_without_mutation(
     assert csv_export.headers["content-disposition"] == (
         'attachment; filename="analytics-buckets.csv"'
     )
-    assert csv_export.headers["x-content-sha256"] == hashlib.sha256(csv_export.content).hexdigest()
+    assert csv_export.headers["x-content-sha256"] == hashlib.sha256(
+        csv_export.content
+    ).hexdigest()
     csv_text = csv_export.content.decode("utf-8-sig")
     assert csv_text.startswith("start_timestamp;end_timestamp;sample_count;")
     assert "1050000.0" in csv_text

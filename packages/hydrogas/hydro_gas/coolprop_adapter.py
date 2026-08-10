@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-import CoolProp.CoolProp as CP
+import CoolProp.CoolProp as coolprop
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,13 +113,13 @@ def evaluate_coolprop_properties(
     definition.envelope.validate_state(temperature_k=temperature_k, pressure_pa=pressure_pa)
     key = definition.coolprop_fluid_key
     try:
-        density = float(CP.PropsSI("DMASS", "T", temperature_k, "P", pressure_pa, key))
+        density = float(coolprop.PropsSI("DMASS", "T", temperature_k, "P", pressure_pa, key))
         dynamic_viscosity = float(
-            CP.PropsSI("VISCOSITY", "T", temperature_k, "P", pressure_pa, key)
+            coolprop.PropsSI("VISCOSITY", "T", temperature_k, "P", pressure_pa, key)
         )
-        vapor_pressure = float(CP.PropsSI("P", "T", temperature_k, "Q", 0, key))
-        version = CP.get_global_param_string("version")
-        gitrevision = CP.get_global_param_string("gitrevision")
+        vapor_pressure = float(coolprop.PropsSI("P", "T", temperature_k, "Q", 0, key))
+        version = coolprop.get_global_param_string("version")
+        gitrevision = coolprop.get_global_param_string("gitrevision")
     except Exception as exc:  # CoolProp expose plusieurs exceptions backend selon l'état.
         raise ValueError(
             f"Échec de l'évaluation CoolProp pour {key} au point T/P demandé."

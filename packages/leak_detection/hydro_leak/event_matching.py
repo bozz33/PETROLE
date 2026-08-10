@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,7 +91,7 @@ def _validate_unambiguous_event_windows(
     if len(event_ids) != len(set(event_ids)):
         raise ValueError("Chaque événement labellisé doit avoir un identifiant unique.")
     window = timedelta(seconds=policy.maximum_detection_delay_s)
-    for previous, current in zip(ordered, ordered[1:], strict=False):
+    for previous, current in pairwise(ordered):
         if current.started_at_utc <= previous.started_at_utc + window:
             raise ValueError(
                 "Les fenêtres de matching de deux événements se chevauchent ; "

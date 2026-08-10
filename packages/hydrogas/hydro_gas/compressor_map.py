@@ -46,7 +46,9 @@ class CompressorSpeedLine:
             raise ValueError("Une ligne de vitesse exige au moins deux points de carte.")
         flows = [point.mass_flow_kg_s for point in self.points]
         if flows != sorted(flows) or len(set(flows)) != len(flows):
-            raise ValueError("Les points d'une ligne doivent avoir des débits strictement croissants.")
+            raise ValueError(
+                "Les points d'une ligne doivent avoir des débits strictement croissants."
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,7 +122,9 @@ def interpolate_compressor_map(
 
     if len(lines) == 1:
         if not math.isclose(speed_rpm, lines[0].speed_rpm, rel_tol=0.0, abs_tol=1e-12):
-            raise ValueError("Une carte à une seule ligne n'autorise aucune interpolation en vitesse.")
+            raise ValueError(
+                "Une carte à une seule ligne n'autorise aucune interpolation en vitesse."
+            )
         pressure_ratio, efficiency = _interpolate_line(lines[0], mass_flow_kg_s)
     else:
         bracket: tuple[CompressorSpeedLine, CompressorSpeedLine] | None = None

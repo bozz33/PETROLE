@@ -39,7 +39,9 @@ class InstrumentCalibrationRecord:
         if any(value is not None and value.tzinfo is None for value in dates):
             raise ValueError("Les dates de calibration doivent être timezone-aware.")
         if (self.calibrated_at is None) != (self.valid_until is None):
-            raise ValueError("Date de calibration et date de validité doivent être fournies ensemble.")
+            raise ValueError(
+                "Date de calibration et date de validité doivent être fournies ensemble."
+            )
         if (
             self.calibrated_at is not None
             and self.valid_until is not None

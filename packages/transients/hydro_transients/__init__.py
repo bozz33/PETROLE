@@ -16,6 +16,11 @@ from hydro_transients.multiproduct import (
     ProductInterface,
     build_batch_sequence,
 )
+from hydro_transients.product_properties import (
+    ProductPropertyTables,
+    TemperaturePropertyPoint,
+    TemperaturePropertyTable,
+)
 from hydro_transients.results import (
     NodeTransientEnvelope,
     TransientEnvelopeSet,
@@ -29,6 +34,9 @@ __all__ = [
     "NodeTransientEnvelope",
     "ProductBatch",
     "ProductInterface",
+    "ProductPropertyTables",
+    "TemperaturePropertyPoint",
+    "TemperaturePropertyTable",
     "TransientEnvelopeSet",
     "build_batch_sequence",
     "build_transient_envelopes",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Generator
 
 import pytest
@@ -118,16 +119,17 @@ def test_phase3_analytics_buckets_exclude_bad_without_mutation(
     )
     assert projected.status_code == 201, projected.text
 
-    analytics = analytics_client.get(
+    analytics_params = {
+        "processing_version": "phase3-test-v1",
+        "bucket_seconds": 120,
+        "expected_interval_seconds": 60,
+    }
+    analytics_response = analytics_client.get(
         f"/api/v1/analytics/measurement-tags/{tag_id}/series",
-        params={
-            "processing_version": "phase3-test-v1",
-            "bucket_seconds": 120,
-            "expected_interval_seconds": 60,
-        },
+        params=analytics_params,
     )
-    assert analytics.status_code == 200, analytics.text
-    body = analytics.json()
+    assert analytics_response.status_code == 200, analytics_response.text
+    body = analytics_response.json()
     assert body["candidate_sample_count"] == 4
     assert body["included_sample_count"] == 3
     assert body["excluded_sample_count"] == 1
@@ -139,7 +141,35 @@ def test_phase3_analytics_buckets_exclude_bad_without_mutation(
     assert body["trend"]["sample_count"] == 3
     assert body["trend"]["slope_si_per_second"] == pytest.approx(1666.6666667)
 
-    # L'analyse ne supprime pas la mesure bad : la projection brute reste complète.
+    json_export = analytics_client.get(
+        f"/api/v1/analytics/measurement-tags/{tag_id}/series/export.json",
+        params=analytics_params,
+    )
+    assert json_export.status_code == 200, json_export.text
+    assert json_export.headers["content-disposition"] == 'attachment; filename="analytics.json"'
+    assert json_export.headers["x-content-sha256"] == hashlib.sha256(json_export.content).hexdigest()
+    exported_json = json_export.json()
+    assert exported_json["export_version"] == "phase3-analytics/1.0"
+    assert exported_json["processing_version"] == "phase3-test-v1"
+    assert exported_json["si_unit"] == "Pa"
+    assert exported_json["included_sample_count"] == 3
+    assert [bucket["sample_count"] for bucket in exported_json["buckets"]] == [2, 1]
+
+    csv_export = analytics_client.get(
+        f"/api/v1/analytics/measurement-tags/{tag_id}/series/export.csv",
+        params=analytics_params,
+    )
+    assert csv_export.status_code == 200, csv_export.text
+    assert csv_export.headers["content-disposition"] == (
+        'attachment; filename="analytics-buckets.csv"'
+    )
+    assert csv_export.headers["x-content-sha256"] == hashlib.sha256(csv_export.content).hexdigest()
+    csv_text = csv_export.content.decode("utf-8-sig")
+    assert csv_text.startswith("start_timestamp;end_timestamp;sample_count;")
+    assert "1050000.0" in csv_text
+    assert "1300000.0" in csv_text
+
+    # L'analyse et ses exports ne suppriment pas la mesure bad : la projection reste complète.
     samples = analytics_client.get(
         f"/api/v1/measurement-tags/{tag_id}/samples",
         params={"processing_version": "phase3-test-v1"},

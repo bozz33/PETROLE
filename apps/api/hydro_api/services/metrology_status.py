@@ -7,6 +7,7 @@ politique proviennent du système métrologique/opérateur.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -57,8 +58,8 @@ class MetrologyPolicy:
     policy_ref: str
 
     def __post_init__(self) -> None:
-        if self.due_warning_seconds < 0:
-            raise ValueError("La fenêtre d'anticipation doit être positive ou nulle.")
+        if not math.isfinite(self.due_warning_seconds) or self.due_warning_seconds < 0:
+            raise ValueError("La fenêtre d'anticipation doit être finie et positive ou nulle.")
         if not self.policy_ref.strip():
             raise ValueError("La référence de politique métrologique est obligatoire.")
 

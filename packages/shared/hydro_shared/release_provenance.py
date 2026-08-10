@@ -68,7 +68,9 @@ class ReleaseManifest:
             raise ValueError("sbom_sha256 doit être un SHA-256 hexadécimal minuscule.")
         names = [artifact.name for artifact in self.artifacts]
         if len(names) != len(set(names)):
-            raise ValueError("Deux artefacts d'une même release ne peuvent pas partager le même nom.")
+            raise ValueError(
+                "Deux artefacts d'une même release ne peuvent pas partager le même nom."
+            )
 
     def payload(self) -> dict[str, Any]:
         """Retourne le payload indépendant de l'ordre d'insertion Python."""

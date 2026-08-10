@@ -160,7 +160,7 @@ def analyze_time_series(
 
     bucket_payloads: list[dict[str, Any]] = []
     expected_sample_count = (
-        max(1, int(round(bucket_seconds / expected_interval_seconds)))
+        max(1, round(bucket_seconds / expected_interval_seconds))
         if expected_interval_seconds is not None
         else None
     )

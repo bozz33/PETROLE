@@ -24,6 +24,20 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Cette branc
 
 ## 3. Fondations déjà codées
 
+### P4-A — lots et interfaces multiproduits
+
+- lots produits avec identifiant, référence produit, volume et provenance obligatoires ;
+- séquence ordonnée et immuable de lots ;
+- identifiants de lots uniques ;
+- interfaces logiques construites entre lots successifs ;
+- position de chaque interface dans un axe de volume cumulé injecté ;
+- volume total déterministe ;
+- aucun volume de mélange/contamination ajouté implicitement.
+
+Cette représentation ne calcule pas encore la position spatiale des interfaces, leur dispersion, leur mélange ou leur évolution thermophysique. Ces phénomènes appartiennent à P4-B et aux futurs modèles de transport multiproduit, avec propriétés validées et benchmarks indépendants.
+
+### P4-C/P4-D — MOC et limites élémentaires
+
 - maillage MOC 1D avec contrôle `CFL = a Δt / Δx = 1` ;
 - coefficient caractéristique `B = a/(gA)` ;
 - terme de frottement quasi-stationnaire explicite ;
@@ -43,7 +57,8 @@ La condition de débit imposé est une brique mathématique. Elle ne prétend pa
 - conservation de masse/énergie contrôlée selon le modèle ;
 - modèles de cavitation ou colonne séparée uniquement après benchmark dédié ;
 - friction instationnaire désactivée tant qu’un modèle et ses références ne sont pas validés ;
-- multiproduit et transitoire restent des moteurs explicitement sélectionnés et versionnés.
+- multiproduit et transitoire restent des moteurs explicitement sélectionnés et versionnés ;
+- aucune largeur d’interface, dispersion ou contamination n’est inventée sans modèle sourcé et validé.
 
 ## 5. Gates
 

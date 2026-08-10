@@ -72,16 +72,16 @@ def summarize_regime_kpis(
         raise ValueError("Tous les régimes d'une synthèse doivent utiliser la même unité SI.")
 
     total_samples = sum(observation.sample_count for observation in observations)
-    weighted_bias = math.fsum(
-        observation.sample_count * observation.bias_si for observation in observations
-    ) / total_samples
-    weighted_mae = math.fsum(
-        observation.sample_count * observation.mae_si for observation in observations
-    ) / total_samples
+    weighted_bias = (
+        math.fsum(observation.sample_count * observation.bias_si for observation in observations)
+        / total_samples
+    )
+    weighted_mae = (
+        math.fsum(observation.sample_count * observation.mae_si for observation in observations)
+        / total_samples
+    )
     pooled_rmse = math.sqrt(
-        math.fsum(
-            observation.sample_count * observation.rmse_si**2 for observation in observations
-        )
+        math.fsum(observation.sample_count * observation.rmse_si**2 for observation in observations)
         / total_samples
     )
     rmse_values = [observation.rmse_si for observation in observations]

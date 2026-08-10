@@ -87,7 +87,9 @@ class DeploymentManifest:
             "migration_revision": self.migration_revision,
             "configuration_sha256": self.configuration_sha256,
             "created_at": self.created_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
-            "images": [asdict(image) for image in sorted(self.images, key=lambda item: item.service)],
+            "images": [
+                asdict(image) for image in sorted(self.images, key=lambda item: item.service)
+            ],
             "previous_release": self.previous_release,
             "rollback_document_ref": self.rollback_document_ref,
         }

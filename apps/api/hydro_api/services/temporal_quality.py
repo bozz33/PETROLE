@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from itertools import pairwise
 from typing import Literal
 
 SampleQuality = Literal["good", "uncertain", "bad", "substituted", "estimated"]
@@ -66,7 +67,10 @@ class TemporalQualityPolicy:
             self.stagnation_min_duration_s,
             self.maximum_jump_si,
         )
-        if any(value is not None and (not math.isfinite(value) or value < 0) for value in nonnegative):
+        if any(
+            value is not None and (not math.isfinite(value) or value < 0)
+            for value in nonnegative
+        ):
             raise ValueError("Les seuils temporels doivent être finis et positifs ou nuls.")
         stagnation_fields = (
             self.stagnation_delta_tolerance_si,
@@ -152,7 +156,7 @@ def assess_temporal_quality(
     if policy.maximum_jump_si is not None:
         jump_count = sum(
             abs(current.value_si - previous.value_si) > policy.maximum_jump_si
-            for previous, current in zip(ordered, ordered[1:], strict=True)
+            for previous, current in pairwise(ordered)
         )
 
     longest_stagnation: float | None = None

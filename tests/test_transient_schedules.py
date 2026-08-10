@@ -7,8 +7,8 @@ from hydro_transients import (
     BoundarySchedulePoint,
     BoundaryValueSchedule,
     MocPipeGrid,
-    ScheduleInterpolation,
     ScheduledBoundary,
+    ScheduleInterpolation,
     simulate_scheduled_boundary_pipe,
 )
 

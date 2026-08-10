@@ -68,8 +68,7 @@ class TemporalQualityPolicy:
             self.maximum_jump_si,
         )
         if any(
-            value is not None and (not math.isfinite(value) or value < 0)
-            for value in nonnegative
+            value is not None and (not math.isfinite(value) or value < 0) for value in nonnegative
         ):
             raise ValueError("Les seuils temporels doivent être finis et positifs ou nuls.")
         stagnation_fields = (
@@ -147,9 +146,7 @@ def assess_temporal_quality(
     quality_counts = {quality: 0 for quality in sorted(_ALLOWED_QUALITIES)}
     for sample in samples:
         quality_counts[sample.quality] += 1
-    quality_fractions = {
-        quality: count / len(samples) for quality, count in quality_counts.items()
-    }
+    quality_fractions = {quality: count / len(samples) for quality, count in quality_counts.items()}
 
     ordered = tuple(sorted(samples, key=lambda sample: sample.source_timestamp_utc))
     jump_count = None

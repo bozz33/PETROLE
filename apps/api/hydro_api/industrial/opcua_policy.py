@@ -82,7 +82,7 @@ class OpcUaEndpointPolicy(BaseModel):
         return normalized
 
     @model_validator(mode="after")
-    def enforce_read_only(self) -> "OpcUaEndpointPolicy":
+    def enforce_read_only(self) -> OpcUaEndpointPolicy:
         if self.security_mode != "SignAndEncrypt":
             raise ValueError("Le pilote OPC UA exige security_mode=SignAndEncrypt.")
         forbidden = set(self.allowed_operations) - READ_ONLY_OPERATIONS
@@ -102,8 +102,8 @@ def assert_read_only_operation(operation: OpcUaOperation) -> None:
 
 
 __all__ = [
+    "READ_ONLY_OPERATIONS",
     "OpcUaEndpointPolicy",
     "OpcUaOperation",
-    "READ_ONLY_OPERATIONS",
     "assert_read_only_operation",
 ]

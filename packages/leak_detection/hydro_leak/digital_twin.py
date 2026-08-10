@@ -106,7 +106,9 @@ def state_delta(
     """Retourne les deltas SI uniquement pour les variables comparables."""
 
     if previous.model_version != current.model_version:
-        raise ValueError("Deux snapshots de versions de modèle différentes ne sont pas comparables.")
+        raise ValueError(
+            "Deux snapshots de versions de modèle différentes ne sont pas comparables."
+        )
     if current.sequence_number <= previous.sequence_number:
         raise ValueError("Le snapshot courant doit avoir une séquence postérieure.")
     previous_by_name = {variable.name: variable for variable in previous.variables}

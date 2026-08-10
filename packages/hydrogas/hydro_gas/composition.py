@@ -52,15 +52,16 @@ class GasComposition:
             raise ValueError("La tolérance de somme des fractions doit être finie et positive.")
         total = math.fsum(component.mole_fraction for component in self.components)
         if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=self.fraction_tolerance):
-            raise ValueError("La somme des fractions molaires doit être égale à 1 dans la tolérance.")
+            raise ValueError(
+                "La somme des fractions molaires doit être égale à 1 dans la tolérance."
+            )
 
     @property
     def molar_mass_kg_mol(self) -> float:
         """M = Σ y_i M_i pour la composition molaire fournie."""
 
         return math.fsum(
-            component.mole_fraction * component.molar_mass_kg_mol
-            for component in self.components
+            component.mole_fraction * component.molar_mass_kg_mol for component in self.components
         )
 
 

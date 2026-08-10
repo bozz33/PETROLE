@@ -1,0 +1,54 @@
+# Phase 8 — Industrialisation multi-sites
+
+Statut : contrat d’industrialisation, sans prétention de certification réglementaire.
+
+Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Les fonctions seront intégrées progressivement après fermeture des gates produits précédents.
+
+## 1. Références projet
+
+- D05 : exigences non fonctionnelles ;
+- D11 : architecture ;
+- D15 : sécurité/continuité ;
+- D17 : Phase 8 — multi-sites, HA, support et gouvernance ;
+- D18 : tests/CI/release ;
+- D20 : critères pilote/production.
+
+## 2. Sous-lots
+
+1. P8-A — séparation stricte des sites/projets et politique de données ;
+2. P8-B — haute disponibilité PostgreSQL, stockage objet et services stateless ;
+3. P8-C — sauvegarde, WAL/PITR, restauration et exercices réguliers ;
+4. P8-D — observabilité : métriques, logs, traces, SLO/SLI ;
+5. P8-E — déploiements reproductibles, canary/rollback et migrations compatibles ;
+6. P8-F — gestion des secrets/certificats, OIDC/MFA et gouvernance des accès ;
+7. P8-G — SBOM, signatures, provenance des builds et politique de dépendances ;
+8. P8-H — tests de charge, chaos ciblé, reprise et capacité ;
+9. P8-I — support, runbooks, incident management et maintenance ;
+10. P8-J — gouvernance des règles/normes/éditions et audit multi-sites.
+
+## 3. Contraintes produit
+
+- la topologie de déploiement ne modifie jamais les résultats scientifiques ;
+- aucune donnée d’un site ne doit fuiter vers un autre ;
+- toutes les migrations sont réversibles ou accompagnées d’un plan de restauration ;
+- les releases sont immuables, signées et traçables ;
+- disponibilité et RPO/RTO sont définis contractuellement avant revendication ;
+- les fonctions OT restent read-only sauf projet distinct explicitement autorisé.
+
+## 4. Sécurité
+
+- défense en profondeur et segmentation ;
+- MFA pour administrateurs ;
+- OIDC/annuaire lorsque l’opérateur l’exige ;
+- secrets hors dépôt ;
+- rotation clés/certificats ;
+- journalisation centralisée et conservation définie ;
+- scans SAST/SCA/images, SBOM et signatures à chaque release.
+
+## 5. Gate « produit industriel »
+
+Aucune qualification industrielle n’est déclarée uniquement parce que le logiciel possède HA, sécurité ou observabilité. Le passage nécessite contrats, responsabilités, pilote accepté, support, procédures, exigences locales et validations externes applicables.
+
+## 6. Multi-sites
+
+Le produit doit supporter plusieurs sites au niveau architecture/administration lorsque le modèle commercial l’exige, mais l’expérience déployée peut rester mono-exploitant. Les utilisateurs ne choisissent pas arbitrairement une organisation dans une instance `single_org` ; l’identifiant d’organisation reste une clé d’isolation interne.

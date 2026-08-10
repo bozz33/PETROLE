@@ -183,6 +183,112 @@ const model = {
   created_at: now,
   updated_at: now,
 };
+const scenario = {
+  id: "scenario-1",
+  model_version_id: model.id,
+  parent_id: null,
+  name: "Régime nominal stable",
+  description: null,
+  payload: {},
+  created_at: now,
+  updated_at: now,
+};
+const calculation = {
+  id: "calculation-1",
+  job_id: null,
+  scenario_id: scenario.id,
+  engine: "long_distance_liquid",
+  engine_version: "long_distance_liquid-0.1.0",
+  status: "SIM_CONVERGED",
+  phase: "completed",
+  progress_percent: 100,
+  input_hash: "sha256:calculation-input",
+  approval_status: "approved",
+  approval_comment: "Référence stationnaire.",
+  approved_at: now,
+  created_at: now,
+  started_at: now,
+  finished_at: now,
+};
+const measurementMapping = {
+  id: "mapping-1",
+  organization_id: organization.id,
+  project_id: project.id,
+  model_version_id: model.id,
+  tag_id: measurementTag.id,
+  version_number: 1,
+  target_type: "node",
+  target_id: "node-terminal",
+  metric: "pressure_pa",
+  dimension: "pressure",
+  si_unit: "Pa",
+  status: "approved",
+  source_ref: "Schéma d'instrumentation de démonstration.",
+  created_by: null,
+  approved_by: null,
+  approved_at: now,
+  created_at: now,
+  updated_at: now,
+};
+const measurementComparison = {
+  id: "measurement-comparison-1",
+  organization_id: organization.id,
+  project_id: project.id,
+  model_version_id: model.id,
+  mapping_id: measurementMapping.id,
+  calculation_id: calculation.id,
+  tag_id: measurementTag.id,
+  processing_version: "pilot-v1-a3",
+  start_timestamp: "2026-08-03T09:00:00Z",
+  end_timestamp: "2026-08-03T09:03:00Z",
+  included_qualities: ["good", "uncertain", "substituted", "estimated"],
+  input_hash: "sha256:comparison-input",
+  calculation_input_hash: calculation.input_hash,
+  engine: calculation.engine,
+  engine_version: calculation.engine_version,
+  simulated_value_si: 1_005_000,
+  si_unit: "Pa",
+  status: "completed",
+  kpis: {
+    n_compared: 3,
+    bias_si: 5_000,
+    mae_si: 8_333.333,
+    rmse_si: 9_128.709,
+    min_residual_si: -5_000,
+    max_residual_si: 15_000,
+  },
+  exclusions: {
+    n_candidates: 4,
+    n_excluded_quality: 1,
+    n_excluded_outlier: 0,
+    quality_counts: { good: 2, uncertain: 1, bad: 1 },
+    exclusion_counts: { "quality:bad": 1 },
+    duplicate_timestamp_count: 1,
+  },
+  mapping: measurementMapping,
+  created_by: null,
+  created_at: now,
+};
+const measurementResiduals = seriesAnalysis.items.map((point) => ({
+  id: "residual-" + point.id,
+  comparison_id: measurementComparison.id,
+  normalized_sample_id: point.id,
+  raw_sample_id: point.raw_sample_id,
+  dataset_id: point.dataset_id,
+  dataset_row_id: point.dataset_row_id,
+  timestamp: point.timestamp,
+  measured_value_si: point.value_si,
+  simulated_value_si: measurementComparison.simulated_value_si,
+  residual_si: point.value_si - measurementComparison.simulated_value_si,
+  quality: point.quality,
+  included_in_kpi: point.quality !== "bad",
+  exclusion_reason: point.quality === "bad" ? "quality:bad" : null,
+  source_timestamp: point.source_timestamp,
+  ingest_timestamp: point.ingest_timestamp,
+  source_value: point.source_value,
+  source_unit: point.source_unit,
+  processing_version: point.processing_version,
+}));
 const nodes = [
   networkNode("node-source", "SRC-01", "Dépôt Abidjan", "source", 18, 5.32, -4.02),
   networkNode("node-station", "ST-01", "Station intermédiaire", "station", 145, 6.3, -4.7),
@@ -315,6 +421,11 @@ async function installApiMock(page: Page): Promise<void> {
       ],
       [`/measurement-tags/${measurementTag.id}/series-analysis`]: seriesAnalysis,
       [`/projects/${project.id}/models`]: pageOf([model]),
+      [`/models/${model.id}/scenarios`]: pageOf([scenario]),
+      [`/scenarios/${scenario.id}/calculations`]: pageOf([calculation]),
+      "/measurement-model-mappings": pageOf([measurementMapping]),
+      "/measurement-comparisons": measurementComparison,
+      [`/measurement-comparisons/${measurementComparison.id}/residuals`]: pageOf(measurementResiduals),
       [`/models/${model.id}/nodes`]: pageOf(nodes),
       [`/models/${model.id}/edges`]: pageOf(edges),
       [`/models/${model.id}/assets`]: pageOf([]),
@@ -371,6 +482,25 @@ test("explore une série SI avec diagnostics et lignage sans étirer la page", a
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test("compare une fenêtre stable au calcul et affiche les résidus sans calibration", async ({ page }) => {
+  await page.goto("/donnees");
+  await expect(
+    page.getByRole("heading", { level: 2, name: "5. Comparaison mesures ↔ modèle" }),
+  ).toBeVisible();
+  await expect(page.getByText("Ce n'est pas une calibration.")).toBeVisible();
+
+  await page.getByLabel("Début de comparaison UTC").fill("2026-08-03T09:00");
+  await page.getByLabel("Fin de comparaison UTC").fill("2026-08-03T09:03");
+  await page.getByRole("button", { name: "Calculer les résidus" }).click();
+
+  await expect(page.getByText("Comparaison stationnaire terminée")).toBeVisible();
+  await expect(page.getByText("RMSE")).toBeVisible();
+  await expect(page.getByRole("img", { name: "Mesures SI et référence de simulation stationnaire" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Résidus signés, mesure moins simulation" })).toBeVisible();
+  const residualTable = page.locator(".table-wrap").filter({ has: page.getByText("Résidu signé") }).last();
+  await expect(residualTable).toHaveCSS("overflow-y", "auto");
 });
 
 test("navigue avec la palette de commandes", async ({ page }, testInfo) => {

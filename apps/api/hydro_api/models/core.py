@@ -795,6 +795,174 @@ class SampleNormalized(UUIDPrimaryKeyMixin, Base):
     processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class MeasurementModelMapping(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Correspondance explicitement approuvable entre une mesure et un résultat.
+
+    Le ``target_id`` est volontairement polymorphe : sa table concrète dépend de
+    ``target_type`` et est validée par le service avant toute persistance. Cette
+    forme évite de déduire silencieusement une cible à partir du nom d'un tag et
+    permet de couvrir nœuds, tronçons et pompes avec une même ressource
+    versionnée.
+    """
+
+    __tablename__ = "measurement_model_mappings"
+    __table_args__ = (
+        UniqueConstraint("tag_id", "version_number", name="uq_measurement_mapping_tag_version"),
+        CheckConstraint("version_number > 0", name="version_positive"),
+        CheckConstraint("target_type IN ('node', 'edge', 'pump')", name="target_type_valid"),
+        CheckConstraint(
+            "metric IN ('pressure_pa', 'flow_m3_s', 'pressure_min_pa', "
+            "'pressure_max_pa', 'suction_pressure_pa', 'discharge_pressure_pa')",
+            name="metric_valid",
+        ),
+        CheckConstraint("status IN ('draft', 'approved', 'archived')", name="status_valid"),
+        Index("ix_measurement_mappings_project_status", "project_id", "status"),
+        Index("ix_measurement_mappings_model_status", "model_version_id", "status"),
+        Index("ix_measurement_mappings_tag_status", "tag_id", "status"),
+    )
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("projects.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    model_version_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("model_versions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    tag_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("tags.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    target_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    metric: Mapped[str] = mapped_column(String(40), nullable=False)
+    dimension: Mapped[str] = mapped_column(String(40), nullable=False)
+    si_unit: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+    source_ref: Mapped[str | None] = mapped_column(String(1_000))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("user_accounts.id", ondelete="SET NULL"),
+    )
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("user_accounts.id", ondelete="SET NULL"),
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class MeasurementComparison(UUIDPrimaryKeyMixin, Base):
+    """Exécution immuable de comparaison mesures SI / calcul stationnaire."""
+
+    __tablename__ = "measurement_comparisons"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "input_hash", name="uq_measurement_comparison_input"),
+        CheckConstraint("status IN ('completed')", name="status_valid"),
+        Index("ix_measurement_comparisons_project_created", "project_id", "created_at"),
+        Index("ix_measurement_comparisons_mapping_created", "mapping_id", "created_at"),
+        Index("ix_measurement_comparisons_calculation", "calculation_id"),
+    )
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("projects.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    mapping_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("measurement_model_mappings.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    calculation_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("calculation_runs.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    tag_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("tags.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    processing_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    start_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    included_qualities: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(71), nullable=False)
+    calculation_input_hash: Mapped[str] = mapped_column(String(71), nullable=False)
+    engine: Mapped[str] = mapped_column(String(100), nullable=False)
+    engine_version: Mapped[str] = mapped_column(String(100), nullable=False)
+    simulated_value_si: Mapped[float] = mapped_column(Float, nullable=False)
+    si_unit: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="completed")
+    result_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("user_accounts.id", ondelete="SET NULL"),
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class MeasurementResidual(UUIDPrimaryKeyMixin, Base):
+    """Point de comparaison conservant mesure, référence et lignage immuables."""
+
+    __tablename__ = "measurement_residuals"
+    __table_args__ = (
+        UniqueConstraint(
+            "comparison_id",
+            "normalized_sample_id",
+            name="uq_measurement_residual_comparison_sample",
+        ),
+        Index("ix_measurement_residuals_comparison_timestamp", "comparison_id", "timestamp"),
+        Index("ix_measurement_residuals_raw_sample", "raw_sample_id"),
+    )
+
+    comparison_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("measurement_comparisons.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    normalized_sample_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("samples_normalized.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    raw_sample_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("samples_raw.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    dataset_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("datasets.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    dataset_row_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("dataset_rows.id", ondelete="SET NULL"),
+    )
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    measured_value_si: Mapped[float] = mapped_column(Float, nullable=False)
+    simulated_value_si: Mapped[float] = mapped_column(Float, nullable=False)
+    residual_si: Mapped[float] = mapped_column(Float, nullable=False)
+    quality: Mapped[str] = mapped_column(String(20), nullable=False)
+    included_in_kpi: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    exclusion_reason: Mapped[str | None] = mapped_column(String(80))
+
+
 class BackgroundJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """Tâche persistante prise en charge atomiquement par un processus de calcul."""
 

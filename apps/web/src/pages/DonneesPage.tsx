@@ -3,6 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { OrganizationField } from "../components/OrganizationField";
 import { apiRequest, downloadApiFile, jsonBody } from "../api";
+import {
+  MeasurementVsSimulationChart,
+  ResidualChart,
+} from "../components/charts/MeasurementComparisonCharts";
 import { TimeSeriesChart } from "../components/charts/TimeSeriesChart";
 import { EmptyState, ErrorNotice, Panel, StatusBadge, SuccessNotice } from "../components/Shell";
 import type {
@@ -10,12 +14,18 @@ import type {
   DatasetImport,
   DatasetKind,
   DatasetPreview,
+  Calculation,
   MeasurementTag,
+  MeasurementComparison,
+  MeasurementModelMapping,
+  MeasurementResidual,
+  ModelVersion,
   OutlierMethod,
   Page,
   ProcessingVersion,
   Project,
   SampleQuality,
+  Scenario,
   SeriesAnalysis,
   Site,
   StoredFile,
@@ -25,6 +35,11 @@ import { formatDate, formatNumber } from "../types";
 const EMPTY_SITES: Site[] = [];
 const EMPTY_MEASUREMENT_TAGS: MeasurementTag[] = [];
 const EMPTY_PROCESSING_VERSIONS: ProcessingVersion[] = [];
+const EMPTY_MODELS: ModelVersion[] = [];
+const EMPTY_SCENARIOS: Scenario[] = [];
+const EMPTY_CALCULATIONS: Calculation[] = [];
+const EMPTY_MEASUREMENT_MAPPINGS: MeasurementModelMapping[] = [];
+const EMPTY_MEASUREMENT_RESIDUALS: MeasurementResidual[] = [];
 const SERIES_PAGE_SIZE = 500;
 const DEFAULT_SERIES_QUALITIES: SampleQuality[] = [
   "good",
@@ -186,6 +201,45 @@ export function buildSeriesAnalysisPath(
   return "/measurement-tags/" + tagId + "/series-analysis?" + parameters.toString();
 }
 
+export interface MeasurementComparisonRequest {
+  organizationId: string;
+  mappingId: string;
+  calculationId: string;
+  processingVersion: string;
+  startTimestamp: string;
+  endTimestamp: string;
+  includedQualities: readonly SampleQuality[];
+}
+
+/** La comparaison V1-B exige une fenêtre UTC explicite et au moins une qualité. */
+export function buildMeasurementComparisonRequest(
+  request: MeasurementComparisonRequest,
+): Record<string, unknown> | null {
+  const startTimestamp = toUtcQuery(request.startTimestamp);
+  const endTimestamp = toUtcQuery(request.endTimestamp);
+  if (
+    !request.organizationId ||
+    !request.mappingId ||
+    !request.calculationId ||
+    !request.processingVersion ||
+    !startTimestamp ||
+    !endTimestamp ||
+    !request.includedQualities.length ||
+    new Date(startTimestamp) > new Date(endTimestamp)
+  ) {
+    return null;
+  }
+  return {
+    organization_id: request.organizationId,
+    mapping_id: request.mappingId,
+    calculation_id: request.calculationId,
+    processing_version: request.processingVersion,
+    start_timestamp: startTimestamp,
+    end_timestamp: endTimestamp,
+    included_qualities: request.includedQualities,
+  };
+}
+
 export function DonneesPage() {
   const [organizationId, setOrganizationId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -211,6 +265,19 @@ export function DonneesPage() {
   const [seriesOutlierMethod, setSeriesOutlierMethod] = useState<OutlierMethod>("none");
   const [seriesOutlierThreshold, setSeriesOutlierThreshold] = useState("3");
   const [seriesOffset, setSeriesOffset] = useState(0);
+  const [comparisonProjectId, setComparisonProjectId] = useState("");
+  const [comparisonModelId, setComparisonModelId] = useState("");
+  const [comparisonScenarioId, setComparisonScenarioId] = useState("");
+  const [comparisonCalculationId, setComparisonCalculationId] = useState("");
+  const [comparisonMappingId, setComparisonMappingId] = useState("");
+  const [comparisonStartTimestamp, setComparisonStartTimestamp] = useState("");
+  const [comparisonEndTimestamp, setComparisonEndTimestamp] = useState("");
+  const [comparisonQualities, setComparisonQualities] = useState<SampleQuality[]>(
+    DEFAULT_SERIES_QUALITIES,
+  );
+  const [measurementComparison, setMeasurementComparison] = useState<MeasurementComparison | null>(
+    null,
+  );
 
   const projectsQuery = useQuery({
     queryKey: ["projects", organizationId],
@@ -297,6 +364,98 @@ export function DonneesPage() {
   });
   const seriesAnalysis = seriesAnalysisQuery.data;
 
+  const selectedComparisonProjectId =
+    comparisonProjectId && projects.some((project) => project.id === comparisonProjectId)
+      ? comparisonProjectId
+      : (projects.find((project) => project.site_id === selectedSeriesSiteId)?.id ?? projects[0]?.id ?? "");
+  const comparisonModelsQuery = useQuery({
+    queryKey: ["measurement-comparison-models", selectedComparisonProjectId],
+    queryFn: () =>
+      apiRequest<Page<ModelVersion>>(
+        "/projects/" + selectedComparisonProjectId + "/models?limit=200&offset=0",
+      ),
+    enabled: Boolean(selectedComparisonProjectId),
+  });
+  const comparisonModels = comparisonModelsQuery.data?.items ?? EMPTY_MODELS;
+  const selectedComparisonModelId =
+    comparisonModelId && comparisonModels.some((model) => model.id === comparisonModelId)
+      ? comparisonModelId
+      : (comparisonModels[0]?.id ?? "");
+  const comparisonScenariosQuery = useQuery({
+    queryKey: ["measurement-comparison-scenarios", selectedComparisonModelId],
+    queryFn: () =>
+      apiRequest<Page<Scenario>>(
+        "/models/" + selectedComparisonModelId + "/scenarios?limit=200&offset=0",
+      ),
+    enabled: Boolean(selectedComparisonModelId),
+  });
+  const comparisonScenarios = comparisonScenariosQuery.data?.items ?? EMPTY_SCENARIOS;
+  const selectedComparisonScenarioId =
+    comparisonScenarioId && comparisonScenarios.some((scenario) => scenario.id === comparisonScenarioId)
+      ? comparisonScenarioId
+      : (comparisonScenarios[0]?.id ?? "");
+  const comparisonCalculationsQuery = useQuery({
+    queryKey: ["measurement-comparison-calculations", selectedComparisonScenarioId],
+    queryFn: () =>
+      apiRequest<Page<Calculation>>(
+        "/scenarios/" + selectedComparisonScenarioId + "/calculations?limit=200&offset=0",
+      ),
+    enabled: Boolean(selectedComparisonScenarioId),
+  });
+  const comparisonCalculations = comparisonCalculationsQuery.data?.items ?? EMPTY_CALCULATIONS;
+  const completedComparisonCalculations = useMemo(
+    () =>
+      comparisonCalculations.filter(
+        (calculation) =>
+          calculation.status === "SIM_CONVERGED" || calculation.status === "SIM_CONVERGED_WARN",
+      ),
+    [comparisonCalculations],
+  );
+  const selectedComparisonCalculationId =
+    comparisonCalculationId &&
+    completedComparisonCalculations.some((calculation) => calculation.id === comparisonCalculationId)
+      ? comparisonCalculationId
+      : (completedComparisonCalculations[0]?.id ?? "");
+  const measurementMappingsQuery = useQuery({
+    queryKey: [
+      "measurement-model-mappings",
+      organizationId,
+      selectedComparisonProjectId,
+      selectedSeriesTagId,
+    ],
+    queryFn: () =>
+      apiRequest<Page<MeasurementModelMapping>>(
+        "/measurement-model-mappings?limit=200&offset=0&organization_id=" +
+          organizationId +
+          "&project_id=" +
+          selectedComparisonProjectId +
+          "&tag_id=" +
+          selectedSeriesTagId +
+          "&status=approved",
+      ),
+    enabled: Boolean(organizationId && selectedComparisonProjectId && selectedSeriesTagId),
+  });
+  const measurementMappings = measurementMappingsQuery.data?.items ?? EMPTY_MEASUREMENT_MAPPINGS;
+  const selectableMeasurementMappings = useMemo(
+    () =>
+      measurementMappings.filter((mapping) => mapping.model_version_id === selectedComparisonModelId),
+    [measurementMappings, selectedComparisonModelId],
+  );
+  const selectedComparisonMappingId =
+    comparisonMappingId &&
+    selectableMeasurementMappings.some((mapping) => mapping.id === comparisonMappingId)
+      ? comparisonMappingId
+      : (selectableMeasurementMappings[0]?.id ?? "");
+  const residualsQuery = useQuery({
+    queryKey: ["measurement-comparison-residuals", measurementComparison?.id],
+    queryFn: () =>
+      apiRequest<Page<MeasurementResidual>>(
+        "/measurement-comparisons/" + measurementComparison?.id + "/residuals?limit=5000&offset=0",
+      ),
+    enabled: Boolean(measurementComparison?.id),
+  });
+  const measurementResiduals = residualsQuery.data?.items ?? EMPTY_MEASUREMENT_RESIDUALS;
+
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
@@ -373,6 +532,30 @@ export function DonneesPage() {
     onSuccess: setImportResult,
   });
 
+  const comparisonMutation = useMutation({
+    mutationFn: () => {
+      const request = buildMeasurementComparisonRequest({
+        organizationId,
+        mappingId: selectedComparisonMappingId,
+        calculationId: selectedComparisonCalculationId,
+        processingVersion: selectedProcessingVersion,
+        startTimestamp: comparisonStartTimestamp,
+        endTimestamp: comparisonEndTimestamp,
+        includedQualities: comparisonQualities,
+      });
+      if (!request) {
+        throw new Error(
+          "Choisissez une correspondance approuvée, un calcul convergé, une fenêtre UTC et au moins une qualité.",
+        );
+      }
+      return apiRequest<MeasurementComparison>("/measurement-comparisons", {
+        method: "POST",
+        body: jsonBody(request),
+      });
+    },
+    onSuccess: setMeasurementComparison,
+  });
+
   const canMap = useMemo(
     () =>
       [...REQUIRED_FIELDS[kind]].every((field) => Boolean(mapping[field])),
@@ -413,6 +596,12 @@ export function DonneesPage() {
     documentsQuery.error ??
     documentMutation.error ??
     seriesAnalysisQuery.error ??
+    residualsQuery.error ??
+    comparisonMutation.error ??
+    measurementMappingsQuery.error ??
+    comparisonCalculationsQuery.error ??
+    comparisonScenariosQuery.error ??
+    comparisonModelsQuery.error ??
     processingVersionsQuery.error ??
     measurementTagsQuery.error ??
     sitesQuery.error ??
@@ -432,6 +621,16 @@ export function DonneesPage() {
       return current.length === 1 ? current : current.filter((item) => item !== quality);
     });
     setSeriesOffset(0);
+  };
+
+  const toggleComparisonQuality = (quality: SampleQuality) => {
+    setComparisonQualities((current) => {
+      if (!current.includes(quality)) {
+        return [...current, quality];
+      }
+      return current.length === 1 ? current : current.filter((item) => item !== quality);
+    });
+    setMeasurementComparison(null);
   };
 
   return (
@@ -885,6 +1084,238 @@ export function DonneesPage() {
       </Panel>
 
       <Panel
+        title="5. Comparaison mesures ↔ modèle"
+        description="Une fenêtre de régime stable est comparée à une valeur stationnaire archivée. Ce n'est pas une calibration."
+      >
+        {!organizationId ? (
+          <EmptyState
+            title="Sélectionnez un exploitant"
+            detail="Les correspondances et comparaisons restent isolées dans leur organisation."
+          />
+        ) : !selectedSeriesTagId || !selectedProcessingVersion ? (
+          <EmptyState
+            title="Sélectionnez une série source"
+            detail="Choisissez d'abord un site, un tag et une version de traitement dans la section Séries temporelles."
+          />
+        ) : (
+          <div className="stack compact">
+            <form
+              className="stack compact"
+              onSubmit={(event) => {
+                event.preventDefault();
+                comparisonMutation.mutate();
+              }}
+            >
+              <div className="form-grid three">
+                <label>
+                  Projet du calcul
+                  <select
+                    aria-label="Projet de comparaison"
+                    value={selectedComparisonProjectId}
+                    onChange={(event) => {
+                      setComparisonProjectId(event.target.value);
+                      setComparisonModelId("");
+                      setComparisonScenarioId("");
+                      setComparisonCalculationId("");
+                      setComparisonMappingId("");
+                      setMeasurementComparison(null);
+                    }}
+                  >
+                    {!projects.length ? <option value="">Aucun projet</option> : null}
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.code} — {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Version de modèle
+                  <select
+                    aria-label="Version de modèle de comparaison"
+                    value={selectedComparisonModelId}
+                    disabled={!comparisonModels.length}
+                    onChange={(event) => {
+                      setComparisonModelId(event.target.value);
+                      setComparisonScenarioId("");
+                      setComparisonCalculationId("");
+                      setComparisonMappingId("");
+                      setMeasurementComparison(null);
+                    }}
+                  >
+                    {!comparisonModels.length ? <option value="">Aucune version</option> : null}
+                    {comparisonModels.map((model) => (
+                      <option key={model.id} value={model.id}>
+                        V{model.version_number} — {model.name} ({model.status})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Correspondance approuvée
+                  <select
+                    aria-label="Correspondance mesure modèle"
+                    value={selectedComparisonMappingId}
+                    disabled={!selectableMeasurementMappings.length}
+                    onChange={(event) => {
+                      setComparisonMappingId(event.target.value);
+                      setMeasurementComparison(null);
+                    }}
+                  >
+                    {!selectableMeasurementMappings.length ? (
+                      <option value="">Aucune correspondance approuvée</option>
+                    ) : null}
+                    {selectableMeasurementMappings.map((mapping) => (
+                      <option key={mapping.id} value={mapping.id}>
+                        V{mapping.version_number} · {mapping.target_type}.{mapping.metric} ({mapping.si_unit})
+                      </option>
+                    ))}
+                  </select>
+                  <small>
+                    Une correspondance est explicitement approuvée ; le nom du tag ne désigne jamais une cible.
+                  </small>
+                </label>
+                <label>
+                  Scénario source
+                  <select
+                    aria-label="Scénario de comparaison"
+                    value={selectedComparisonScenarioId}
+                    disabled={!comparisonScenarios.length}
+                    onChange={(event) => {
+                      setComparisonScenarioId(event.target.value);
+                      setComparisonCalculationId("");
+                      setMeasurementComparison(null);
+                    }}
+                  >
+                    {!comparisonScenarios.length ? <option value="">Aucun scénario</option> : null}
+                    {comparisonScenarios.map((scenario) => (
+                      <option key={scenario.id} value={scenario.id}>
+                        {scenario.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Calcul stationnaire convergé
+                  <select
+                    aria-label="Calcul de comparaison"
+                    value={selectedComparisonCalculationId}
+                    disabled={!completedComparisonCalculations.length}
+                    onChange={(event) => {
+                      setComparisonCalculationId(event.target.value);
+                      setMeasurementComparison(null);
+                    }}
+                  >
+                    {!completedComparisonCalculations.length ? (
+                      <option value="">Aucun calcul convergé</option>
+                    ) : null}
+                    {completedComparisonCalculations.map((calculation) => (
+                      <option key={calculation.id} value={calculation.id}>
+                        {calculation.status} · {formatDate(calculation.finished_at)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Version de série
+                  <input value={selectedProcessingVersion} readOnly aria-label="Version de série comparée" />
+                  <small>La comparaison ne mélange jamais deux reprocessings.</small>
+                </label>
+                <label>
+                  Début du régime stable (UTC)
+                  <input
+                    aria-label="Début de comparaison UTC"
+                    type="datetime-local"
+                    value={comparisonStartTimestamp}
+                    onChange={(event) => {
+                      setComparisonStartTimestamp(event.target.value);
+                      setMeasurementComparison(null);
+                    }}
+                    required
+                  />
+                </label>
+                <label>
+                  Fin du régime stable (UTC)
+                  <input
+                    aria-label="Fin de comparaison UTC"
+                    type="datetime-local"
+                    value={comparisonEndTimestamp}
+                    onChange={(event) => {
+                      setComparisonEndTimestamp(event.target.value);
+                      setMeasurementComparison(null);
+                    }}
+                    required
+                  />
+                </label>
+              </div>
+
+              <fieldset className="field-group">
+                <legend>Qualités incluses dans les KPI</legend>
+                <div className="checkbox-row">
+                  {(Object.keys(SERIES_QUALITY_LABELS) as SampleQuality[]).map((quality) => (
+                    <label key={quality} className="checkbox-field">
+                      <input
+                        type="checkbox"
+                        checked={comparisonQualities.includes(quality)}
+                        onChange={() => toggleComparisonQuality(quality)}
+                      />
+                      {SERIES_QUALITY_LABELS[quality]}
+                    </label>
+                  ))}
+                </div>
+                <p className="field-help">
+                  Les points <code>bad</code> sont exclus par défaut des KPI mais restent archivés et visibles dans le bilan.
+                </p>
+              </fieldset>
+
+              <div className="button-row">
+                <button
+                  className="button button-primary"
+                  disabled={
+                    !buildMeasurementComparisonRequest({
+                      organizationId,
+                      mappingId: selectedComparisonMappingId,
+                      calculationId: selectedComparisonCalculationId,
+                      processingVersion: selectedProcessingVersion,
+                      startTimestamp: comparisonStartTimestamp,
+                      endTimestamp: comparisonEndTimestamp,
+                      includedQualities: comparisonQualities,
+                    }) || comparisonMutation.isPending
+                  }
+                >
+                  {comparisonMutation.isPending ? "Comparaison en cours…" : "Calculer les résidus"}
+                </button>
+                <span className="field-help">
+                  Résidu signé = mesure SI − simulation stationnaire SI.
+                </span>
+              </div>
+            </form>
+
+            {!measurementMappingsQuery.isPending && !selectableMeasurementMappings.length ? (
+              <EmptyState
+                title="Correspondance absente pour cette version"
+                detail="Créez puis faites approuver une correspondance explicite entre ce tag et une cible du modèle avant comparaison."
+              />
+            ) : null}
+
+            {measurementComparison ? (
+              residualsQuery.isPending ? (
+                <EmptyState
+                  title="Chargement des résidus"
+                  detail="Le calcul source et les échantillons restent inchangés pendant cette lecture."
+                />
+              ) : (
+                <MeasurementComparisonPanel
+                  comparison={measurementComparison}
+                  residuals={measurementResiduals}
+                />
+              )
+            ) : null}
+          </div>
+        )}
+      </Panel>
+
+      <Panel
         title="Pièces jointes du projet"
         description="Fiches constructeur, plans, notes et rapports, conservés tels quels."
       >
@@ -1186,6 +1617,129 @@ function SeriesAnalysisPanel({
           Points suivants
         </button>
       </div>
+    </div>
+  );
+}
+
+function MeasurementComparisonPanel({
+  comparison,
+  residuals,
+}: {
+  comparison: MeasurementComparison;
+  residuals: MeasurementResidual[];
+}) {
+  const kpis = comparison.kpis;
+  const exclusions = comparison.exclusions;
+  return (
+    <div className="stack compact">
+      <div className="preview-meta">
+        <strong>Comparaison stationnaire terminée</strong>
+        <span>{comparison.mapping.target_type}.{comparison.mapping.metric}</span>
+        <span>{comparison.si_unit}</span>
+        <span>{formatDate(comparison.start_timestamp)} → {formatDate(comparison.end_timestamp)}</span>
+      </div>
+
+      <div className="metrics-grid">
+        <SeriesMetric
+          label="Biais signé"
+          value={kpis.bias_si === null ? "—" : formatNumber(kpis.bias_si)}
+          detail={comparison.si_unit}
+          tone="blue"
+        />
+        <SeriesMetric
+          label="MAE"
+          value={kpis.mae_si === null ? "—" : formatNumber(kpis.mae_si)}
+          detail={comparison.si_unit}
+          tone="blue"
+        />
+        <SeriesMetric
+          label="RMSE"
+          value={kpis.rmse_si === null ? "—" : formatNumber(kpis.rmse_si)}
+          detail={comparison.si_unit}
+          tone="purple"
+        />
+        <SeriesMetric
+          label="Points comparés"
+          value={formatNumber(kpis.n_compared, 0)}
+          detail={`${formatNumber(exclusions.n_excluded_quality, 0)} exclu(s) par qualité`}
+          tone="green"
+        />
+        <SeriesMetric
+          label="Résidu min / max"
+          value={`${kpis.min_residual_si === null ? "—" : formatNumber(kpis.min_residual_si)} / ${kpis.max_residual_si === null ? "—" : formatNumber(kpis.max_residual_si)}`}
+          detail={comparison.si_unit}
+          tone="amber"
+        />
+      </div>
+
+      <div className="detail-list">
+        <div>
+          <dt>Référence simulée</dt>
+          <dd>{formatNumber(comparison.simulated_value_si)} {comparison.si_unit}</dd>
+        </div>
+        <div>
+          <dt>Calcul source</dt>
+          <dd className="mono hash">{comparison.calculation_id}</dd>
+        </div>
+        <div>
+          <dt>Correspondance</dt>
+          <dd>V{comparison.mapping.version_number} · {comparison.mapping.status}</dd>
+        </div>
+        <div>
+          <dt>Politique qualité</dt>
+          <dd>{comparison.included_qualities.map((quality) => SERIES_QUALITY_LABELS[quality]).join(", ")}</dd>
+        </div>
+        <div>
+          <dt>Doublons conservés</dt>
+          <dd>{formatNumber(exclusions.duplicate_timestamp_count, 0)}</dd>
+        </div>
+      </div>
+
+      {residuals.length ? (
+        <>
+          <MeasurementVsSimulationChart points={residuals} siUnit={comparison.si_unit} />
+          <ResidualChart points={residuals} siUnit={comparison.si_unit} />
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Horodatage UTC</th>
+                  <th>Mesure SI</th>
+                  <th>Simulation SI</th>
+                  <th>Résidu signé</th>
+                  <th>Qualité</th>
+                  <th>Dans KPI</th>
+                  <th>Exclusion</th>
+                  <th>Dataset</th>
+                  <th>Ligne source</th>
+                  <th>Brut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {residuals.map((point) => (
+                  <tr key={point.id}>
+                    <td>{formatDate(point.timestamp)}</td>
+                    <td>{formatNumber(point.measured_value_si)} {comparison.si_unit}</td>
+                    <td>{formatNumber(point.simulated_value_si)} {comparison.si_unit}</td>
+                    <td>{formatNumber(point.residual_si)} {comparison.si_unit}</td>
+                    <td><StatusBadge value={point.quality} /></td>
+                    <td>{point.included_in_kpi ? "Oui" : "Non"}</td>
+                    <td>{point.exclusion_reason ?? "—"}</td>
+                    <td className="mono hash">{point.dataset_id.slice(0, 12)}…</td>
+                    <td className="mono hash">{point.dataset_row_id?.slice(0, 12) ?? "—"}</td>
+                    <td className="mono hash">{point.raw_sample_id.slice(0, 12)}…</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <EmptyState
+          title="Aucun résidu à afficher"
+          detail="La comparaison est archivée, mais aucun échantillon n'a été retourné par la consultation."
+        />
+      )}
     </div>
   );
 }

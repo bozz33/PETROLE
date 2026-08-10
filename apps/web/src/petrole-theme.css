@@ -415,6 +415,35 @@ td small,
   padding-inline-end: 4px;
 }
 
+/* Filtres V1-A3 : les choix restent lisibles sur petit écran sans déplacer
+   le défilement global de la page. */
+.checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.checkbox-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-block-size: 34px;
+  margin: 0;
+  color: var(--foreground);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.checkbox-field input {
+  inline-size: 16px;
+  block-size: 16px;
+  accent-color: var(--petrole);
+}
+
+.time-series-chart {
+  min-block-size: clamp(20rem, 42dvh, 30rem);
+}
+
 .button {
   min-height: 36px;
   padding: 8px 13px;

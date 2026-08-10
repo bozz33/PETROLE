@@ -27,6 +27,149 @@ const project = {
   created_at: now,
   updated_at: now,
 };
+const site = {
+  id: "site-1",
+  organization_id: organization.id,
+  name: "Station pilote",
+  code: "ST-PILOTE",
+  country_code: "CI",
+  latitude: null,
+  longitude: null,
+  status: "active",
+  created_at: now,
+  updated_at: now,
+};
+const measurementTag = {
+  id: "tag-pt-101",
+  organization_id: organization.id,
+  site_id: site.id,
+  asset_instance_id: null,
+  external_name: "PT-101",
+  name: "Pression de refoulement",
+  measurement_type: "pressure",
+  dimension: "pressure",
+  source_unit: "bar",
+  si_unit: "Pa",
+  source: "fichier-pilote",
+  status: "active",
+  metadata: { absolute_pressure: true },
+  created_at: now,
+  updated_at: now,
+};
+const seriesAnalysis = {
+  tag: measurementTag,
+  processing_version: "pilot-v1-a3",
+  requested_start_timestamp: null,
+  requested_end_timestamp: null,
+  start_timestamp: "2026-08-03T09:00:00Z",
+  end_timestamp: "2026-08-03T09:03:00Z",
+  included_qualities: ["good", "uncertain"],
+  quality_counts: { good: 2, uncertain: 1, bad: 1 },
+  visible_quality_counts: { good: 2, uncertain: 1 },
+  candidate_sample_count: 4,
+  excluded_sample_count: 1,
+  statistics: {
+    sample_count: 3,
+    minimum_value_si: 1_000_000,
+    maximum_value_si: 1_020_000,
+    mean_value_si: 1_010_000,
+    stddev_value_si: 8_164.966,
+  },
+  duplicate_timestamp_count: 1,
+  out_of_order_count: 0,
+  gap_count: 1,
+  observed_interval_seconds: 60,
+  reference_interval_seconds: 60,
+  gap_factor: 1.5,
+  outlier_method: "none",
+  outlier_threshold: null,
+  outlier_count: 0,
+  issues: [
+    {
+      code: "DQ-008",
+      severity: "warning",
+      count: 1,
+      message: "Les mesures bad sont exclues par le filtre par défaut, sans suppression.",
+    },
+    {
+      code: "TS-GAP",
+      severity: "warning",
+      count: 1,
+      message: "Un trou est signalé sans supprimer les points.",
+    },
+  ],
+  items: [
+    {
+      id: "normalized-1",
+      raw_sample_id: "raw-1",
+      time_series_import_id: "import-1",
+      dataset_id: "dataset-1",
+      dataset_row_id: "row-1",
+      source_timestamp: "2026-08-03T09:00:00Z",
+      ingest_timestamp: now,
+      source_value: "10.0",
+      source_unit: "bar",
+      timestamp: "2026-08-03T09:00:00Z",
+      value_si: 1_000_000,
+      si_unit: "Pa",
+      quality: "good",
+      sequence_number: 1,
+      processing_version: "pilot-v1-a3",
+      duplicate: false,
+      gap_after: false,
+      gap_after_seconds: null,
+      outlier: false,
+      outlier_score: null,
+    },
+    {
+      id: "normalized-2",
+      raw_sample_id: "raw-2",
+      time_series_import_id: "import-1",
+      dataset_id: "dataset-1",
+      dataset_row_id: "row-2",
+      source_timestamp: "2026-08-03T09:01:00Z",
+      ingest_timestamp: now,
+      source_value: "10.1",
+      source_unit: "bar",
+      timestamp: "2026-08-03T09:01:00Z",
+      value_si: 1_010_000,
+      si_unit: "Pa",
+      quality: "uncertain",
+      sequence_number: 2,
+      processing_version: "pilot-v1-a3",
+      duplicate: true,
+      gap_after: true,
+      gap_after_seconds: 120,
+      outlier: false,
+      outlier_score: null,
+    },
+    {
+      id: "normalized-3",
+      raw_sample_id: "raw-3",
+      time_series_import_id: "import-1",
+      dataset_id: "dataset-1",
+      dataset_row_id: "row-3",
+      source_timestamp: "2026-08-03T09:03:00Z",
+      ingest_timestamp: now,
+      source_value: "10.2",
+      source_unit: "bar",
+      timestamp: "2026-08-03T09:03:00Z",
+      value_si: 1_020_000,
+      si_unit: "Pa",
+      quality: "good",
+      sequence_number: 3,
+      processing_version: "pilot-v1-a3",
+      duplicate: false,
+      gap_after: false,
+      gap_after_seconds: null,
+      outlier: false,
+      outlier_score: null,
+    },
+  ],
+  total: 3,
+  limit: 500,
+  offset: 0,
+};
 const model = {
   id: "model-1",
   project_id: project.id,
@@ -159,7 +302,18 @@ async function installApiMock(page: Page): Promise<void> {
         object_storage: "ready",
       },
       "/organizations": pageOf([organization]),
+      "/sites": pageOf([site]),
       "/projects": pageOf([project]),
+      "/measurement-tags": pageOf([measurementTag]),
+      [`/measurement-tags/${measurementTag.id}/processing-versions`]: [
+        {
+          processing_version: "pilot-v1-a3",
+          sample_count: 4,
+          start_timestamp: seriesAnalysis.start_timestamp,
+          end_timestamp: seriesAnalysis.end_timestamp,
+        },
+      ],
+      [`/measurement-tags/${measurementTag.id}/series-analysis`]: seriesAnalysis,
       [`/projects/${project.id}/models`]: pageOf([model]),
       [`/models/${model.id}/nodes`]: pageOf(nodes),
       [`/models/${model.id}/edges`]: pageOf(edges),
@@ -201,6 +355,22 @@ test("affiche le tableau de bord et conserve le thème sombre", async ({ page })
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Tableau de bord" })).toBeVisible();
   await expect(page.locator("html")).toHaveClass(/dark/);
+});
+
+test("explore une série SI avec diagnostics et lignage sans étirer la page", async ({ page }) => {
+  await page.goto("/donnees");
+  await expect(page.getByRole("heading", { level: 1, name: "Données et imports" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "4. Séries temporelles et qualité" })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Série temporelle en unité SI/ })).toBeVisible();
+  await expect(page.getByText("TS-GAP")).toBeVisible();
+  await expect(page.getByText("Doublons")).toBeVisible();
+
+  const table = page.locator(".table-wrap").filter({ has: page.getByText("Ligne source") }).last();
+  await expect(table).toHaveCSS("overflow-y", "auto");
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(1);
 });
 
 test("navigue avec la palette de commandes", async ({ page }, testInfo) => {

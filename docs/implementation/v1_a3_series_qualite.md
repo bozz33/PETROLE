@@ -39,10 +39,15 @@ Paramètres :
 
 - `start_timestamp`, `end_timestamp` ;
 - `qualities` facultatif ;
-- `processing_version` facultatif ;
-- `outlier_method=none|zscore|iqr` ;
-- `outlier_threshold` selon la méthode ;
+- `processing_version` **obligatoire** : l'API ne choisit jamais implicitement une projection ;
+- `qualities` répétable ; par défaut `bad` reste exclu des statistiques mais peut être demandé ;
+- `reference_interval_seconds` facultatif et `gap_factor` explicite ; à défaut, la cadence est la médiane des intervalles positifs observés ;
+- `outlier_method=none|zscore|iqr`, avec `zscore_threshold` ou `iqr_multiplier` explicites ;
 - pagination des points.
+
+`GET /api/v1/measurement-tags/{tag_id}/processing-versions` liste les
+projections disponibles afin que l'interface choisisse cette version de manière
+traçable avant tout appel d'analyse.
 
 Réponse :
 
@@ -54,14 +59,16 @@ Réponse :
 - nombre de doublons ;
 - nombre de trous selon cadence de référence ;
 - définition de la cadence observée/référence ;
-- points paginés avec drapeaux `duplicate`, `gap_after`, `outlier`, qualité et lignage.
+- points paginés avec drapeaux `duplicate`, `gap_after`, `outlier`, qualité et lignage ;
+- compteurs et diagnostics calculés sur toute la sélection avant pagination,
+  afin qu'un changement de page ne change pas le verdict.
 
 ## Règles de qualité
 
 - `bad` est exclu des statistiques par défaut mais reste retournable ;
 - `uncertain`, `substituted` et `estimated` restent distingués ;
 - les doublons ne sont pas fusionnés automatiquement ;
-- un trou n'est déclaré que si une cadence de référence peut être déterminée ou fournie explicitement ;
+- un trou n'est déclaré que si une cadence de référence peut être déterminée ou fournie explicitement ; le facteur de dépassement est retourné dans la réponse ;
 - les horodatages restent en UTC au contrat API ;
 - aucune interpolation automatique dans V1-A3.
 

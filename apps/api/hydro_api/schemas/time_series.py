@@ -19,6 +19,8 @@ MeasurementType = Literal[
     "vibration",
     "energy",
 ]
+SampleQuality = Literal["good", "uncertain", "bad", "substituted", "estimated"]
+OutlierMethod = Literal["none", "zscore", "iqr"]
 
 
 class MeasurementTagCreate(BaseModel):
@@ -124,10 +126,76 @@ class NormalizedSampleRead(BaseModel):
     processing_version: str
 
 
+class ProcessingVersionRead(BaseModel):
+    """Projection disponible pour un tag, sans mélanger ses versions."""
+
+    processing_version: str
+    sample_count: int = Field(ge=0)
+    start_timestamp: datetime | None
+    end_timestamp: datetime | None
+
+
+class SeriesAnalysisPoint(NormalizedSampleRead):
+    """Point SI analysé, avec diagnostics et lignage vers la source immuable."""
+
+    duplicate: bool
+    gap_after: bool
+    gap_after_seconds: float | None
+    outlier: bool
+    outlier_score: float | None
+
+
+class SeriesAnalysisStatistics(BaseModel):
+    """Statistiques de la sélection visible, toujours en unité SI."""
+
+    sample_count: int = Field(ge=0)
+    minimum_value_si: float | None
+    maximum_value_si: float | None
+    mean_value_si: float | None
+    stddev_value_si: float | None
+
+
+class SeriesAnalysisRead(BaseModel):
+    """Résultat déterministe d'exploration d'une projection temporelle."""
+
+    tag: MeasurementTagRead
+    processing_version: str
+    requested_start_timestamp: datetime | None
+    requested_end_timestamp: datetime | None
+    start_timestamp: datetime | None
+    end_timestamp: datetime | None
+    included_qualities: list[SampleQuality]
+    quality_counts: dict[str, int]
+    visible_quality_counts: dict[str, int]
+    candidate_sample_count: int = Field(ge=0)
+    excluded_sample_count: int = Field(ge=0)
+    statistics: SeriesAnalysisStatistics
+    duplicate_timestamp_count: int = Field(ge=0)
+    out_of_order_count: int = Field(ge=0)
+    gap_count: int = Field(ge=0)
+    observed_interval_seconds: float | None
+    reference_interval_seconds: float | None
+    gap_factor: float = Field(gt=1)
+    outlier_method: OutlierMethod
+    outlier_threshold: float | None
+    outlier_count: int = Field(ge=0)
+    issues: list[dict[str, Any]]
+    items: list[SeriesAnalysisPoint]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+
+
 __all__ = [
     "MeasurementTagCreate",
     "MeasurementTagRead",
     "NormalizedSampleRead",
+    "OutlierMethod",
+    "ProcessingVersionRead",
+    "SampleQuality",
+    "SeriesAnalysisPoint",
+    "SeriesAnalysisRead",
+    "SeriesAnalysisStatistics",
     "TimeSeriesDatasetImportCreate",
     "TimeSeriesImportRead",
 ]

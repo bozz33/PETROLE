@@ -34,7 +34,11 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Les fonctio
 - preuve d’exercice de reprise avec chronologie mesurée, RPO/RTO observés, intégrité base, intégrité stockage objet et readiness applicative ;
 - refus d’un drill dont la chronologie est incohérente ;
 - résultat détaillé des violations plutôt qu’un simple booléen de conformité ;
-- résolveur de portée organisationnelle : `single_org` utilise l’organisation interne par défaut et refuse toute tentative de sélection croisée ; `multi_org`/`saas` exigent une organisation préalablement résolue par la couche d’identité/autorisation.
+- résolveur de portée organisationnelle : `single_org` utilise l’organisation interne par défaut et refuse toute tentative de sélection croisée ; `multi_org`/`saas` exigent une organisation préalablement résolue par la couche d’identité/autorisation ;
+- registre d’édition normative avec code, édition, éditeur, provenance, acquisition projet et revue ;
+- binding d’un jeu de règles interne versionné vers une édition uniquement lorsqu’elle est marquée acquise et revue ;
+- détection explicite d’un changement d’édition exigeant une nouvelle revue ;
+- aucune conservation du texte normatif protégé dans le registre de gouvernance.
 
 Ces briques ne prouvent aucune HA à elles seules. La preuve requiert une infrastructure réelle ou représentative et des exercices reproductibles.
 
@@ -45,7 +49,8 @@ Ces briques ne prouvent aucune HA à elles seules. La preuve requiert une infras
 - toutes les migrations sont réversibles ou accompagnées d’un plan de restauration ;
 - les releases sont immuables, signées et traçables ;
 - disponibilité et RPO/RTO sont définis contractuellement avant revendication ;
-- les fonctions OT restent read-only sauf projet distinct explicitement autorisé.
+- les fonctions OT restent read-only sauf projet distinct explicitement autorisé ;
+- un changement d’édition normative ne remplace jamais silencieusement le jeu de règles précédemment approuvé.
 
 ## 5. Sécurité
 
@@ -64,3 +69,7 @@ Aucune qualification industrielle n’est déclarée uniquement parce que le log
 ## 7. Multi-sites
 
 Le produit doit supporter plusieurs sites au niveau architecture/administration lorsque le modèle commercial l’exige, mais l’expérience déployée peut rester mono-exploitant. Les utilisateurs ne choisissent pas arbitrairement une organisation dans une instance `single_org` ; l’identifiant d’organisation reste une clé d’isolation interne. Le résolveur de portée ne remplace pas RBAC/OIDC : il constitue une barrière supplémentaire de cohérence du mode de déploiement.
+
+## 8. Gouvernance normative
+
+Le registre interne stocke les métadonnées d’une édition et les références de revue, pas le contenu protégé de la norme. Une page publique officielle peut servir à identifier une édition ou son statut, mais un jeu de règles contractuelles n’est lié qu’après acquisition légale de l’édition applicable et revue par le responsable compétent. Une nouvelle édition reste une nouvelle référence à examiner ; elle n’est jamais considérée automatiquement compatible avec les règles précédentes.

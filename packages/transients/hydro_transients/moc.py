@@ -87,9 +87,7 @@ def interior_characteristic_step(
     coefficient = grid.characteristic_coefficient
     friction = grid.quasi_steady_friction_coefficient
     c_plus = (
-        left_head_m
-        + coefficient * left_flow_m3_s
-        - friction * left_flow_m3_s * abs(left_flow_m3_s)
+        left_head_m + coefficient * left_flow_m3_s - friction * left_flow_m3_s * abs(left_flow_m3_s)
     )
     c_minus = (
         right_head_m
@@ -146,8 +144,8 @@ def fixed_head_right_boundary(
 
 
 __all__ = [
-    "STANDARD_GRAVITY_M_S2",
     "MocPipeGrid",
+    "STANDARD_GRAVITY_M_S2",
     "fixed_head_left_boundary",
     "fixed_head_right_boundary",
     "interior_characteristic_step",

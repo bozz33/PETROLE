@@ -1,6 +1,6 @@
 # Phase 5 — SCADA / historian en lecture seule
 
-Statut : contrat d’implémentation OT, non certifiant et sans commande procédé.
+Statut : fondations exécutables OT, non certifiantes et sans commande procédé.
 
 Base de travail : `6d18ef39d16c2dd9ae34128ccf6d87f4788e19bc`, afin de réutiliser les tags/séries V1. Cette branche sera rebasée sur la baseline Phase 2 consolidée avant intégration.
 
@@ -29,9 +29,22 @@ PETROLE reste un client analytique **lecture seule**. Aucun endpoint ou connecte
 
 ## 4. OPC UA
 
-Implémentation alignée sur les spécifications OPC Foundation actives au moment du développement. Les profils et services supportés doivent être listés explicitement. Le connecteur refuse toute opération non incluse dans l’allow-list de lecture.
+Implémentation alignée sur OPC UA Part 4 v1.05.07 consultée pendant le développement. Les profils et services réellement supportés devront rester listés explicitement. Le connecteur refuse toute opération non incluse dans l’allow-list de lecture.
 
-Exigences minimales : `SignAndEncrypt`, certificats, Endpoint configuré, namespace URI + NodeId stable, qualité réversible, timestamps doubles, backoff et trous de reconnexion visibles.
+Fondations déjà codées :
+
+- politique de services OPC UA autorisés/refusés en lecture seule ;
+- normalisation `DataValue` conservant `StatusCode`, `SourceTimestamp` et `ServerTimestamp` ;
+- valeur `Bad` non utilisable par l’analytique, sans supprimer la preuve de qualité ;
+- valeur `Uncertain` conservée et explicitement signalée ;
+- suivi des numéros de séquence `NotificationMessage` ;
+- détection de doublons, messages anciens et trous de séquence ;
+- prise en compte du rollover 32 bits non nul ;
+- production explicite des séquences à demander par `Republish`, avec limite de sécurité empêchant une allocation incontrôlée après une reprise incohérente.
+
+La couche actuelle **ne réalise pas encore** la session réseau OPC UA, les certificats, la trust list, les acknowledgements Publish ni les appels Republish : ces opérations restent derrière P5-B/P5-C et la qualification sur simulateur.
+
+Exigences minimales du futur connecteur réel : `SignAndEncrypt`, certificats, Endpoint configuré, namespace URI + NodeId stable, qualité réversible, timestamps doubles, backoff et trous de reconnexion visibles.
 
 ## 5. Cybersécurité
 

@@ -1,8 +1,8 @@
 # Phase 7 — Détection de fuite et jumeau numérique
 
-Statut : contrat R&D/produit post-SCADA, non certifiant et non opérationnel tant que les gates de données ne sont pas fermées.
+Statut : fondations R&D/produit post-SCADA, non certifiantes et non opérationnelles tant que les gates de données ne sont pas fermées.
 
-Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Cette branche contient d’abord le contrat ; l’implémentation dépendra des sorties Phase 5 et des données labellisées.
+Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Cette branche développe uniquement les briques qui peuvent être vérifiées sans prétendre disposer de données de fuite industrielles validantes.
 
 ## 1. Références projet
 
@@ -23,7 +23,20 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Cette branc
 8. P7-H — jumeau numérique versionné : état estimé, modèle, données et hypothèses ;
 9. P7-I — campagne de validation sur données labellisées/essais contrôlés.
 
-## 3. Règles non négociables
+## 3. Fondations déjà codées
+
+- métriques de détection à partir de TP/FP/FN/TN et délais observés ;
+- bilan matière compensé `entrée - sortie - variation d’inventaire` ;
+- propagation RSS des incertitudes-types fournies pour le bilan ;
+- résidu normalisé uniquement lorsque l’incertitude combinée est non nulle ;
+- aucun seuil de fuite implicite ni génération d’alarme ;
+- variables de jumeau en SI avec unité et référence de provenance obligatoires ;
+- snapshots immuables ordonnés, horodatés UTC et adressés par empreinte `sha256` canonique ;
+- comparaison de snapshots uniquement pour une même version de modèle, séquence croissante et unités cohérentes.
+
+Le snapshot versionné est une brique de traçabilité. Il ne constitue pas encore l’estimation d’état P7-A, le RTTM P7-B, un détecteur P7-D ou une localisation P7-F.
+
+## 4. Règles non négociables
 
 - une alerte PETROLE est une **suspicion analytique**, jamais un ordre d’arrêt ;
 - aucune performance de détection/localisation n’est annoncée sans jeu d’essai indépendant ;
@@ -32,11 +45,11 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Cette branc
 - faux positifs, faux négatifs, sensibilité, temps de détection et disponibilité sont mesurés ;
 - séparation entraînement/calibration/validation/test si des méthodes apprenantes sont utilisées.
 
-## 4. Référentiel API
+## 5. Référentiel API
 
 API RP 1175 définit le cadre de gestion du programme de détection ; API RP 1130 traite la surveillance computationnelle. Les détails normatifs sont implémentés uniquement à partir des éditions légalement acquises et approuvées par l’équipe métier. Le dépôt conserve des règles internes synthétiques et la référence d’édition, jamais le texte protégé.
 
-## 5. Gates avant code opérationnel
+## 6. Gates avant code opérationnel
 
 - Phase 5 read-only qualifiée ;
 - données synchronisées et métrologie documentée ;
@@ -45,7 +58,7 @@ API RP 1175 définit le cadre de gestion du programme de détection ; API RP 113
 - procédure opérateur de traitement des alertes ;
 - revue indépendante de la campagne.
 
-## 6. Hors portée
+## 7. Hors portée
 
 - déclenchement automatique SIS/ESD ;
 - fermeture automatique de vanne ;

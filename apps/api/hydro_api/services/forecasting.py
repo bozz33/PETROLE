@@ -104,8 +104,7 @@ def fit_linear_forecast(split: ForecastDatasetSplit) -> LinearForecastResult:
         raise ValueError("Les timestamps d'entraînement ne permettent pas d'ajuster une pente.")
     slope = (
         math.fsum(
-            (x_value - x_mean) * (y_value - y_mean)
-            for x_value, y_value in zip(xs, ys, strict=True)
+            (x_value - x_mean) * (y_value - y_mean) for x_value, y_value in zip(xs, ys, strict=True)
         )
         / denominator
     )

@@ -4,6 +4,22 @@ Le paquet est volontairement séparé de ``hydroliquid`` : un réseau gaz ne doi
 pas être modélisé en remplaçant simplement la densité d'un liquide.
 """
 
+from hydro_gas.compressor_map import (
+    CompressorMap,
+    CompressorMapPoint,
+    CompressorOperatingPoint,
+    CompressorSpeedLine,
+    interpolate_compressor_map,
+)
 from hydro_gas.properties import GasState, gas_density_from_z, linepack_mass
 
-__all__ = ["GasState", "gas_density_from_z", "linepack_mass"]
+__all__ = [
+    "CompressorMap",
+    "CompressorMapPoint",
+    "CompressorOperatingPoint",
+    "CompressorSpeedLine",
+    "GasState",
+    "gas_density_from_z",
+    "interpolate_compressor_map",
+    "linepack_mass",
+]

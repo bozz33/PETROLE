@@ -39,15 +39,15 @@ class RecoveryDrillEvidence:
         if self.completed_at <= self.started_at:
             raise ValueError("La fin du drill doit être postérieure à son début.")
         if self.latest_recovered_data_at > self.incident_reference_time:
-            raise ValueError("La dernière donnée récupérée ne peut pas être postérieure à l'incident.")
+            raise ValueError(
+                "La dernière donnée récupérée ne peut pas être postérieure à l'incident."
+            )
         if not self.drill_reference.strip():
             raise ValueError("La référence de l'exercice de reprise est obligatoire.")
 
     @property
     def observed_rto_s(self) -> float:
-        return (
-            self.completed_at.astimezone(UTC) - self.started_at.astimezone(UTC)
-        ).total_seconds()
+        return (self.completed_at.astimezone(UTC) - self.started_at.astimezone(UTC)).total_seconds()
 
     @property
     def observed_rpo_s(self) -> float:

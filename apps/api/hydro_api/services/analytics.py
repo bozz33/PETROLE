@@ -72,8 +72,7 @@ def _linear_trend(records: list[tuple[datetime, float]]) -> dict[str, Any]:
         }
 
     slope = (
-        math.fsum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys, strict=True))
-        / denominator
+        math.fsum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys, strict=True)) / denominator
     )
     intercept = y_mean - slope * x_mean
     predictions = [intercept + slope * x for x in xs]

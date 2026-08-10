@@ -78,11 +78,15 @@ class SQLiteIndustrialSpool:
     @property
     def journal_mode(self) -> str:
         row = self._connection.execute("PRAGMA journal_mode").fetchone()
+        if row is None:
+            raise RuntimeError("SQLite n'a pas retourné le mode de journalisation.")
         return str(row[0]).lower()
 
     @property
     def synchronous_level(self) -> int:
         row = self._connection.execute("PRAGMA synchronous").fetchone()
+        if row is None:
+            raise RuntimeError("SQLite n'a pas retourné le niveau synchronous.")
         return int(row[0])
 
     def append(
@@ -134,6 +138,8 @@ class SQLiteIndustrialSpool:
                     created_at.isoformat(),
                 ),
             )
+            if cursor.lastrowid is None:
+                raise RuntimeError("SQLite n'a pas retourné la séquence du payload inséré.")
             local_sequence = int(cursor.lastrowid)
         return StoredSpoolRecord(
             local_sequence=local_sequence,
@@ -145,7 +151,12 @@ class SQLiteIndustrialSpool:
             created_at=created_at,
         )
 
-    def list_after(self, local_sequence: int, *, limit: int = 1_000) -> tuple[StoredSpoolRecord, ...]:
+    def list_after(
+        self,
+        local_sequence: int,
+        *,
+        limit: int = 1_000,
+    ) -> tuple[StoredSpoolRecord, ...]:
         """Lit un suffixe ordonné sans supprimer les données acquittées."""
 
         if local_sequence < 0:

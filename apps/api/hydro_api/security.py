@@ -20,6 +20,8 @@ from hydro_api.models import (
     Dataset,
     DatasetImport,
     GeneratedReport,
+    MeasurementComparison,
+    MeasurementModelMapping,
     ModelVersion,
     NetworkEdge,
     NetworkNode,
@@ -209,6 +211,12 @@ def _organization_for_resource(
         if value := path_parameters.get("import_id"):
             import_run = session.get(DatasetImport, uuid.UUID(value))
             return import_run.dataset.organization_id if import_run else None
+        if value := path_parameters.get("mapping_id"):
+            mapping = session.get(MeasurementModelMapping, uuid.UUID(value))
+            return mapping.organization_id if mapping else None
+        if value := path_parameters.get("measurement_comparison_id"):
+            measurement_comparison = session.get(MeasurementComparison, uuid.UUID(value))
+            return measurement_comparison.organization_id if measurement_comparison else None
     except ValueError:
         return None
     return None

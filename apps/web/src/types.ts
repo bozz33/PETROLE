@@ -771,6 +771,100 @@ export interface SeriesAnalysis {
   offset: number;
 }
 
+/** Correspondance métier explicitement approuvée avant toute comparaison V1-B. */
+export interface MeasurementModelMapping {
+  id: string;
+  organization_id: string;
+  project_id: string;
+  model_version_id: string;
+  tag_id: string;
+  version_number: number;
+  target_type: "node" | "edge" | "pump";
+  target_id: string;
+  metric:
+    | "pressure_pa"
+    | "flow_m3_s"
+    | "pressure_min_pa"
+    | "pressure_max_pa"
+    | "suction_pressure_pa"
+    | "discharge_pressure_pa";
+  dimension: string;
+  si_unit: string;
+  status: "draft" | "approved" | "archived";
+  source_ref: string | null;
+  created_by: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MeasurementComparisonKpis {
+  n_compared: number;
+  bias_si: number | null;
+  mae_si: number | null;
+  rmse_si: number | null;
+  min_residual_si: number | null;
+  max_residual_si: number | null;
+}
+
+export interface MeasurementComparisonExclusions {
+  n_candidates: number;
+  n_excluded_quality: number;
+  n_excluded_outlier: number;
+  quality_counts: Record<string, number>;
+  exclusion_counts: Record<string, number>;
+  duplicate_timestamp_count: number;
+}
+
+/** Résultat immuable d'une comparaison stationnaire, et non une calibration. */
+export interface MeasurementComparison {
+  id: string;
+  organization_id: string;
+  project_id: string;
+  model_version_id: string;
+  mapping_id: string;
+  calculation_id: string;
+  tag_id: string;
+  processing_version: string;
+  start_timestamp: string;
+  end_timestamp: string;
+  included_qualities: SampleQuality[];
+  input_hash: string;
+  calculation_input_hash: string;
+  engine: string;
+  engine_version: string;
+  simulated_value_si: number;
+  si_unit: string;
+  status: "completed";
+  kpis: MeasurementComparisonKpis;
+  exclusions: MeasurementComparisonExclusions;
+  mapping: MeasurementModelMapping;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface MeasurementResidual {
+  id: string;
+  comparison_id: string;
+  normalized_sample_id: string;
+  raw_sample_id: string;
+  dataset_id: string;
+  dataset_row_id: string | null;
+  timestamp: string;
+  measured_value_si: number;
+  simulated_value_si: number;
+  residual_si: number;
+  quality: SampleQuality;
+  included_in_kpi: boolean;
+  exclusion_reason: string | null;
+  source_timestamp: string;
+  ingest_timestamp: string;
+  source_value: unknown;
+  source_unit: string;
+  processing_version: string;
+}
+
 export interface Report {
   id: string;
   organization_id: string;

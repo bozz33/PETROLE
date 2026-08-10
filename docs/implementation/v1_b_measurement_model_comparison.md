@@ -1,10 +1,25 @@
 # V1-B — comparaison mesure ↔ modèle
 
-Statut : contrat d’implémentation Pilote/V1, sans effet de certification.
+Statut : V1-B1 implémenté sur la branche Pilote/V1 ; validation CI complète requise avant fermeture. Ce lot n’a aucun effet de certification.
 
 Base documentaire : D04 FR-DAT-005, D09, D12, D17, D20.
 
 Base logicielle : `feat/pilot-v1-timeseries-explorer` à `7aacd47b7cd6e74b7c2afb6228ed738268557d07`.
+
+## État V1-B1
+
+La première implémentation ajoute les objets immuables `MeasurementModelMapping`,
+`MeasurementComparison` et `MeasurementResidual`, ainsi que leur migration Alembic.
+Elle fournit les API de création, approbation et consultation des correspondances,
+de calcul de comparaison et de consultation des résidus. L’interface Données permet
+de sélectionner une correspondance approuvée, un calcul stationnaire et une fenêtre
+temporelle, puis affiche les KPI, les courbes et le lignage. La création et
+l’approbation des correspondances restent également accessibles par API afin de
+conserver une revue métier explicite.
+
+V1-B1 ne crée pas automatiquement une correspondance à partir d’un code de tag et
+ne modifie aucune donnée source. La CI complète de la PR reste la porte de fermeture
+du lot.
 
 ## 1. But
 
@@ -54,6 +69,7 @@ Créer une correspondance versionnée contenant au minimum :
 
 - `organization_id` ;
 - `project_id` ;
+- `model_version_id` ;
 - `tag_id` ;
 - `target_type` (`node`, `edge`, `pump`) ;
 - `target_id` ;
@@ -64,7 +80,7 @@ Créer une correspondance versionnée contenant au minimum :
 - `source_ref` / commentaire métier ;
 - auteur et horodatage d’approbation.
 
-La cible doit appartenir au même projet/site logique que le tag. Une correspondance approuvée devient immuable ; toute évolution crée une nouvelle version.
+La cible et la version de modèle doivent appartenir au même projet/site logique que le tag. Une correspondance approuvée devient immuable ; toute évolution crée une nouvelle version.
 
 ## 5. Sémantique de comparaison stationnaire
 
@@ -99,7 +115,7 @@ Par défaut :
 
 La réponse doit restituer les compteurs par motif d’exclusion.
 
-## 7. Persistance proposée
+## 7. Persistance mise en œuvre
 
 Ajouter des objets immuables de comparaison, séparés des calculs et de la calibration :
 
@@ -119,12 +135,14 @@ Une comparaison doit mémoriser :
 - statut et diagnostics ;
 - version du code/moteur qui a produit la comparaison.
 
-## 8. API cible
+## 8. API mise en œuvre
 
 Contrat minimal :
 
 - `POST /measurement-model-mappings` ;
 - `GET /measurement-model-mappings` ;
+- `GET /measurement-model-mappings/{id}` ;
+- `POST /measurement-model-mappings/{id}/approve` ;
 - `POST /measurement-comparisons` ;
 - `GET /measurement-comparisons/{id}` ;
 - `GET /measurement-comparisons/{id}/residuals`.

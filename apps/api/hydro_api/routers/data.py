@@ -39,6 +39,15 @@ from hydro_api.schemas.data import (
     MeasurementQualitySummary,
     StoredFileRead,
 )
+from hydro_api.schemas.measurement_comparison import (
+    MappingStatus,
+    MeasurementComparisonCreate,
+    MeasurementComparisonRead,
+    MeasurementModelMappingApproval,
+    MeasurementModelMappingCreate,
+    MeasurementModelMappingRead,
+    MeasurementResidualRead,
+)
 from hydro_api.schemas.time_series import (
     MeasurementTagCreate,
     MeasurementTagRead,
@@ -50,7 +59,7 @@ from hydro_api.schemas.time_series import (
     TimeSeriesDatasetImportCreate,
     TimeSeriesImportRead,
 )
-from hydro_api.services import data_import, measurement_quality, time_series
+from hydro_api.services import data_import, measurement_comparison, measurement_quality, time_series
 from hydro_api.storage import ObjectStorageDependency
 
 router = APIRouter(tags=["Données"])
@@ -261,6 +270,142 @@ def list_measurement_tags(
 )
 def read_measurement_tag(tag_id: uuid.UUID, session: DatabaseSession):
     return time_series.get_measurement_tag(session, tag_id)
+
+
+@router.post(
+    "/measurement-model-mappings",
+    response_model=MeasurementModelMappingRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Créer une correspondance explicite mesure ↔ résultat calculé",
+)
+def create_measurement_model_mapping(
+    data: MeasurementModelMappingCreate,
+    request: Request,
+    session: DatabaseSession,
+):
+    """Crée un brouillon : aucune association ne dérive du nom du tag."""
+
+    data = bind_default_organization(request, session, data)
+    return measurement_comparison.create_measurement_mapping(
+        session,
+        data,
+        actor_id=request.state.access_context.user_id,
+    )
+
+
+@router.get(
+    "/measurement-model-mappings",
+    response_model=Page[MeasurementModelMappingRead],
+    summary="Lister les correspondances versionnées mesure ↔ modèle",
+)
+def list_measurement_model_mappings(
+    organization_id: uuid.UUID,
+    request: Request,
+    session: DatabaseSession,
+    project_id: uuid.UUID | None = None,
+    tag_id: uuid.UUID | None = None,
+    status_filter: Annotated[MappingStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    if is_single_organization(request.app.state.settings):
+        organization_id = require_default_organization_id(request, session)
+    items, total = measurement_comparison.list_measurement_mappings(
+        session,
+        organization_id=organization_id,
+        project_id=project_id,
+        tag_id=tag_id,
+        status=status_filter,
+        limit=limit,
+        offset=offset,
+    )
+    return Page(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get(
+    "/measurement-model-mappings/{mapping_id}",
+    response_model=MeasurementModelMappingRead,
+    summary="Lire une correspondance versionnée",
+)
+def read_measurement_model_mapping(mapping_id: uuid.UUID, session: DatabaseSession):
+    return measurement_comparison.get_measurement_mapping(session, mapping_id)
+
+
+@router.post(
+    "/measurement-model-mappings/{mapping_id}/approve",
+    response_model=MeasurementModelMappingRead,
+    summary="Approuver et figer une correspondance mesure ↔ modèle",
+)
+def approve_measurement_model_mapping(
+    mapping_id: uuid.UUID,
+    data: MeasurementModelMappingApproval,
+    request: Request,
+    session: DatabaseSession,
+):
+    return measurement_comparison.approve_measurement_mapping(
+        session,
+        mapping_id,
+        actor_id=request.state.access_context.user_id,
+        comment=data.comment,
+    )
+
+
+@router.post(
+    "/measurement-comparisons",
+    response_model=MeasurementComparisonRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Comparer une fenêtre de mesures à un calcul stationnaire",
+)
+def create_measurement_comparison(
+    data: MeasurementComparisonCreate,
+    request: Request,
+    session: DatabaseSession,
+):
+    """Archive résidus/KPI et lignage sans modifier les deux sources."""
+
+    data = bind_default_organization(request, session, data)
+    comparison = measurement_comparison.create_measurement_comparison(
+        session,
+        data,
+        actor_id=request.state.access_context.user_id,
+    )
+    return measurement_comparison.comparison_payload(session, comparison)
+
+
+@router.get(
+    "/measurement-comparisons/{measurement_comparison_id}",
+    response_model=MeasurementComparisonRead,
+    summary="Lire une comparaison stationnaire archivée",
+)
+def read_measurement_comparison(
+    measurement_comparison_id: uuid.UUID,
+    session: DatabaseSession,
+):
+    comparison = measurement_comparison.get_measurement_comparison(
+        session,
+        measurement_comparison_id,
+    )
+    return measurement_comparison.comparison_payload(session, comparison)
+
+
+@router.get(
+    "/measurement-comparisons/{measurement_comparison_id}/residuals",
+    response_model=Page[MeasurementResidualRead],
+    summary="Lister les résidus et leur lignage de mesure",
+)
+def list_measurement_comparison_residuals(
+    measurement_comparison_id: uuid.UUID,
+    session: DatabaseSession,
+    limit: Annotated[int, Query(ge=1, le=5_000)] = 500,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    items, total = measurement_comparison.list_measurement_residuals(
+        session,
+        comparison_id=measurement_comparison_id,
+        limit=limit,
+        offset=offset,
+    )
+    return Page(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get(

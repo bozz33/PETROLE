@@ -53,7 +53,9 @@ def detection_performance(
     if not truth:
         raise ValueError("Une campagne de performance doit contenir au moins un échantillon.")
 
-    true_positive = sum(expected and observed for expected, observed in zip(truth, predicted, strict=True))
+    true_positive = sum(
+        expected and observed for expected, observed in zip(truth, predicted, strict=True)
+    )
     false_positive = sum(
         (not expected) and observed for expected, observed in zip(truth, predicted, strict=True)
     )

@@ -3,6 +3,8 @@
 from hydro_transients.moc import (
     MocPipeGrid,
     MocStateSnapshot,
+    fixed_flow_left_boundary,
+    fixed_flow_right_boundary,
     fixed_head_left_boundary,
     fixed_head_right_boundary,
     interior_characteristic_step,
@@ -12,6 +14,8 @@ from hydro_transients.moc import (
 __all__ = [
     "MocPipeGrid",
     "MocStateSnapshot",
+    "fixed_flow_left_boundary",
+    "fixed_flow_right_boundary",
     "fixed_head_left_boundary",
     "fixed_head_right_boundary",
     "interior_characteristic_step",

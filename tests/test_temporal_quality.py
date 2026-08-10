@@ -60,7 +60,9 @@ def test_temporal_quality_reports_latency_quality_stagnation_and_jumps() -> None
     assert result.stagnation_detected is True
 
 
-def test_temporal_quality_counts_source_order_and_negative_latency_without_reordering_input() -> None:
+def test_temporal_quality_counts_source_order_and_negative_latency_without_reordering_input() -> (
+    None
+):
     first = _sample(2, 100.0)
     second = _sample(1, 101.0, latency_s=-1.0)
     result = assess_temporal_quality(

@@ -115,9 +115,22 @@ def verify_artifact_bytes(artifact: ReleaseArtifact, content: bytes) -> bool:
     return artifact.size_bytes == len(content) and artifact.sha256 == sha256_bytes(content)
 
 
+def verify_sbom_bytes(manifest: ReleaseManifest, sbom_content: bytes) -> bool:
+    """Vérifie que le SBOM fourni est exactement celui lié au manifeste.
+
+    Une release sans `sbom_sha256` retourne `False` : l'absence de binding ne
+    doit jamais être interprétée comme une vérification réussie.
+    """
+
+    if manifest.sbom_sha256 is None:
+        return False
+    return manifest.sbom_sha256 == sha256_bytes(sbom_content)
+
+
 __all__ = [
     "ReleaseArtifact",
     "ReleaseManifest",
     "sha256_bytes",
     "verify_artifact_bytes",
+    "verify_sbom_bytes",
 ]

@@ -153,6 +153,50 @@ def fixed_head_right_boundary(
     return boundary_head_m, flow
 
 
+def fixed_flow_left_boundary(
+    *,
+    boundary_flow_m3_s: float,
+    interior_head_m: float,
+    interior_flow_m3_s: float,
+    grid: MocPipeGrid,
+) -> tuple[float, float]:
+    """Condition de débit imposé à l'amont utilisant la caractéristique C-."""
+
+    _validate_state(0.0, boundary_flow_m3_s)
+    _validate_state(interior_head_m, interior_flow_m3_s)
+    coefficient = grid.characteristic_coefficient
+    friction = grid.quasi_steady_friction_coefficient
+    c_minus = (
+        interior_head_m
+        - coefficient * interior_flow_m3_s
+        + friction * interior_flow_m3_s * abs(interior_flow_m3_s)
+    )
+    head = c_minus + coefficient * boundary_flow_m3_s
+    return head, boundary_flow_m3_s
+
+
+def fixed_flow_right_boundary(
+    *,
+    boundary_flow_m3_s: float,
+    interior_head_m: float,
+    interior_flow_m3_s: float,
+    grid: MocPipeGrid,
+) -> tuple[float, float]:
+    """Condition de débit imposé à l'aval utilisant la caractéristique C+."""
+
+    _validate_state(0.0, boundary_flow_m3_s)
+    _validate_state(interior_head_m, interior_flow_m3_s)
+    coefficient = grid.characteristic_coefficient
+    friction = grid.quasi_steady_friction_coefficient
+    c_plus = (
+        interior_head_m
+        + coefficient * interior_flow_m3_s
+        - friction * interior_flow_m3_s * abs(interior_flow_m3_s)
+    )
+    head = c_plus - coefficient * boundary_flow_m3_s
+    return head, boundary_flow_m3_s
+
+
 def simulate_fixed_head_pipe(
     *,
     initial_heads_m: tuple[float, ...],
@@ -231,6 +275,8 @@ __all__ = [
     "STANDARD_GRAVITY_M_S2",
     "MocPipeGrid",
     "MocStateSnapshot",
+    "fixed_flow_left_boundary",
+    "fixed_flow_right_boundary",
     "fixed_head_left_boundary",
     "fixed_head_right_boundary",
     "interior_characteristic_step",

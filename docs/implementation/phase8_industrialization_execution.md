@@ -33,7 +33,8 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Les fonctio
 - évaluation déterministe des mesures observées contre ces objectifs, sans valeurs cibles cachées ;
 - preuve d’exercice de reprise avec chronologie mesurée, RPO/RTO observés, intégrité base, intégrité stockage objet et readiness applicative ;
 - refus d’un drill dont la chronologie est incohérente ;
-- résultat détaillé des violations plutôt qu’un simple booléen de conformité.
+- résultat détaillé des violations plutôt qu’un simple booléen de conformité ;
+- résolveur de portée organisationnelle : `single_org` utilise l’organisation interne par défaut et refuse toute tentative de sélection croisée ; `multi_org`/`saas` exigent une organisation préalablement résolue par la couche d’identité/autorisation.
 
 Ces briques ne prouvent aucune HA à elles seules. La preuve requiert une infrastructure réelle ou représentative et des exercices reproductibles.
 
@@ -62,4 +63,4 @@ Aucune qualification industrielle n’est déclarée uniquement parce que le log
 
 ## 7. Multi-sites
 
-Le produit doit supporter plusieurs sites au niveau architecture/administration lorsque le modèle commercial l’exige, mais l’expérience déployée peut rester mono-exploitant. Les utilisateurs ne choisissent pas arbitrairement une organisation dans une instance `single_org` ; l’identifiant d’organisation reste une clé d’isolation interne.
+Le produit doit supporter plusieurs sites au niveau architecture/administration lorsque le modèle commercial l’exige, mais l’expérience déployée peut rester mono-exploitant. Les utilisateurs ne choisissent pas arbitrairement une organisation dans une instance `single_org` ; l’identifiant d’organisation reste une clé d’isolation interne. Le résolveur de portée ne remplace pas RBAC/OIDC : il constitue une barrière supplémentaire de cohérence du mode de déploiement.

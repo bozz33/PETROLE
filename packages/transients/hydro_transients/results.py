@@ -49,7 +49,9 @@ def _validate_snapshots(snapshots: tuple[MocStateSnapshot, ...]) -> int:
         if not math.isfinite(snapshot.time_s) or snapshot.time_s < 0:
             raise ValueError("Les temps transitoires doivent être finis et positifs ou nuls.")
         if previous_time is not None and snapshot.time_s <= previous_time:
-            raise ValueError("Les snapshots transitoires doivent être strictement ordonnés dans le temps.")
+            raise ValueError(
+                "Les snapshots transitoires doivent être strictement ordonnés dans le temps."
+            )
         if len(snapshot.heads_m) != node_count or len(snapshot.flows_m3_s) != node_count:
             raise ValueError("Tous les snapshots doivent conserver le même nombre de nœuds.")
         if any(not math.isfinite(value) for value in (*snapshot.heads_m, *snapshot.flows_m3_s)):

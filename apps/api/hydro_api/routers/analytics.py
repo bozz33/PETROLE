@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
@@ -28,7 +28,7 @@ def _analyze(
     qualities: list[SampleQuality] | None,
     bucket_seconds: int,
     expected_interval_seconds: float | None,
-):
+) -> dict[str, Any]:
     return analytics.analyze_time_series(
         session,
         tag_id=tag_id,
@@ -55,7 +55,7 @@ def analyze_measurement_tag_series(
     qualities: Annotated[list[SampleQuality] | None, Query()] = None,
     bucket_seconds: Annotated[int, Query(ge=1, le=31_536_000)] = 3600,
     expected_interval_seconds: Annotated[float | None, Query(gt=0)] = None,
-):
+) -> dict[str, Any]:
     """Retourne des agrégats UTC sans réécrire ni interpoler les mesures."""
 
     return _analyze(

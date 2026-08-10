@@ -97,13 +97,52 @@ def test_checkpoint_persists_across_reopen_and_cannot_regress(tmp_path: Path) ->
 
 def test_checkpoint_same_sequence_cannot_change_idempotency_identity(tmp_path: Path) -> None:
     with SQLiteIndustrialSpool(tmp_path / "spool.db") as spool:
-        spool.save_checkpoint(
-            ConnectorCheckpoint("connector://hist/lab", "v1", 4, "k4")
-        )
+        spool.save_checkpoint(ConnectorCheckpoint("connector://hist/lab", "v1", 4, "k4"))
         with pytest.raises(ValueError, match="même séquence"):
             spool.save_checkpoint(
                 ConnectorCheckpoint("connector://hist/lab", "v1", 4, "other-key")
             )
+
+
+def test_atomic_acknowledge_persists_checkpoint_and_compacts_prefix(tmp_path: Path) -> None:
+    path = tmp_path / "gateway-spool.db"
+    with SQLiteIndustrialSpool(path) as spool:
+        _append(spool, "k1", b"one")
+        _append(spool, "k2", b"two")
+        _append(spool, "k3", b"three")
+        checkpoint = ConnectorCheckpoint("connector://opcua/lab", "v1", 2, "k2")
+
+        deleted = spool.acknowledge_through(checkpoint)
+
+        assert deleted == 2
+        assert spool.load_checkpoint(
+            connector_ref="connector://opcua/lab",
+            checkpoint_version="v1",
+        ) == checkpoint
+        assert tuple(record.local_sequence for record in spool.list_after(0)) == (3,)
+        assert spool.acknowledge_through(checkpoint) == 0
+
+    with SQLiteIndustrialSpool(path) as reopened:
+        assert reopened.load_checkpoint(
+            connector_ref="connector://opcua/lab",
+            checkpoint_version="v1",
+        ) == checkpoint
+        assert tuple(record.local_sequence for record in reopened.list_after(0)) == (3,)
+
+
+def test_atomic_acknowledge_rejects_wrong_final_idempotency_key(tmp_path: Path) -> None:
+    with SQLiteIndustrialSpool(tmp_path / "spool.db") as spool:
+        _append(spool, "k1", b"one")
+        _append(spool, "k2", b"two")
+        with pytest.raises(ValueError, match="ne correspond pas"):
+            spool.acknowledge_through(
+                ConnectorCheckpoint("connector://opcua/lab", "v1", 2, "wrong-key")
+            )
+        assert spool.load_checkpoint(
+            connector_ref="connector://opcua/lab",
+            checkpoint_version="v1",
+        ) is None
+        assert tuple(record.local_sequence for record in spool.list_after(0)) == (1, 2)
 
 
 def test_missing_checkpoint_remains_explicitly_absent(tmp_path: Path) -> None:

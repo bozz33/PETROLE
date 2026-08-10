@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from hydro_api.industrial.buffer_checkpoint import ConnectorCheckpoint
 from hydro_api.industrial.sqlite_spool import SQLiteIndustrialSpool
 
 
@@ -59,6 +60,61 @@ def test_spool_rejects_changed_payload_for_existing_idempotency_key(tmp_path: Pa
         _append(spool, "same-key", b"payload-A")
         with pytest.raises(ValueError, match="payload différent"):
             _append(spool, "same-key", b"payload-B")
+
+
+def test_checkpoint_persists_across_reopen_and_cannot_regress(tmp_path: Path) -> None:
+    path = tmp_path / "gateway-spool.db"
+    checkpoint = ConnectorCheckpoint(
+        connector_ref="connector://opcua/lab",
+        checkpoint_version="v1",
+        last_local_sequence=2,
+        last_idempotency_key="k2",
+    )
+    with SQLiteIndustrialSpool(path) as spool:
+        _append(spool, "k1", b"one")
+        _append(spool, "k2", b"two")
+        spool.save_checkpoint(checkpoint)
+        assert spool.load_checkpoint(
+            connector_ref="connector://opcua/lab",
+            checkpoint_version="v1",
+        ) == checkpoint
+
+    with SQLiteIndustrialSpool(path) as reopened:
+        assert reopened.load_checkpoint(
+            connector_ref="connector://opcua/lab",
+            checkpoint_version="v1",
+        ) == checkpoint
+        with pytest.raises(ValueError, match="ne peut pas régresser"):
+            reopened.save_checkpoint(
+                ConnectorCheckpoint(
+                    connector_ref="connector://opcua/lab",
+                    checkpoint_version="v1",
+                    last_local_sequence=1,
+                    last_idempotency_key="k1",
+                )
+            )
+
+
+def test_checkpoint_same_sequence_cannot_change_idempotency_identity(tmp_path: Path) -> None:
+    with SQLiteIndustrialSpool(tmp_path / "spool.db") as spool:
+        spool.save_checkpoint(
+            ConnectorCheckpoint("connector://hist/lab", "v1", 4, "k4")
+        )
+        with pytest.raises(ValueError, match="même séquence"):
+            spool.save_checkpoint(
+                ConnectorCheckpoint("connector://hist/lab", "v1", 4, "other-key")
+            )
+
+
+def test_missing_checkpoint_remains_explicitly_absent(tmp_path: Path) -> None:
+    with SQLiteIndustrialSpool(tmp_path / "spool.db") as spool:
+        assert (
+            spool.load_checkpoint(
+                connector_ref="connector://opcua/lab",
+                checkpoint_version="v1",
+            )
+            is None
+        )
 
 
 def test_compaction_deletes_only_acknowledged_prefix(tmp_path: Path) -> None:

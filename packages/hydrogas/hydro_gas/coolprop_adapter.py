@@ -121,7 +121,9 @@ def evaluate_coolprop_properties(
         version = CP.get_global_param_string("version")
         gitrevision = CP.get_global_param_string("gitrevision")
     except Exception as exc:  # CoolProp expose plusieurs exceptions backend selon l'état.
-        raise ValueError(f"Échec de l'évaluation CoolProp pour {key} au point T/P demandé.") from exc
+        raise ValueError(
+            f"Échec de l'évaluation CoolProp pour {key} au point T/P demandé."
+        ) from exc
 
     density = _positive_finite(density, "density")
     dynamic_viscosity = _positive_finite(dynamic_viscosity, "dynamic_viscosity")

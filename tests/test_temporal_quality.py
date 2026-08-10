@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from hydro_api.services.temporal_quality import (
+    SampleQuality,
     TemporalQualityPolicy,
     TemporalQualitySample,
     assess_temporal_quality,
@@ -18,14 +19,14 @@ def _sample(
     value: float,
     *,
     latency_s: float = 2.0,
-    quality: str = "good",
+    quality: SampleQuality = "good",
 ) -> TemporalQualitySample:
     source = _BASE + timedelta(minutes=minute)
     return TemporalQualitySample(
         source_timestamp=source,
         ingest_timestamp=source + timedelta(seconds=latency_s),
         value_si=value,
-        quality=quality,  # type: ignore[arg-type]
+        quality=quality,
     )
 
 

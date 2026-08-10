@@ -46,7 +46,9 @@ class MigrationCompatibilityEvidence:
             self.evidence_archive_ref,
         )
         if any(not value.strip() for value in required):
-            raise ValueError("Releases, révisions, environnement et archive de preuve sont obligatoires.")
+            raise ValueError(
+                "Releases, révisions, environnement et archive de preuve sont obligatoires."
+            )
         if self.from_release == self.to_release and self.from_revision == self.to_revision:
             raise ValueError("L'exercice de migration doit représenter un changement réel.")
 

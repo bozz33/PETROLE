@@ -40,7 +40,9 @@ Fondations déjà codées :
 - suivi des numéros de séquence `NotificationMessage` ;
 - détection de doublons, messages anciens et trous de séquence ;
 - prise en compte du rollover 32 bits non nul ;
-- production explicite des séquences à demander par `Republish`, avec limite de sécurité empêchant une allocation incontrôlée après une reprise incohérente.
+- production explicite des séquences à demander par `Republish`, avec limite de sécurité empêchant une allocation incontrôlée après une reprise incohérente ;
+- objectifs de santé connecteur fournis par le site : âge maximal de la source, nombre de trous, fraction maximale de qualité `Bad` et reconnexions ;
+- évaluation détaillée de ces objectifs sans seuil OT implicite ni action sur le procédé.
 
 La couche actuelle **ne réalise pas encore** la session réseau OPC UA, les certificats, la trust list, les acknowledgements Publish ni les appels Republish : ces opérations restent derrière P5-B/P5-C et la qualification sur simulateur.
 

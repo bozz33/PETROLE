@@ -20,6 +20,7 @@ from hydro_leak.evidence_fusion import (
     EvidenceSignal,
     fuse_evidence,
 )
+from hydro_leak.localization import LeakLocationEstimate
 from hydro_leak.material_balance import (
     MaterialBalanceResult,
     MaterialBalanceWindow,
@@ -37,6 +38,7 @@ __all__ = [
     "EvidenceSignal",
     "LeakAlertObservation",
     "LeakEventLabel",
+    "LeakLocationEstimate",
     "MatchedLeakEvent",
     "MaterialBalanceResult",
     "MaterialBalanceWindow",

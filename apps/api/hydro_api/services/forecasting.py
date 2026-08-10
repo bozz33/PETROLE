@@ -102,16 +102,18 @@ def fit_linear_forecast(split: ForecastDatasetSplit) -> LinearForecastResult:
     denominator = math.fsum((value - x_mean) ** 2 for value in xs)
     if math.isclose(denominator, 0.0, abs_tol=1e-15):
         raise ValueError("Les timestamps d'entraînement ne permettent pas d'ajuster une pente.")
-    slope = math.fsum(
-        (x_value - x_mean) * (y_value - y_mean)
-        for x_value, y_value in zip(xs, ys, strict=True)
-    ) / denominator
+    slope = (
+        math.fsum(
+            (x_value - x_mean) * (y_value - y_mean)
+            for x_value, y_value in zip(xs, ys, strict=True)
+        )
+        / denominator
+    )
     intercept = y_mean - slope * x_mean
 
     def predict_set(observations: tuple[ForecastObservation, ...]) -> list[float]:
         return [
-            intercept
-            + slope * (item.timestamp.astimezone(UTC) - origin).total_seconds()
+            intercept + slope * (item.timestamp.astimezone(UTC) - origin).total_seconds()
             for item in observations
         ]
 

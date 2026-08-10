@@ -49,7 +49,9 @@ class ConnectorHealthEvidence:
         if any(value < 0 for value in counts):
             raise ValueError("Les compteurs de santé connecteur doivent être positifs ou nuls.")
         if self.bad_quality_count > self.sample_count:
-            raise ValueError("Le nombre de valeurs Bad ne peut pas dépasser le nombre d'échantillons.")
+            raise ValueError(
+                "Le nombre de valeurs Bad ne peut pas dépasser le nombre d'échantillons."
+            )
 
     @property
     def bad_quality_fraction(self) -> float:

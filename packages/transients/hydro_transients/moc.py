@@ -144,8 +144,8 @@ def fixed_head_right_boundary(
 
 
 __all__ = [
-    "MocPipeGrid",
     "STANDARD_GRAVITY_M_S2",
+    "MocPipeGrid",
     "fixed_head_left_boundary",
     "fixed_head_right_boundary",
     "interior_characteristic_step",

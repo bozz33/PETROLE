@@ -14,7 +14,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from hydro_api.industrial.buffer_checkpoint import BufferedIndustrialRecord
+from hydro_api.industrial.buffer_checkpoint import (
+    BufferedIndustrialRecord,
+    ConnectorCheckpoint,
+)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS spool_records (
@@ -25,6 +28,16 @@ CREATE TABLE IF NOT EXISTS spool_records (
     source_timestamp TEXT NOT NULL,
     source_ref TEXT NOT NULL,
     created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS spool_checkpoints (
+    connector_ref TEXT NOT NULL,
+    checkpoint_version TEXT NOT NULL,
+    last_local_sequence INTEGER NOT NULL,
+    last_idempotency_key TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (connector_ref, checkpoint_version),
+    CHECK (last_local_sequence >= 0)
 );
 """
 
@@ -63,7 +76,7 @@ class SQLiteIndustrialSpool:
         self._connection.execute("PRAGMA journal_mode=WAL")
         self._connection.execute("PRAGMA synchronous=FULL")
         self._connection.execute("PRAGMA foreign_keys=ON")
-        self._connection.execute(_SCHEMA)
+        self._connection.executescript(_SCHEMA)
         self._connection.commit()
 
     def close(self) -> None:
@@ -173,6 +186,73 @@ class SQLiteIndustrialSpool:
             (local_sequence, limit),
         ).fetchall()
         return tuple(self._row_to_record(row) for row in rows)
+
+    def load_checkpoint(
+        self,
+        *,
+        connector_ref: str,
+        checkpoint_version: str,
+    ) -> ConnectorCheckpoint | None:
+        """Relit le dernier checkpoint durable d'un connecteur/version."""
+
+        if not connector_ref.strip() or not checkpoint_version.strip():
+            raise ValueError("Le connecteur et la version de checkpoint sont obligatoires.")
+        row = self._connection.execute(
+            """
+            SELECT connector_ref, checkpoint_version, last_local_sequence, last_idempotency_key
+            FROM spool_checkpoints
+            WHERE connector_ref = ? AND checkpoint_version = ?
+            """,
+            (connector_ref, checkpoint_version),
+        ).fetchone()
+        if row is None:
+            return None
+        last_key = row["last_idempotency_key"]
+        return ConnectorCheckpoint(
+            connector_ref=str(row["connector_ref"]),
+            checkpoint_version=str(row["checkpoint_version"]),
+            last_local_sequence=int(row["last_local_sequence"]),
+            last_idempotency_key=str(last_key) if last_key is not None else None,
+        )
+
+    def save_checkpoint(self, checkpoint: ConnectorCheckpoint) -> None:
+        """Persiste un checkpoint sans autoriser de retour en arrière."""
+
+        existing = self.load_checkpoint(
+            connector_ref=checkpoint.connector_ref,
+            checkpoint_version=checkpoint.checkpoint_version,
+        )
+        if existing is not None:
+            if checkpoint.last_local_sequence < existing.last_local_sequence:
+                raise ValueError("Un checkpoint durable ne peut pas régresser.")
+            if (
+                checkpoint.last_local_sequence == existing.last_local_sequence
+                and checkpoint.last_idempotency_key != existing.last_idempotency_key
+            ):
+                raise ValueError(
+                    "Une même séquence checkpoint ne peut pas changer de clé d'idempotence."
+                )
+        updated_at = datetime.now(UTC).isoformat()
+        with self._connection:
+            self._connection.execute(
+                """
+                INSERT INTO spool_checkpoints (
+                    connector_ref, checkpoint_version, last_local_sequence,
+                    last_idempotency_key, updated_at
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(connector_ref, checkpoint_version) DO UPDATE SET
+                    last_local_sequence = excluded.last_local_sequence,
+                    last_idempotency_key = excluded.last_idempotency_key,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    checkpoint.connector_ref,
+                    checkpoint.checkpoint_version,
+                    checkpoint.last_local_sequence,
+                    checkpoint.last_idempotency_key,
+                    updated_at,
+                ),
+            )
 
     def compact_through(self, local_sequence: int) -> int:
         """Supprime uniquement un préfixe explicitement acquitté par le consommateur."""

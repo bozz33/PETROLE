@@ -1,7 +1,8 @@
 """Briques déterministes de méthode des caractéristiques (MOC).
 
-Le module implémente uniquement les relations de compatibilité 1D associées
-aux équations simplifiées de D07. Il ne constitue pas encore un solveur de
+Le module implémente les relations de compatibilité 1D associées aux équations
+simplifiées de D07 et un solveur de référence pour une conduite uniforme avec
+charges imposées aux deux extrémités. Il ne constitue pas encore un solveur de
 coup de bélier qualifié : cavitation, séparation de colonne, friction
 instationnaire et dispositifs de protection nécessitent des modèles et des
 benchmarks séparés.
@@ -65,6 +66,15 @@ class MocPipeGrid:
             * self.cell_length_m
             / (2.0 * self.gravity_m_s2 * self.diameter_m * area**2)
         )
+
+
+@dataclass(frozen=True, slots=True)
+class MocStateSnapshot:
+    """État complet de la conduite à un instant discret."""
+
+    time_s: float
+    heads_m: tuple[float, ...]
+    flows_m3_s: tuple[float, ...]
 
 
 def _validate_state(head_m: float, flow_m3_s: float) -> None:
@@ -143,10 +153,86 @@ def fixed_head_right_boundary(
     return boundary_head_m, flow
 
 
+def simulate_fixed_head_pipe(
+    *,
+    initial_heads_m: tuple[float, ...],
+    initial_flows_m3_s: tuple[float, ...],
+    left_boundary_head_m: float,
+    right_boundary_head_m: float,
+    grid: MocPipeGrid,
+    time_steps: int,
+) -> tuple[MocStateSnapshot, ...]:
+    """Propage un état MOC sur une conduite uniforme à charges limites fixes.
+
+    Le premier snapshot correspond à l'état initial. Chaque pas suivant utilise
+    uniquement l'état du pas précédent, conformément au schéma explicite CFL=1.
+    Le modèle ne gère ni cavitation, ni vanne, ni pompe transitoire.
+    """
+
+    if len(initial_heads_m) != len(initial_flows_m3_s):
+        raise ValueError("Les vecteurs initiaux de charge et débit doivent avoir la même taille.")
+    if len(initial_heads_m) < 3:
+        raise ValueError("Le solveur MOC exige au moins trois nœuds.")
+    if time_steps < 0:
+        raise ValueError("Le nombre de pas de temps doit être positif ou nul.")
+    _validate_state(left_boundary_head_m, 0.0)
+    _validate_state(right_boundary_head_m, 0.0)
+    for head, flow in zip(initial_heads_m, initial_flows_m3_s, strict=True):
+        _validate_state(head, flow)
+
+    previous_heads = list(initial_heads_m)
+    previous_flows = list(initial_flows_m3_s)
+    snapshots = [
+        MocStateSnapshot(
+            time_s=0.0,
+            heads_m=tuple(previous_heads),
+            flows_m3_s=tuple(previous_flows),
+        )
+    ]
+
+    node_count = len(previous_heads)
+    for step_index in range(1, time_steps + 1):
+        next_heads = [0.0] * node_count
+        next_flows = [0.0] * node_count
+        next_heads[0], next_flows[0] = fixed_head_left_boundary(
+            boundary_head_m=left_boundary_head_m,
+            interior_head_m=previous_heads[1],
+            interior_flow_m3_s=previous_flows[1],
+            grid=grid,
+        )
+        for node_index in range(1, node_count - 1):
+            next_heads[node_index], next_flows[node_index] = interior_characteristic_step(
+                left_head_m=previous_heads[node_index - 1],
+                left_flow_m3_s=previous_flows[node_index - 1],
+                right_head_m=previous_heads[node_index + 1],
+                right_flow_m3_s=previous_flows[node_index + 1],
+                grid=grid,
+            )
+        next_heads[-1], next_flows[-1] = fixed_head_right_boundary(
+            boundary_head_m=right_boundary_head_m,
+            interior_head_m=previous_heads[-2],
+            interior_flow_m3_s=previous_flows[-2],
+            grid=grid,
+        )
+        snapshots.append(
+            MocStateSnapshot(
+                time_s=step_index * grid.time_step_s,
+                heads_m=tuple(next_heads),
+                flows_m3_s=tuple(next_flows),
+            )
+        )
+        previous_heads = next_heads
+        previous_flows = next_flows
+
+    return tuple(snapshots)
+
+
 __all__ = [
     "STANDARD_GRAVITY_M_S2",
     "MocPipeGrid",
+    "MocStateSnapshot",
     "fixed_head_left_boundary",
     "fixed_head_right_boundary",
     "interior_characteristic_step",
+    "simulate_fixed_head_pipe",
 ]

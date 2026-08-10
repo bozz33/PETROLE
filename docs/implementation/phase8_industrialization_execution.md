@@ -1,6 +1,6 @@
 # Phase 8 — Industrialisation multi-sites
 
-Statut : contrat d’industrialisation, sans prétention de certification réglementaire.
+Statut : fondations d’industrialisation exécutables, sans prétention de certification réglementaire.
 
 Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Les fonctions seront intégrées progressivement après fermeture des gates produits précédents.
 
@@ -26,7 +26,18 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Les fonctio
 9. P8-I — support, runbooks, incident management et maintenance ;
 10. P8-J — gouvernance des règles/normes/éditions et audit multi-sites.
 
-## 3. Contraintes produit
+## 3. Fondations déjà codées
+
+- manifeste de provenance de release avec SHA Git et empreintes d’artefacts ;
+- objectifs de fiabilité explicitement fournis par le protocole : disponibilité minimale, latence P95 maximale, RPO maximal et RTO maximal ;
+- évaluation déterministe des mesures observées contre ces objectifs, sans valeurs cibles cachées ;
+- preuve d’exercice de reprise avec chronologie mesurée, RPO/RTO observés, intégrité base, intégrité stockage objet et readiness applicative ;
+- refus d’un drill dont la chronologie est incohérente ;
+- résultat détaillé des violations plutôt qu’un simple booléen de conformité.
+
+Ces briques ne prouvent aucune HA à elles seules. La preuve requiert une infrastructure réelle ou représentative et des exercices reproductibles.
+
+## 4. Contraintes produit
 
 - la topologie de déploiement ne modifie jamais les résultats scientifiques ;
 - aucune donnée d’un site ne doit fuiter vers un autre ;
@@ -35,7 +46,7 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Les fonctio
 - disponibilité et RPO/RTO sont définis contractuellement avant revendication ;
 - les fonctions OT restent read-only sauf projet distinct explicitement autorisé.
 
-## 4. Sécurité
+## 5. Sécurité
 
 - défense en profondeur et segmentation ;
 - MFA pour administrateurs ;
@@ -45,10 +56,10 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Les fonctio
 - journalisation centralisée et conservation définie ;
 - scans SAST/SCA/images, SBOM et signatures à chaque release.
 
-## 5. Gate « produit industriel »
+## 6. Gate « produit industriel »
 
 Aucune qualification industrielle n’est déclarée uniquement parce que le logiciel possède HA, sécurité ou observabilité. Le passage nécessite contrats, responsabilités, pilote accepté, support, procédures, exigences locales et validations externes applicables.
 
-## 6. Multi-sites
+## 7. Multi-sites
 
 Le produit doit supporter plusieurs sites au niveau architecture/administration lorsque le modèle commercial l’exige, mais l’expérience déployée peut rester mono-exploitant. Les utilisateurs ne choisissent pas arbitrairement une organisation dans une instance `single_org` ; l’identifiant d’organisation reste une clé d’isolation interne.

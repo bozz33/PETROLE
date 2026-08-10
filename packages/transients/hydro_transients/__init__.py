@@ -4,8 +4,8 @@ from hydro_transients.events import (
     BoundaryKind,
     BoundarySchedulePoint,
     BoundaryValueSchedule,
-    ScheduleInterpolation,
     ScheduledBoundary,
+    ScheduleInterpolation,
     simulate_scheduled_boundary_pipe,
 )
 from hydro_transients.moc import (

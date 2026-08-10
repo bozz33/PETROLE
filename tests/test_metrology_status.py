@@ -67,3 +67,10 @@ def test_calibration_validity_cannot_precede_calibration_date() -> None:
             valid_until=_BASE - timedelta(seconds=1),
             certificate_ref="certificate://PT-101/cal",
         )
+
+
+def test_metrology_policy_rejects_non_finite_due_window() -> None:
+    with pytest.raises(ValueError, match="finie"):
+        MetrologyPolicy(float("nan"), "policy://site-A/metrology/v1")
+    with pytest.raises(ValueError, match="finie"):
+        MetrologyPolicy(float("inf"), "policy://site-A/metrology/v1")

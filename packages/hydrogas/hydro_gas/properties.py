@@ -87,8 +87,8 @@ def linepack_mass(
 
 
 __all__ = [
-    "GasState",
     "UNIVERSAL_GAS_CONSTANT_J_MOL_K",
+    "GasState",
     "gas_density_from_z",
     "linepack_mass",
 ]

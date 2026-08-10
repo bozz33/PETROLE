@@ -75,6 +75,7 @@ packages = [
     "packages/shared/hydro_shared",
     "packages/domain/hydro_domain",
     "packages/hydroliquid/hydroliquid",
+    "packages/transients/hydro_transients",
     "packages/tank_transfer/hydro_tanks",
     "packages/optimization/hydro_optimization",
     "packages/reporting/hydro_reporting",
@@ -92,6 +93,7 @@ pythonpath = [
     "packages/shared",
     "packages/domain",
     "packages/hydroliquid",
+    "packages/transients",
     "packages/tank_transfer",
     "packages/optimization",
     "packages/reporting",
@@ -115,6 +117,7 @@ src = [
     "packages/shared",
     "packages/domain",
     "packages/hydroliquid",
+    "packages/transients",
     "packages/tank_transfer",
     "packages/optimization",
     "packages/reporting",
@@ -134,7 +137,7 @@ python_version = "3.11"
 warn_unused_configs = true
 warn_redundant_casts = true
 no_implicit_optional = true
-mypy_path = "packages/shared:packages/domain:packages/hydroliquid:packages/tank_transfer:packages/optimization:packages/reporting:packages/validation:apps/api"
+mypy_path = "packages/shared:packages/domain:packages/hydroliquid:packages/transients:packages/tank_transfer:packages/optimization:packages/reporting:packages/validation:apps/api"
 
 [[tool.mypy.overrides]]
 module = ["boto3.*", "botocore.*", "openpyxl.*", "fluids.*", "CoolProp.*", "scipy.*", "pyomo.*", "pandapipes.*", "geoalchemy2.*", "reportlab.*", "matplotlib.*", "pandas.*"]

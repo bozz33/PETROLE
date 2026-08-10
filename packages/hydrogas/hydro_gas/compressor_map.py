@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from itertools import pairwise
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +89,7 @@ def _interpolate_line(
     points = line.points
     if mass_flow_kg_s < points[0].mass_flow_kg_s or mass_flow_kg_s > points[-1].mass_flow_kg_s:
         raise ValueError("Le débit demandé est hors du domaine de la ligne de vitesse.")
-    for left, right in zip(points, points[1:], strict=True):
+    for left, right in pairwise(points):
         if left.mass_flow_kg_s <= mass_flow_kg_s <= right.mass_flow_kg_s:
             fraction = (mass_flow_kg_s - left.mass_flow_kg_s) / (
                 right.mass_flow_kg_s - left.mass_flow_kg_s
@@ -128,7 +129,7 @@ def interpolate_compressor_map(
         pressure_ratio, efficiency = _interpolate_line(lines[0], mass_flow_kg_s)
     else:
         bracket: tuple[CompressorSpeedLine, CompressorSpeedLine] | None = None
-        for lower, upper in zip(lines, lines[1:], strict=True):
+        for lower, upper in pairwise(lines):
             if lower.speed_rpm <= speed_rpm <= upper.speed_rpm:
                 bracket = lower, upper
                 break

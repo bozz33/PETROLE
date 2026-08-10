@@ -1,5 +1,15 @@
-"""Operations Optimizer : énumération, contraintes et classement."""
+"""Operations Optimizer : énumération, contraintes, classement et calibration contrôlée."""
 
+from hydro_optimization.calibration import (
+    CalibratedParameter,
+    CalibrationDataset,
+    CalibrationObservation,
+    CalibrationParameter,
+    CalibrationResult,
+    ErrorMetrics,
+    ModelEvaluator,
+    calibrate_parameters,
+)
 from hydro_optimization.optimizer import (
     CandidateEvaluation,
     ExhaustivePumpOptimizer,
@@ -14,8 +24,15 @@ from hydro_optimization.optimizer import (
 )
 
 __all__ = [
+    "CalibratedParameter",
+    "CalibrationDataset",
+    "CalibrationObservation",
+    "CalibrationParameter",
+    "CalibrationResult",
     "CandidateEvaluation",
+    "ErrorMetrics",
     "ExhaustivePumpOptimizer",
+    "ModelEvaluator",
     "ObjectiveWeights",
     "OptimizationConstraints",
     "OptimizationRequest",
@@ -24,4 +41,5 @@ __all__ = [
     "PumpConfiguration",
     "RankedCandidate",
     "RejectedCandidate",
+    "calibrate_parameters",
 ]

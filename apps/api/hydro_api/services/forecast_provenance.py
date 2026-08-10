@@ -20,9 +20,7 @@ from hydro_api.services.forecasting import (
 )
 
 
-def _observation_payload(
-    split_part: tuple[ForecastObservation, ...],
-) -> list[dict[str, object]]:
+def _observation_payload(split_part: tuple[ForecastObservation, ...]) -> list[dict[str, object]]:
     return [
         {
             "timestamp": item.timestamp.astimezone(UTC).isoformat().replace("+00:00", "Z"),

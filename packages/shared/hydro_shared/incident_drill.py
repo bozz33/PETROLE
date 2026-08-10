@@ -27,7 +27,9 @@ class IncidentResponseObjectives:
         if any(not math.isfinite(value) or value <= 0 for value in values):
             raise ValueError("Les objectifs incident doivent être finis et strictement positifs.")
         if self.maximum_acknowledgement_s > self.maximum_recovery_s:
-            raise ValueError("L'objectif d'acquittement ne peut pas dépasser l'objectif de reprise.")
+            raise ValueError(
+                "L'objectif d'acquittement ne peut pas dépasser l'objectif de reprise."
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,9 +72,7 @@ class IncidentDrillEvidence:
 
     @property
     def recovery_s(self) -> float:
-        return (
-            self.recovered_at.astimezone(UTC) - self.started_at.astimezone(UTC)
-        ).total_seconds()
+        return (self.recovered_at.astimezone(UTC) - self.started_at.astimezone(UTC)).total_seconds()
 
 
 @dataclass(frozen=True, slots=True)

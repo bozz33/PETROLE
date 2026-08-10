@@ -1,6 +1,6 @@
 # Phase 6 — Gazoducs et compression
 
-Statut : contrat d’implémentation scientifique post-transitoires, non certifiant.
+Statut : fondations scientifiques exécutables post-transitoires, non certifiantes.
 
 Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. La branche reste indépendante tant que les gates Phase 4 ne sont pas fermées.
 
@@ -23,21 +23,35 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. La branche 
 7. P6-G — résultats et rapports dédiés gaz ;
 8. P6-H — benchmarks indépendants et pilote.
 
-## 3. Règles scientifiques
+## 3. Fondations déjà codées
+
+- état gaz minimal `p/T/M/Z` avec pression et température absolues ;
+- densité issue de l’équation d’état avec `Z` explicitement fourni, sans corrélation implicite ;
+- line-pack discret `Σ ρ A Δx` ;
+- composition molaire explicite, source obligatoire et somme des fractions vérifiée ;
+- masse molaire de mélange `Σ yᵢ Mᵢ` calculée uniquement depuis les composants fournis ;
+- cartes compresseur avec provenance/version obligatoires ;
+- interpolation à l’intérieur du domaine fourni en débit et vitesse ;
+- refus systématique de l’extrapolation hors carte ;
+- validation des rendements, ordres de points et lignes de vitesse.
+
+Ces fondations ne constituent pas encore un solveur de gazoduc stationnaire ni une station de compression complète.
+
+## 4. Règles scientifiques
 
 - le fluide gaz est un domaine séparé du moteur liquide ;
 - toute équation d’état ou corrélation publie son domaine, sa source et son édition ;
 - aucun facteur de compressibilité, efficacité ou limite compresseur n’est inventé ;
 - cartes fournisseur brutes conservées et ajustements versionnés ;
-- extrapolations hors domaine signalées ;
+- extrapolations hors domaine refusées ou signalées explicitement ;
 - line-pack et bilans de masse vérifiables ;
 - les modèles stationnaires et transitoires gaz restent explicitement distincts.
 
-## 4. Normes et propriété intellectuelle
+## 5. Normes et propriété intellectuelle
 
 Les pages officielles ASME/ISO/API servent à vérifier l’existence, le statut et l’édition. Les clauses contractuelles détaillées ne sont implémentées qu’à partir de copies légalement acquises et revues par l’expert compétent. Aucun texte protégé n’est recopié dans le dépôt.
 
-## 5. Gate avant publication
+## 6. Gate avant publication
 
 - propriétés et composition représentatives disponibles ;
 - cartes compresseurs réelles ou jeux de référence publics ;
@@ -45,7 +59,7 @@ Les pages officielles ASME/ISO/API servent à vérifier l’existence, le statut
 - revue par un ingénieur gaz/thermofluides ;
 - documentation des limites et incertitudes.
 
-## 6. Hors portée
+## 7. Hors portée
 
 - commande compresseur ;
 - SIS/anti-surge opérationnel ;

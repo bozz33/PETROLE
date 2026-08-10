@@ -43,6 +43,10 @@ from hydro_api.schemas.time_series import (
     MeasurementTagCreate,
     MeasurementTagRead,
     NormalizedSampleRead,
+    OutlierMethod,
+    ProcessingVersionRead,
+    SampleQuality,
+    SeriesAnalysisRead,
     TimeSeriesDatasetImportCreate,
     TimeSeriesImportRead,
 )
@@ -269,6 +273,8 @@ def list_measurement_tag_samples(
     session: DatabaseSession,
     start_timestamp: datetime | None = None,
     end_timestamp: datetime | None = None,
+    processing_version: Annotated[str | None, Query(min_length=1, max_length=80)] = None,
+    qualities: Annotated[list[SampleQuality] | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=5_000)] = 500,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
@@ -283,10 +289,62 @@ def list_measurement_tag_samples(
         tag_id=tag_id,
         start_timestamp=start_timestamp,
         end_timestamp=end_timestamp,
+        processing_version=processing_version,
+        qualities=qualities,
         limit=limit,
         offset=offset,
     )
     return Page(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get(
+    "/measurement-tags/{tag_id}/processing-versions",
+    response_model=list[ProcessingVersionRead],
+    summary="Lister les projections temporelles d'un tag",
+)
+def list_measurement_tag_processing_versions(tag_id: uuid.UUID, session: DatabaseSession):
+    """L'interface choisit une version, sans mélanger plusieurs reprocessings."""
+
+    return time_series.list_processing_versions(session, tag_id=tag_id)
+
+
+@router.get(
+    "/measurement-tags/{tag_id}/series-analysis",
+    response_model=SeriesAnalysisRead,
+    summary="Explorer une série SI et ses diagnostics de qualité",
+)
+def analyze_measurement_tag_series(
+    tag_id: uuid.UUID,
+    session: DatabaseSession,
+    processing_version: Annotated[str, Query(min_length=1, max_length=80)],
+    start_timestamp: datetime | None = None,
+    end_timestamp: datetime | None = None,
+    qualities: Annotated[list[SampleQuality] | None, Query()] = None,
+    reference_interval_seconds: Annotated[float | None, Query(gt=0)] = None,
+    gap_factor: Annotated[float, Query(gt=1, le=100)] = 1.5,
+    outlier_method: OutlierMethod = "none",
+    zscore_threshold: Annotated[float, Query(gt=0, le=100)] = 3.0,
+    iqr_multiplier: Annotated[float, Query(gt=0, le=100)] = 1.5,
+    limit: Annotated[int, Query(ge=1, le=5_000)] = 500,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    """Analyse en lecture seule ; les seuils restent visibles dans la réponse."""
+
+    return time_series.analyze_normalized_series(
+        session,
+        tag_id=tag_id,
+        processing_version=processing_version,
+        start_timestamp=start_timestamp,
+        end_timestamp=end_timestamp,
+        qualities=qualities,
+        reference_interval_seconds=reference_interval_seconds,
+        gap_factor=gap_factor,
+        outlier_method=outlier_method,
+        zscore_threshold=zscore_threshold,
+        iqr_multiplier=iqr_multiplier,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(

@@ -672,6 +672,105 @@ export interface DatasetImport {
   finished_at: string | null;
 }
 
+export type SampleQuality =
+  | "good"
+  | "uncertain"
+  | "bad"
+  | "substituted"
+  | "estimated";
+
+export type OutlierMethod = "none" | "zscore" | "iqr";
+
+export interface MeasurementTag {
+  id: string;
+  organization_id: string;
+  site_id: string;
+  asset_instance_id: string | null;
+  external_name: string;
+  name: string;
+  measurement_type: string;
+  dimension: string;
+  source_unit: string;
+  si_unit: string;
+  source: string;
+  status: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProcessingVersion {
+  processing_version: string;
+  sample_count: number;
+  start_timestamp: string | null;
+  end_timestamp: string | null;
+}
+
+export interface SeriesAnalysisPoint {
+  id: string;
+  raw_sample_id: string;
+  time_series_import_id: string;
+  dataset_id: string;
+  dataset_row_id: string | null;
+  source_timestamp: string;
+  ingest_timestamp: string;
+  source_value: unknown;
+  source_unit: string;
+  timestamp: string;
+  value_si: number;
+  si_unit: string;
+  quality: SampleQuality;
+  sequence_number: number | null;
+  processing_version: string;
+  duplicate: boolean;
+  gap_after: boolean;
+  gap_after_seconds: number | null;
+  outlier: boolean;
+  outlier_score: number | null;
+}
+
+export interface SeriesAnalysisStatistics {
+  sample_count: number;
+  minimum_value_si: number | null;
+  maximum_value_si: number | null;
+  mean_value_si: number | null;
+  stddev_value_si: number | null;
+}
+
+export interface SeriesAnalysis {
+  tag: MeasurementTag;
+  processing_version: string;
+  requested_start_timestamp: string | null;
+  requested_end_timestamp: string | null;
+  start_timestamp: string | null;
+  end_timestamp: string | null;
+  included_qualities: SampleQuality[];
+  quality_counts: Record<string, number>;
+  visible_quality_counts: Record<string, number>;
+  candidate_sample_count: number;
+  excluded_sample_count: number;
+  statistics: SeriesAnalysisStatistics;
+  duplicate_timestamp_count: number;
+  out_of_order_count: number;
+  gap_count: number;
+  observed_interval_seconds: number | null;
+  reference_interval_seconds: number | null;
+  gap_factor: number;
+  outlier_method: OutlierMethod;
+  outlier_threshold: number | null;
+  outlier_count: number;
+  issues: Array<{
+    code: string;
+    severity: "information" | "warning" | "error";
+    count: number;
+    message: string;
+  }>;
+  items: SeriesAnalysisPoint[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface Report {
   id: string;
   organization_id: string;

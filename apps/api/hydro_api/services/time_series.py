@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import math
 import uuid
+from collections import Counter
 from datetime import UTC, datetime
+from itertools import pairwise
+from statistics import median
 from typing import Any
 
 from sqlalchemy import func, insert, select
@@ -34,13 +37,19 @@ from hydro_api.models import (
     Site,
     TimeSeriesImport,
 )
-from hydro_api.schemas.time_series import MeasurementTagCreate
+from hydro_api.schemas.time_series import MeasurementTagCreate, OutlierMethod, SampleQuality
 from hydro_api.services.data_import import get_dataset
 from hydro_shared.errors import DimensionalityMismatchError, UnknownUnitError
 from hydro_shared.units import SI_UNITS, Dimension, to_si
 
 INGESTION_BATCH_SIZE = 5_000
 INGESTION_ERROR_LIMIT = 100
+DEFAULT_ANALYSIS_QUALITIES: tuple[SampleQuality, ...] = (
+    "good",
+    "uncertain",
+    "substituted",
+    "estimated",
+)
 
 
 def _audit(
@@ -485,6 +494,8 @@ def list_normalized_samples(
     tag_id: uuid.UUID,
     start_timestamp: datetime | None,
     end_timestamp: datetime | None,
+    processing_version: str | None,
+    qualities: list[SampleQuality] | None,
     limit: int,
     offset: int,
 ) -> tuple[list[dict[str, Any]], int]:
@@ -496,6 +507,10 @@ def list_normalized_samples(
         filters.append(SampleNormalized.timestamp >= start_timestamp)
     if end_timestamp is not None:
         filters.append(SampleNormalized.timestamp <= end_timestamp)
+    if processing_version is not None:
+        filters.append(SampleNormalized.processing_version == processing_version)
+    if qualities is not None:
+        filters.append(SampleNormalized.quality.in_(qualities))
     total = session.scalar(select(func.count()).select_from(SampleNormalized).where(*filters))
     records = session.execute(
         select(SampleNormalized, SampleRaw)
@@ -530,11 +545,396 @@ def list_normalized_samples(
     )
 
 
+def list_processing_versions(
+    session: Session,
+    *,
+    tag_id: uuid.UUID,
+) -> list[dict[str, Any]]:
+    """Expose les projections disponibles sans choisir silencieusement la plus récente."""
+
+    get_measurement_tag(session, tag_id)
+    records = session.execute(
+        select(
+            SampleNormalized.processing_version,
+            func.count(),
+            func.min(SampleNormalized.timestamp),
+            func.max(SampleNormalized.timestamp),
+        )
+        .where(SampleNormalized.tag_id == tag_id)
+        .group_by(SampleNormalized.processing_version)
+        .order_by(SampleNormalized.processing_version)
+    ).all()
+    return [
+        {
+            "processing_version": processing_version,
+            "sample_count": int(sample_count),
+            "start_timestamp": start_timestamp,
+            "end_timestamp": end_timestamp,
+        }
+        for processing_version, sample_count, start_timestamp, end_timestamp in records
+    ]
+
+
+class _RunningStatistics:
+    """Statistiques population, stables numériquement, pour la série visible."""
+
+    def __init__(self) -> None:
+        self.count = 0
+        self.minimum: float | None = None
+        self.maximum: float | None = None
+        self.mean = 0.0
+        self.m2 = 0.0
+
+    def add(self, value: float) -> None:
+        self.count += 1
+        self.minimum = value if self.minimum is None else min(self.minimum, value)
+        self.maximum = value if self.maximum is None else max(self.maximum, value)
+        delta = value - self.mean
+        self.mean += delta / self.count
+        self.m2 += delta * (value - self.mean)
+
+    @property
+    def stddev(self) -> float | None:
+        if self.count == 0:
+            return None
+        return math.sqrt(self.m2 / self.count)
+
+
+def _normalize_boundary(timestamp: datetime | None) -> datetime | None:
+    """Le contrat des séries utilise UTC, mais accepte une borne offset-aware."""
+
+    if timestamp is None:
+        return None
+    if timestamp.tzinfo is None:
+        raise ResourceConflictError("Les bornes temporelles doivent inclure un fuseau horaire.")
+    return timestamp.astimezone(UTC)
+
+
+def _quantile_linear(values: list[float], probability: float) -> float:
+    """Quantile déterministe par interpolation linéaire sur données triées."""
+
+    if not values:
+        raise ValueError("Un quantile exige au moins une valeur.")
+    position = (len(values) - 1) * probability
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return values[lower]
+    return values[lower] + (position - lower) * (values[upper] - values[lower])
+
+
+def _outlier_scores(
+    records: list[tuple[SampleNormalized, SampleRaw]],
+    *,
+    method: OutlierMethod,
+    zscore_threshold: float,
+    iqr_multiplier: float,
+) -> tuple[dict[uuid.UUID, float], float | None]:
+    """Retourne uniquement les valeurs signalées ; aucun échantillon n'est altéré."""
+
+    if method == "none" or len(records) < 2:
+        return {}, None if method == "none" else (
+            zscore_threshold if method == "zscore" else iqr_multiplier
+        )
+
+    values = [float(normalized.value_si) for normalized, _ in records]
+    if method == "zscore":
+        statistics = _RunningStatistics()
+        for value in values:
+            statistics.add(value)
+        stddev = statistics.stddev
+        if stddev is None or math.isclose(stddev, 0.0, abs_tol=1e-15):
+            return {}, zscore_threshold
+        return (
+            {
+                normalized.id: abs((float(normalized.value_si) - statistics.mean) / stddev)
+                for normalized, _ in records
+                if abs((float(normalized.value_si) - statistics.mean) / stddev) > zscore_threshold
+            },
+            zscore_threshold,
+        )
+
+    sorted_values = sorted(values)
+    first_quartile = _quantile_linear(sorted_values, 0.25)
+    third_quartile = _quantile_linear(sorted_values, 0.75)
+    interquartile_range = third_quartile - first_quartile
+    if math.isclose(interquartile_range, 0.0, abs_tol=1e-15):
+        return {}, iqr_multiplier
+    lower_bound = first_quartile - iqr_multiplier * interquartile_range
+    upper_bound = third_quartile + iqr_multiplier * interquartile_range
+    scores: dict[uuid.UUID, float] = {}
+    for normalized, _ in records:
+        value = float(normalized.value_si)
+        if value < lower_bound:
+            scores[normalized.id] = (lower_bound - value) / interquartile_range
+        elif value > upper_bound:
+            scores[normalized.id] = (value - upper_bound) / interquartile_range
+    return scores, iqr_multiplier
+
+
+def analyze_normalized_series(
+    session: Session,
+    *,
+    tag_id: uuid.UUID,
+    processing_version: str,
+    start_timestamp: datetime | None,
+    end_timestamp: datetime | None,
+    qualities: list[SampleQuality] | None,
+    reference_interval_seconds: float | None,
+    gap_factor: float,
+    outlier_method: OutlierMethod,
+    zscore_threshold: float,
+    iqr_multiplier: float,
+    limit: int,
+    offset: int,
+) -> dict[str, Any]:
+    """Analyse en lecture seule d'une seule projection versionnée d'un tag.
+
+    La détection ne supprime ni ne corrige jamais les points. Les diagnostics
+    sont calculés sur la série complète filtrée dans la plage, avant pagination,
+    afin qu'une page isolée ne produise pas un verdict différent.
+    """
+
+    tag = get_measurement_tag(session, tag_id)
+    normalized_start = _normalize_boundary(start_timestamp)
+    normalized_end = _normalize_boundary(end_timestamp)
+    if (
+        normalized_start is not None
+        and normalized_end is not None
+        and normalized_start > normalized_end
+    ):
+        raise ResourceConflictError("La borne de début doit précéder la borne de fin.")
+
+    candidate_filters = [
+        SampleNormalized.tag_id == tag_id,
+        SampleNormalized.processing_version == processing_version,
+    ]
+    if normalized_start is not None:
+        candidate_filters.append(SampleNormalized.timestamp >= normalized_start)
+    if normalized_end is not None:
+        candidate_filters.append(SampleNormalized.timestamp <= normalized_end)
+
+    records: list[tuple[SampleNormalized, SampleRaw]] = [
+        (normalized, raw)
+        for normalized, raw in session.execute(
+            select(SampleNormalized, SampleRaw)
+            .join(SampleRaw, SampleNormalized.raw_sample_id == SampleRaw.id)
+            .where(*candidate_filters)
+        )
+    ]
+    included_qualities = list(dict.fromkeys(qualities or DEFAULT_ANALYSIS_QUALITIES))
+    candidate_quality_counts: Counter[str] = Counter(
+        normalized.quality for normalized, _ in records
+    )
+    visible_records = [record for record in records if record[0].quality in included_qualities]
+    visible_quality_counts: Counter[str] = Counter(
+        normalized.quality for normalized, _ in visible_records
+    )
+
+    chronological_records = sorted(
+        records,
+        key=lambda record: (
+            record[0].timestamp,
+            record[1].sequence_number is None,
+            record[1].sequence_number if record[1].sequence_number is not None else 0,
+            str(record[0].id),
+        ),
+    )
+    source_order_records = sorted(
+        records,
+        key=lambda record: (
+            record[1].sequence_number is None,
+            record[1].sequence_number if record[1].sequence_number is not None else 0,
+            str(record[0].id),
+        ),
+    )
+    duplicate_timestamps = Counter(normalized.timestamp for normalized, _ in chronological_records)
+    duplicate_ids = {
+        normalized.id
+        for normalized, _ in chronological_records
+        if duplicate_timestamps[normalized.timestamp] > 1
+    }
+    point_ids_by_timestamp: dict[datetime, list[uuid.UUID]] = {}
+    for normalized, _ in chronological_records:
+        point_ids_by_timestamp.setdefault(normalized.timestamp, []).append(normalized.id)
+    duplicate_timestamp_count = sum(
+        count - 1 for count in duplicate_timestamps.values() if count > 1
+    )
+    out_of_order_count = sum(
+        1
+        for previous, current in pairwise(source_order_records)
+        if current[0].timestamp < previous[0].timestamp
+    )
+
+    positive_intervals = [
+        (current[0].timestamp - previous[0].timestamp).total_seconds()
+        for previous, current in pairwise(chronological_records)
+        if current[0].timestamp > previous[0].timestamp
+    ]
+    observed_interval_seconds = float(median(positive_intervals)) if positive_intervals else None
+    effective_reference_interval = (
+        reference_interval_seconds
+        if reference_interval_seconds is not None
+        else observed_interval_seconds
+    )
+    effective_gap_threshold = (
+        effective_reference_interval * gap_factor
+        if effective_reference_interval is not None
+        else None
+    )
+    gap_after_seconds: dict[uuid.UUID, float] = {}
+    gap_interval_count = 0
+    if effective_gap_threshold is not None:
+        for previous, current in pairwise(chronological_records):
+            interval_seconds = (current[0].timestamp - previous[0].timestamp).total_seconds()
+            if interval_seconds > effective_gap_threshold:
+                gap_interval_count += 1
+                # Un point bad peut partager le même horodatage qu'un point
+                # visible. Le trou doit donc rester visible sur toute la
+                # grappe horodatée, sans confondre un filtre qualité et une
+                # disparition silencieuse du diagnostic.
+                for point_id in point_ids_by_timestamp[previous[0].timestamp]:
+                    gap_after_seconds[point_id] = interval_seconds
+
+    outlier_scores, effective_outlier_threshold = _outlier_scores(
+        visible_records,
+        method=outlier_method,
+        zscore_threshold=zscore_threshold,
+        iqr_multiplier=iqr_multiplier,
+    )
+    statistics = _RunningStatistics()
+    for normalized, _ in visible_records:
+        statistics.add(float(normalized.value_si))
+
+    issues: list[dict[str, Any]] = []
+    if out_of_order_count:
+        issues.append(
+            {
+                "code": "DQ-007",
+                "severity": "warning",
+                "count": out_of_order_count,
+                "message": "Des horodatages sont hors ordre dans la séquence source.",
+            }
+        )
+    bad_count = candidate_quality_counts.get("bad", 0)
+    if bad_count and "bad" not in included_qualities:
+        issues.append(
+            {
+                "code": "DQ-008",
+                "severity": "warning",
+                "count": bad_count,
+                "message": "Les mesures bad sont exclues par le filtre par défaut, sans suppression.",
+            }
+        )
+    if duplicate_timestamp_count:
+        issues.append(
+            {
+                "code": "TS-DUPLICATE",
+                "severity": "warning",
+                "count": duplicate_timestamp_count,
+                "message": "Des horodatages dupliqués restent présents dans la projection sélectionnée.",
+            }
+        )
+    if effective_reference_interval is None and len(chronological_records) > 1:
+        issues.append(
+            {
+                "code": "TS-CADENCE_UNAVAILABLE",
+                "severity": "information",
+                "count": 1,
+                "message": "Aucune cadence positive ne peut être déterminée ; aucun trou n'est déclaré.",
+            }
+        )
+    if gap_interval_count:
+        issues.append(
+            {
+                "code": "TS-GAP",
+                "severity": "warning",
+                "count": gap_interval_count,
+                "message": "Des intervalles dépassent la cadence de référence multipliée par le facteur déclaré.",
+            }
+        )
+    if outlier_scores:
+        issues.append(
+            {
+                "code": "TS-OUTLIER",
+                "severity": "warning",
+                "count": len(outlier_scores),
+                "message": "Des points sont signalés par la méthode d'aberrants choisie, sans être supprimés.",
+            }
+        )
+
+    visible_chronological_records = [
+        record for record in chronological_records if record[0].quality in included_qualities
+    ]
+    page_records = visible_chronological_records[offset : offset + limit]
+    items = [
+        {
+            "id": normalized.id,
+            "raw_sample_id": raw.id,
+            "time_series_import_id": normalized.time_series_import_id,
+            "dataset_id": raw.dataset_id,
+            "dataset_row_id": raw.dataset_row_id,
+            "source_timestamp": raw.source_timestamp,
+            "ingest_timestamp": raw.ingest_timestamp,
+            "source_value": raw.source_value,
+            "source_unit": raw.source_unit,
+            "timestamp": normalized.timestamp,
+            "value_si": normalized.value_si,
+            "si_unit": normalized.si_unit,
+            "quality": normalized.quality,
+            "sequence_number": raw.sequence_number,
+            "processing_version": normalized.processing_version,
+            "duplicate": normalized.id in duplicate_ids,
+            "gap_after": normalized.id in gap_after_seconds,
+            "gap_after_seconds": gap_after_seconds.get(normalized.id),
+            "outlier": normalized.id in outlier_scores,
+            "outlier_score": outlier_scores.get(normalized.id),
+        }
+        for normalized, raw in page_records
+    ]
+    return {
+        "tag": tag,
+        "processing_version": processing_version,
+        "requested_start_timestamp": normalized_start,
+        "requested_end_timestamp": normalized_end,
+        "start_timestamp": chronological_records[0][0].timestamp if chronological_records else None,
+        "end_timestamp": chronological_records[-1][0].timestamp if chronological_records else None,
+        "included_qualities": included_qualities,
+        "quality_counts": dict(sorted(candidate_quality_counts.items())),
+        "visible_quality_counts": dict(sorted(visible_quality_counts.items())),
+        "candidate_sample_count": len(records),
+        "excluded_sample_count": len(records) - len(visible_records),
+        "statistics": {
+            "sample_count": statistics.count,
+            "minimum_value_si": statistics.minimum,
+            "maximum_value_si": statistics.maximum,
+            "mean_value_si": statistics.mean if statistics.count else None,
+            "stddev_value_si": statistics.stddev,
+        },
+        "duplicate_timestamp_count": duplicate_timestamp_count,
+        "out_of_order_count": out_of_order_count,
+        "gap_count": gap_interval_count,
+        "observed_interval_seconds": observed_interval_seconds,
+        "reference_interval_seconds": effective_reference_interval,
+        "gap_factor": gap_factor,
+        "outlier_method": outlier_method,
+        "outlier_threshold": effective_outlier_threshold,
+        "outlier_count": len(outlier_scores),
+        "issues": issues,
+        "items": items,
+        "total": len(visible_chronological_records),
+        "limit": limit,
+        "offset": offset,
+    }
+
+
 __all__ = [
+    "analyze_normalized_series",
     "create_measurement_tag",
     "get_measurement_tag",
     "get_time_series_import",
     "import_dataset_time_series",
     "list_measurement_tags",
     "list_normalized_samples",
+    "list_processing_versions",
 ]

@@ -6,6 +6,14 @@ from hydro_leak.digital_twin import (
     build_twin_snapshot,
     state_delta,
 )
+from hydro_leak.event_matching import (
+    EventMatchingPolicy,
+    EventMatchingResult,
+    LeakAlertObservation,
+    LeakEventLabel,
+    MatchedLeakEvent,
+    match_alerts_to_events,
+)
 from hydro_leak.evidence_fusion import (
     EvidenceContribution,
     EvidenceFusionResult,
@@ -22,9 +30,14 @@ from hydro_leak.metrics import DetectionPerformance, detection_performance
 __all__ = [
     "DetectionPerformance",
     "DigitalTwinSnapshot",
+    "EventMatchingPolicy",
+    "EventMatchingResult",
     "EvidenceContribution",
     "EvidenceFusionResult",
     "EvidenceSignal",
+    "LeakAlertObservation",
+    "LeakEventLabel",
+    "MatchedLeakEvent",
     "MaterialBalanceResult",
     "MaterialBalanceWindow",
     "TwinStateVariable",
@@ -32,5 +45,6 @@ __all__ = [
     "compute_material_balance",
     "detection_performance",
     "fuse_evidence",
+    "match_alerts_to_events",
     "state_delta",
 ]

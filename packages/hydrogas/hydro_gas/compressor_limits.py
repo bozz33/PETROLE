@@ -70,7 +70,9 @@ def _limits_at_speed(
         raise ValueError("La vitesse demandée est hors du domaine de l'enveloppe compresseur.")
     if len(points) == 1:
         if not math.isclose(speed_rpm, points[0].speed_rpm, rel_tol=0.0, abs_tol=1e-12):
-            raise ValueError("Une enveloppe à une vitesse n'autorise aucune interpolation en vitesse.")
+            raise ValueError(
+                "Une enveloppe à une vitesse n'autorise aucune interpolation en vitesse."
+            )
         return points[0].minimum_mass_flow_kg_s, points[0].maximum_mass_flow_kg_s
 
     for lower, upper in pairwise(points):

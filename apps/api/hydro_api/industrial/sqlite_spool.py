@@ -215,6 +215,44 @@ class SQLiteIndustrialSpool:
             last_idempotency_key=str(last_key) if last_key is not None else None,
         )
 
+    @staticmethod
+    def _validate_checkpoint_progress(
+        existing: ConnectorCheckpoint | None,
+        checkpoint: ConnectorCheckpoint,
+    ) -> None:
+        if existing is None:
+            return
+        if checkpoint.last_local_sequence < existing.last_local_sequence:
+            raise ValueError("Un checkpoint durable ne peut pas régresser.")
+        if (
+            checkpoint.last_local_sequence == existing.last_local_sequence
+            and checkpoint.last_idempotency_key != existing.last_idempotency_key
+        ):
+            raise ValueError(
+                "Une même séquence checkpoint ne peut pas changer de clé d'idempotence."
+            )
+
+    def _upsert_checkpoint(self, checkpoint: ConnectorCheckpoint) -> None:
+        self._connection.execute(
+            """
+            INSERT INTO spool_checkpoints (
+                connector_ref, checkpoint_version, last_local_sequence,
+                last_idempotency_key, updated_at
+            ) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(connector_ref, checkpoint_version) DO UPDATE SET
+                last_local_sequence = excluded.last_local_sequence,
+                last_idempotency_key = excluded.last_idempotency_key,
+                updated_at = excluded.updated_at
+            """,
+            (
+                checkpoint.connector_ref,
+                checkpoint.checkpoint_version,
+                checkpoint.last_local_sequence,
+                checkpoint.last_idempotency_key,
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+
     def save_checkpoint(self, checkpoint: ConnectorCheckpoint) -> None:
         """Persiste un checkpoint sans autoriser de retour en arrière."""
 
@@ -222,37 +260,51 @@ class SQLiteIndustrialSpool:
             connector_ref=checkpoint.connector_ref,
             checkpoint_version=checkpoint.checkpoint_version,
         )
-        if existing is not None:
-            if checkpoint.last_local_sequence < existing.last_local_sequence:
-                raise ValueError("Un checkpoint durable ne peut pas régresser.")
-            if (
-                checkpoint.last_local_sequence == existing.last_local_sequence
-                and checkpoint.last_idempotency_key != existing.last_idempotency_key
-            ):
-                raise ValueError(
-                    "Une même séquence checkpoint ne peut pas changer de clé d'idempotence."
-                )
-        updated_at = datetime.now(UTC).isoformat()
+        self._validate_checkpoint_progress(existing, checkpoint)
         with self._connection:
-            self._connection.execute(
+            self._upsert_checkpoint(checkpoint)
+
+    def acknowledge_through(self, checkpoint: ConnectorCheckpoint) -> int:
+        """Persiste le checkpoint puis compacte son préfixe dans une transaction unique.
+
+        Pour une progression réelle, la séquence finale doit encore exister dans
+        le spool et porter exactement la clé d'idempotence annoncée. Rejouer le
+        même checkpoint après une compaction déjà réussie reste idempotent.
+        """
+
+        existing = self.load_checkpoint(
+            connector_ref=checkpoint.connector_ref,
+            checkpoint_version=checkpoint.checkpoint_version,
+        )
+        self._validate_checkpoint_progress(existing, checkpoint)
+        if existing == checkpoint:
+            return 0
+        if checkpoint.last_local_sequence == 0:
+            if checkpoint.last_idempotency_key is not None:
+                raise ValueError("Le checkpoint zéro ne doit pas référencer de clé d'idempotence.")
+        else:
+            if checkpoint.last_idempotency_key is None:
+                raise ValueError("Un checkpoint non nul doit référencer sa clé d'idempotence finale.")
+            row = self._connection.execute(
                 """
-                INSERT INTO spool_checkpoints (
-                    connector_ref, checkpoint_version, last_local_sequence,
-                    last_idempotency_key, updated_at
-                ) VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(connector_ref, checkpoint_version) DO UPDATE SET
-                    last_local_sequence = excluded.last_local_sequence,
-                    last_idempotency_key = excluded.last_idempotency_key,
-                    updated_at = excluded.updated_at
+                SELECT idempotency_key
+                FROM spool_records
+                WHERE local_sequence = ?
                 """,
-                (
-                    checkpoint.connector_ref,
-                    checkpoint.checkpoint_version,
-                    checkpoint.last_local_sequence,
-                    checkpoint.last_idempotency_key,
-                    updated_at,
-                ),
+                (checkpoint.last_local_sequence,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("La séquence finale du checkpoint n'existe plus dans le spool.")
+            if str(row["idempotency_key"]) != checkpoint.last_idempotency_key:
+                raise ValueError("La séquence finale ne correspond pas à la clé d'idempotence annoncée.")
+
+        with self._connection:
+            self._upsert_checkpoint(checkpoint)
+            cursor = self._connection.execute(
+                "DELETE FROM spool_records WHERE local_sequence <= ?",
+                (checkpoint.last_local_sequence,),
             )
+        return int(cursor.rowcount)
 
     def compact_through(self, local_sequence: int) -> int:
         """Supprime uniquement un préfixe explicitement acquitté par le consommateur."""

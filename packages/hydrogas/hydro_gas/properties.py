@@ -75,9 +75,7 @@ def linepack_mass(
 
     if not densities_kg_m3:
         raise ValueError("Le calcul de line-pack exige au moins une cellule.")
-    if not (
-        len(densities_kg_m3) == len(cross_section_areas_m2) == len(cell_lengths_m)
-    ):
+    if not (len(densities_kg_m3) == len(cross_section_areas_m2) == len(cell_lengths_m)):
         raise ValueError("Les vecteurs densité, aire et longueur doivent avoir la même taille.")
     values = zip(densities_kg_m3, cross_section_areas_m2, cell_lengths_m, strict=True)
     contributions: list[float] = []
@@ -89,8 +87,8 @@ def linepack_mass(
 
 
 __all__ = [
-    "UNIVERSAL_GAS_CONSTANT_J_MOL_K",
     "GasState",
+    "UNIVERSAL_GAS_CONSTANT_J_MOL_K",
     "gas_density_from_z",
     "linepack_mass",
 ]

@@ -1,10 +1,32 @@
 # V1-D — Résultats ingénieur avancés D19
 
-Statut : contrat d’implémentation Phase 2 / Pilote-V1. Aucun effet de certification.
+Statut : V1-D1 implémenté sur la branche Pilote/V1 ; CI complète requise avant fermeture. Aucun effet de certification.
 
 Base documentaire : D04 FR-LIQ-003, FR-LIQ-005, FR-LIQ-007 et D19 §§5, 10, 15.
 
 Base logicielle : `main` à `6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`.
+
+## État V1-D1
+
+L’implémentation enrichit la réponse de calcul existante, sans migration ni seconde
+résolution hydraulique. Chaque bilan de tronçon publie désormais son chaînage de début,
+son chaînage de fin et la limite `maop_pa` effectivement configurée lorsque celle-ci
+existe. Cette publication sert exclusivement à positionner l’enveloppe sur le profil.
+
+La page Calcul restitue :
+
+- les repères et sauts aspiration/refoulement des stations publiées ;
+- l’enveloppe MAOP/MAWP seulement sur les tronçons qui publient simultanément leur limite
+  et leurs bornes ;
+- le seuil vapeur issu de `assumptions.fluid_state`, avec sa source et son éventuelle
+  extrapolation ;
+- les points sous vapeur et zones gravitaires seulement lorsqu’ils sont signalés par le
+  calcul ;
+- une synthèse min/max/marges/source et deux exports PNG haute résolution contenant le
+  titre, le calcul, le scénario et la date du résultat.
+
+Les anciens calculs qui ne portent pas les nouvelles métadonnées restent consultables :
+leurs limites correspondantes sont affichées comme indisponibles, jamais reconstruites.
 
 ## 1. Objet
 

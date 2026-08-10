@@ -68,6 +68,12 @@ def test_marche_directe_reproduit_darcy_weisbach():
     assert result.total_head_loss_m == pytest.approx(expected_loss, rel=1e-12)
     assert result.profile[-1].pressure_pa == pytest.approx(expected_outlet, rel=1e-12)
     assert result.segments[0].outlet_pressure_pa == pytest.approx(expected_outlet)
+    # V1-D restitue les bornes et la limite déjà configurées : aucun calcul
+    # d'intégrité supplémentaire n'est introduit par cette publication.
+    assert result.segments[0].start_chainage_m == pytest.approx(0.0)
+    assert result.segments[0].end_chainage_m == pytest.approx(10_000.0)
+    assert result.segments[0].maop_pa == pytest.approx(10.0e6)
+    assert result.segments[0].as_dict()["maop_pa"] == pytest.approx(10.0e6)
     assert result.diagnostics.method == "marche directe"
     assert result.diagnostics.iterations == 1
     assert result.diagnostics.mass_balance_ok

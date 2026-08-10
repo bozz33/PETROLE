@@ -71,6 +71,18 @@ class SegmentResult:
     max_pressure_pa: float
     #: Marge à la pression maximale admissible, en pascals. ``None`` si non renseignée.
     maop_margin_pa: float | None = None
+    #: Bornes physiques du tronçon sur le profil du calcul, en mètres.
+    #:
+    #: Elles sont publiées pour permettre une restitution distance → pression
+    #: exacte. Elles ne constituent pas une nouvelle discrétisation ni un calcul
+    #: de résistance de conduite.
+    start_chainage_m: float | None = None
+    end_chainage_m: float | None = None
+    #: Pression maximale admissible configurée pour le tronçon, en pascals.
+    #:
+    #: ``None`` signifie que le modèle n'a pas fourni de limite ; le frontend ne
+    #: doit alors afficher aucune enveloppe implicite.
+    maop_pa: float | None = None
 
     @property
     def total_head_loss_m(self) -> float:
@@ -108,6 +120,9 @@ class SegmentResult:
             "min_pressure_pa": self.min_pressure_pa,
             "max_pressure_pa": self.max_pressure_pa,
             "maop_margin_pa": self.maop_margin_pa,
+            "start_chainage_m": self.start_chainage_m,
+            "end_chainage_m": self.end_chainage_m,
+            "maop_pa": self.maop_pa,
         }
 
 

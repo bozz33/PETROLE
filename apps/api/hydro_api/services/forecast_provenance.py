@@ -9,26 +9,36 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from hydro_api.services.forecasting import ForecastDatasetSplit, LinearForecastResult
+from hydro_api.services.forecasting import (
+    ForecastDatasetSplit,
+    ForecastMetrics,
+    ForecastObservation,
+    LinearForecastResult,
+)
 
 
-def _observation_payload(split_part: tuple[object, ...]) -> list[dict[str, object]]:
-    payload: list[dict[str, object]] = []
-    for item in split_part:
-        timestamp = getattr(item, "timestamp")
-        value_si = getattr(item, "value_si")
-        if not isinstance(timestamp, datetime):
-            raise TypeError("Une observation de prévision doit exposer un timestamp datetime.")
-        payload.append(
-            {
-                "timestamp": timestamp.astimezone(UTC).isoformat().replace("+00:00", "Z"),
-                "value_si": float(value_si),
-            }
-        )
-    return payload
+def _observation_payload(
+    split_part: tuple[ForecastObservation, ...],
+) -> list[dict[str, object]]:
+    return [
+        {
+            "timestamp": item.timestamp.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+            "value_si": item.value_si,
+        }
+        for item in split_part
+    ]
+
+
+def _metrics_payload(metrics: ForecastMetrics) -> dict[str, float | int]:
+    return {
+        "sample_count": metrics.sample_count,
+        "mae_si": metrics.mae_si,
+        "rmse_si": metrics.rmse_si,
+        "bias_si": metrics.bias_si,
+    }
 
 
 def _sha256_payload(payload: object) -> str:
@@ -84,22 +94,23 @@ def build_forecast_run_manifest(
     if created_at.tzinfo is None:
         raise ValueError("La date du run de prévision doit être timezone-aware.")
 
-    train_payload = _observation_payload(split.train)
-    validation_payload = _observation_payload(split.validation)
-    test_payload = _observation_payload(split.test)
-    train_metrics = asdict(result.train_metrics)
-    validation_metrics = asdict(result.validation_metrics)
-    test_metrics = asdict(result.test_metrics)
+    created_at_utc = created_at.astimezone(UTC)
+    train_sha256 = _sha256_payload(_observation_payload(split.train))
+    validation_sha256 = _sha256_payload(_observation_payload(split.validation))
+    test_sha256 = _sha256_payload(_observation_payload(split.test))
+    train_metrics = _metrics_payload(result.train_metrics)
+    validation_metrics = _metrics_payload(result.validation_metrics)
+    test_metrics = _metrics_payload(result.test_metrics)
     manifest_payload = {
         "run_reference": run_reference,
         "source_reference": source_reference,
         "model_family": "linear_ols",
         "model_version": model_version,
         "code_version": code_version,
-        "created_at": created_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
-        "train_sha256": _sha256_payload(train_payload),
-        "validation_sha256": _sha256_payload(validation_payload),
-        "test_sha256": _sha256_payload(test_payload),
+        "created_at": created_at_utc.isoformat().replace("+00:00", "Z"),
+        "train_sha256": train_sha256,
+        "validation_sha256": validation_sha256,
+        "test_sha256": test_sha256,
         "train_sample_count": len(split.train),
         "validation_sample_count": len(split.validation),
         "test_sample_count": len(split.test),
@@ -109,10 +120,25 @@ def build_forecast_run_manifest(
         "validation_metrics": validation_metrics,
         "test_metrics": test_metrics,
     }
-    manifest_hash = _sha256_payload(manifest_payload)
     return ForecastRunManifest(
-        **manifest_payload,
-        manifest_sha256=manifest_hash,
+        run_reference=run_reference,
+        source_reference=source_reference,
+        model_family="linear_ols",
+        model_version=model_version,
+        code_version=code_version,
+        created_at=created_at_utc,
+        train_sha256=train_sha256,
+        validation_sha256=validation_sha256,
+        test_sha256=test_sha256,
+        train_sample_count=len(split.train),
+        validation_sample_count=len(split.validation),
+        test_sample_count=len(split.test),
+        intercept_si=result.intercept_si,
+        slope_si_per_second=result.slope_si_per_second,
+        train_metrics=train_metrics,
+        validation_metrics=validation_metrics,
+        test_metrics=test_metrics,
+        manifest_sha256=_sha256_payload(manifest_payload),
     )
 
 

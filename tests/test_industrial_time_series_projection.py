@@ -7,7 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from hydro_api.errors import ResourceConflictError
-from hydro_api.industrial.time_series_projection import IndustrialBatchSample, ingest_industrial_batch
+from hydro_api.industrial.time_series_projection import (
+    IndustrialBatchSample,
+    ingest_industrial_batch,
+)
 from hydro_api.models import MeasurementTag, Organization, SampleNormalized, SampleRaw, Site
 
 _SOURCE_HASH = "sha256:" + "a" * 64
@@ -106,7 +109,9 @@ def test_industrial_batch_preserves_raw_then_projects_si(pg_session: Session) ->
     assert raws[0].source_value == 10.0
     assert raws[0].raw_payload["source_payload"] == {"value": 10.0, "status": "good"}
     assert len(normalized) == 2
-    assert sorted(sample.value_si for sample in normalized) == pytest.approx([1_000_000.0, 1_100_000.0])
+    assert sorted(sample.value_si for sample in normalized) == pytest.approx(
+        [1_000_000.0, 1_100_000.0]
+    )
     assert {sample.quality for sample in normalized} == {"good", "bad"}
 
 
@@ -192,7 +197,9 @@ def test_reusing_batch_key_with_changed_source_is_rejected(pg_session: Session) 
         )
 
 
-def test_duplicate_sequence_inside_batch_is_rejected_before_persistence(pg_session: Session) -> None:
+def test_duplicate_sequence_inside_batch_is_rejected_before_persistence(
+    pg_session: Session,
+) -> None:
     tag = _tag(pg_session)
     with pytest.raises(ValueError, match="Chaque séquence"):
         ingest_industrial_batch(

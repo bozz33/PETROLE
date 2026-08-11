@@ -75,7 +75,9 @@ def test_failed_observed_stage_blocks_qualification_without_hiding_evidence() ->
 
 
 def test_complete_ot0_to_ot5_evidence_passes_documentary_gate() -> None:
-    evidence = tuple(_evidence(stage) for stage in required_stages_through(OtQualificationStage.OT_5))
+    evidence = tuple(
+        _evidence(stage) for stage in required_stages_through(OtQualificationStage.OT_5)
+    )
 
     assessment = assess_ot_qualification(evidence)
 

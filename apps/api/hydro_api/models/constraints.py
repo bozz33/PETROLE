@@ -1,9 +1,10 @@
 """Contraintes SQLAlchemy dérivées des contrats publics du domaine.
 
 Les statuts de calcul sont définis une seule fois dans :class:`SimulationStatus`.
-Ce module remplace la contrainte historique déclarée dans le modèle par une
-contrainte construite depuis cette énumération, afin que les métadonnées
-SQLAlchemy, Alembic et le contrat API restent alignés.
+Ce module maintient également les adaptations de métadonnées rendues nécessaires
+par les sources industrielles read-only : contrairement à un import de fichier,
+une acquisition OPC UA/historian possède un lignage propre et ne doit jamais
+recevoir un faux ``dataset_id`` uniquement pour satisfaire le schéma.
 """
 
 from __future__ import annotations
@@ -53,7 +54,25 @@ def align_calculation_status_constraint(table: Table) -> None:
     )
 
 
+def align_industrial_dataset_nullability(*tables: Table) -> None:
+    """Autorise ``dataset_id=NULL`` pour le lignage industriel read-only.
+
+    La migration ``d8f1a6c3e590`` ouvre ces colonnes afin qu'un flux OPC UA ou
+    historian soit rattaché à son tag/import sans fabriquer de dataset fichier.
+    Cette fonction aligne les métadonnées ORM avec ce contrat avant leur lecture
+    par Alembic. Elle ne retire ni clé étrangère, ni identifiant d'import, ni
+    provenance brute.
+    """
+
+    for table in tables:
+        dataset_column = table.c.get("dataset_id")
+        if dataset_column is None:
+            raise ValueError(f"La table {table.name} ne possède pas de colonne dataset_id.")
+        dataset_column.nullable = True
+
+
 __all__ = [
     "align_calculation_status_constraint",
+    "align_industrial_dataset_nullability",
     "calculation_status_expression",
 ]

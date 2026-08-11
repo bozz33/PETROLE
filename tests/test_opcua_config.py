@@ -34,17 +34,17 @@ def test_opcua_config_requires_sign_and_encrypt_and_external_secret_refs() -> No
 
 
 def test_opcua_config_rejects_non_opc_tcp_endpoint_and_weaker_security_mode() -> None:
-    kwargs = dict(
-        connector_id="opcua-site-A",
-        security_policy_uri="policy://required",
-        application_certificate_ref="certificate://client",
-        private_key_secret_ref="secret://key",
-        trust_list_ref="trust-list://v1",
-        identity_secret_ref=None,
-        node_mappings=(_mapping(),),
-        configuration_source_ref="config://opcua/site-A/v1",
-    )
-    with pytest.raises(ValueError, match="opc.tcp"):
+    kwargs = {
+        "connector_id": "opcua-site-A",
+        "security_policy_uri": "policy://required",
+        "application_certificate_ref": "certificate://client",
+        "private_key_secret_ref": "secret://key",
+        "trust_list_ref": "trust-list://v1",
+        "identity_secret_ref": None,
+        "node_mappings": (_mapping(),),
+        "configuration_source_ref": "config://opcua/site-A/v1",
+    }
+    with pytest.raises(ValueError, match=r"opc\.tcp"):
         OpcUaReadOnlyConnectorConfig(endpoint_url="https://host:4840", **kwargs)
     with pytest.raises(ValueError, match="SignAndEncrypt"):
         OpcUaReadOnlyConnectorConfig(

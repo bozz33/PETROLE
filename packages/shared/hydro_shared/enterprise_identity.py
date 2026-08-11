@@ -29,11 +29,19 @@ class OidcProviderContract:
     configuration_ref: str
 
     def __post_init__(self) -> None:
-        if not self.provider_id.strip() or not self.audience.strip() or not self.configuration_ref.strip():
-            raise ValueError("Fournisseur, audience et référence de configuration OIDC sont obligatoires.")
+        if (
+            not self.provider_id.strip()
+            or not self.audience.strip()
+            or not self.configuration_ref.strip()
+        ):
+            raise ValueError(
+                "Fournisseur, audience et référence de configuration OIDC sont obligatoires."
+            )
         parsed = urlsplit(self.issuer)
         if parsed.scheme.lower() != "https" or not parsed.netloc or parsed.query or parsed.fragment:
-            raise ValueError("L'issuer OIDC doit être une URL HTTPS absolue sans query ni fragment.")
+            raise ValueError(
+                "L'issuer OIDC doit être une URL HTTPS absolue sans query ni fragment."
+            )
 
 
 @dataclass(frozen=True, slots=True)

@@ -32,9 +32,15 @@ def test_certificate_lifecycle_classifies_valid_due_expired_and_not_yet_valid() 
         policy_ref="policy://site-A/certificates/v2",
     )
 
-    valid = assess_certificate_lifecycle(_metadata(not_after_days=30), evaluated_at=_BASE, policy=policy)
-    due = assess_certificate_lifecycle(_metadata(not_after_days=5), evaluated_at=_BASE, policy=policy)
-    expired = assess_certificate_lifecycle(_metadata(not_after_days=-1), evaluated_at=_BASE, policy=policy)
+    valid = assess_certificate_lifecycle(
+        _metadata(not_after_days=30), evaluated_at=_BASE, policy=policy
+    )
+    due = assess_certificate_lifecycle(
+        _metadata(not_after_days=5), evaluated_at=_BASE, policy=policy
+    )
+    expired = assess_certificate_lifecycle(
+        _metadata(not_after_days=-1), evaluated_at=_BASE, policy=policy
+    )
     future = assess_certificate_lifecycle(
         _metadata(not_before_days=1, not_after_days=30),
         evaluated_at=_BASE,

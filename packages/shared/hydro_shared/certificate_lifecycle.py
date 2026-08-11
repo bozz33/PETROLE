@@ -43,9 +43,13 @@ class CertificateMetadata:
             self.source_ref,
         )
         if any(not value.strip() for value in references):
-            raise ValueError("Les références du certificat, sujet, émetteur et source sont obligatoires.")
+            raise ValueError(
+                "Les références du certificat, sujet, émetteur et source sont obligatoires."
+            )
         if not _SHA256_PATTERN.fullmatch(self.sha256_fingerprint):
-            raise ValueError("Le certificat doit être identifié par une empreinte SHA-256 hexadécimale.")
+            raise ValueError(
+                "Le certificat doit être identifié par une empreinte SHA-256 hexadécimale."
+            )
         if self.not_before.tzinfo is None or self.not_after.tzinfo is None:
             raise ValueError("Les bornes de validité du certificat doivent être timezone-aware.")
         if self.not_after <= self.not_before:
@@ -59,7 +63,9 @@ class CertificateLifecyclePolicy:
 
     def __post_init__(self) -> None:
         if not math.isfinite(self.due_warning_seconds) or self.due_warning_seconds < 0:
-            raise ValueError("La fenêtre d'anticipation certificat doit être finie et positive ou nulle.")
+            raise ValueError(
+                "La fenêtre d'anticipation certificat doit être finie et positive ou nulle."
+            )
         if not self.policy_ref.strip():
             raise ValueError("La référence de politique certificat est obligatoire.")
 

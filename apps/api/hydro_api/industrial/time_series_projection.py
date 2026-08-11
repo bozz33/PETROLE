@@ -245,6 +245,14 @@ def ingest_industrial_batch(
             )
         )
         import_run.raw_created_count += 1
+        try:
+            # Le brut doit exister en base avant toute projection qui le référence.
+            # ``flush`` ne commit pas : le batch reste atomique dans la transaction appelante.
+            session.flush()
+        except IntegrityError as exc:
+            raise ResourceConflictError(
+                "Une séquence industrielle du batch existe déjà ou viole le lignage brut."
+            ) from exc
 
         if sample.source_unit != tag.source_unit:
             rejected_count += 1
@@ -325,7 +333,7 @@ def ingest_industrial_batch(
         session.flush()
     except IntegrityError as exc:
         raise ResourceConflictError(
-            "Une séquence industrielle du batch existe déjà ou viole le lignage temporel."
+            "Une projection industrielle viole le lignage temporel du batch."
         ) from exc
 
     return IndustrialBatchResult(

@@ -27,6 +27,11 @@ from hydro_leak.material_balance import (
     compute_material_balance,
 )
 from hydro_leak.metrics import DetectionPerformance, detection_performance
+from hydro_leak.residuals import (
+    MeasurementModelResidual,
+    MeasurementModelResidualInput,
+    compute_measurement_model_residual,
+)
 
 __all__ = [
     "DetectionPerformance",
@@ -42,9 +47,12 @@ __all__ = [
     "MatchedLeakEvent",
     "MaterialBalanceResult",
     "MaterialBalanceWindow",
+    "MeasurementModelResidual",
+    "MeasurementModelResidualInput",
     "TwinStateVariable",
     "build_twin_snapshot",
     "compute_material_balance",
+    "compute_measurement_model_residual",
     "detection_performance",
     "fuse_evidence",
     "match_alerts_to_events",

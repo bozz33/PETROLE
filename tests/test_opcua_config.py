@@ -5,7 +5,9 @@ import pytest
 from hydro_api.industrial.opcua_config import OpcUaNodeMapping, OpcUaReadOnlyConnectorConfig
 
 
-def _mapping(tag: str = "tag://PT-101", node_id: str = "nsu=urn:site-A;s=PT-101") -> OpcUaNodeMapping:
+def _mapping(
+    tag: str = "tag://PT-101", node_id: str = "nsu=urn:site-A;s=PT-101"
+) -> OpcUaNodeMapping:
     return OpcUaNodeMapping(
         tag_ref=tag,
         namespace_uri="urn:site-A:process",

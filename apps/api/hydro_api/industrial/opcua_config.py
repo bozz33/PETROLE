@@ -52,12 +52,18 @@ class OpcUaReadOnlyConnectorConfig:
             self.configuration_source_ref,
         )
         if any(not value.strip() for value in required):
-            raise ValueError("Les références de configuration OPC UA obligatoires ne peuvent être vides.")
+            raise ValueError(
+                "Les références de configuration OPC UA obligatoires ne peuvent être vides."
+            )
         parsed = urlsplit(self.endpoint_url)
         if parsed.scheme.lower() != "opc.tcp" or not parsed.hostname or parsed.port is None:
-            raise ValueError("L'endpoint OPC UA doit être une URL opc.tcp:// avec hôte et port explicites.")
+            raise ValueError(
+                "L'endpoint OPC UA doit être une URL opc.tcp:// avec hôte et port explicites."
+            )
         if self.security_mode != "SignAndEncrypt":
-            raise ValueError("PETROLE exige le mode OPC UA SignAndEncrypt pour le connecteur industriel.")
+            raise ValueError(
+                "PETROLE exige le mode OPC UA SignAndEncrypt pour le connecteur industriel."
+            )
         if self.identity_secret_ref is not None and not self.identity_secret_ref.strip():
             raise ValueError("La référence de secret d'identité ne peut pas être vide.")
         if not self.node_mappings:
@@ -67,10 +73,14 @@ class OpcUaReadOnlyConnectorConfig:
             raise ValueError("Un tag PETROLE ne peut être mappé qu'une fois dans un connecteur.")
         source_nodes = [(mapping.namespace_uri, mapping.node_id) for mapping in self.node_mappings]
         if len(source_nodes) != len(set(source_nodes)):
-            raise ValueError("Un nœud OPC UA source ne peut être mappé qu'une fois dans un connecteur.")
+            raise ValueError(
+                "Un nœud OPC UA source ne peut être mappé qu'une fois dans un connecteur."
+            )
         secret_refs = (self.private_key_secret_ref, self.identity_secret_ref)
         if any(ref is not None and "-----BEGIN" in ref for ref in secret_refs):
-            raise ValueError("La configuration doit référencer les secrets, jamais embarquer une clé privée.")
+            raise ValueError(
+                "La configuration doit référencer les secrets, jamais embarquer une clé privée."
+            )
 
 
 __all__ = ["OpcUaNodeMapping", "OpcUaReadOnlyConnectorConfig"]

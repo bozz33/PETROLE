@@ -24,6 +24,7 @@ from hydro_gas.coolprop_adapter import (
     CoolPropPureFluidDefinition,
     evaluate_coolprop_properties,
 )
+from hydro_gas.linepack import GasLinepackCell, GasLinepackResult, compute_segmented_linepack
 from hydro_gas.properties import GasState, gas_density_from_z, linepack_mass
 from hydro_gas.station import (
     CompressorStationConfiguration,
@@ -50,11 +51,14 @@ __all__ = [
     "CoolPropPureFluidDefinition",
     "GasComponentFraction",
     "GasComposition",
+    "GasLinepackCell",
+    "GasLinepackResult",
     "GasState",
     "StationCoolerConfiguration",
     "StationValveConfiguration",
     "StationValveRole",
     "assess_compressor_envelope",
+    "compute_segmented_linepack",
     "evaluate_coolprop_properties",
     "gas_density_from_z",
     "interpolate_compressor_map",

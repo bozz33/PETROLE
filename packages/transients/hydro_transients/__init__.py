@@ -29,6 +29,14 @@ from hydro_transients.pressure import (
     mean_velocity_full_pipe,
     pressure_from_total_head,
 )
+from hydro_transients.pressure_results import (
+    NodePressureEnvelope,
+    TransientNodePressureInput,
+    TransientPressureEnvelopeSet,
+    TransientPressureSnapshot,
+    build_transient_pressure_envelopes,
+    build_transient_pressure_snapshots,
+)
 from hydro_transients.product_properties import (
     ProductPropertyTables,
     TemperaturePropertyPoint,
@@ -47,6 +55,7 @@ __all__ = [
     "BoundaryValueSchedule",
     "MocPipeGrid",
     "MocStateSnapshot",
+    "NodePressureEnvelope",
     "NodeTransientEnvelope",
     "ProductBatch",
     "ProductInterface",
@@ -57,8 +66,13 @@ __all__ = [
     "TemperaturePropertyTable",
     "TotalHeadPressureResult",
     "TransientEnvelopeSet",
+    "TransientNodePressureInput",
+    "TransientPressureEnvelopeSet",
+    "TransientPressureSnapshot",
     "build_batch_sequence",
     "build_transient_envelopes",
+    "build_transient_pressure_envelopes",
+    "build_transient_pressure_snapshots",
     "fixed_flow_left_boundary",
     "fixed_flow_right_boundary",
     "fixed_head_left_boundary",

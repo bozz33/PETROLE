@@ -66,7 +66,7 @@ class OtStageEvidence:
             raise ValueError("Preuve, protocole et environnement OT sont obligatoires.")
         if self.observed_at.tzinfo is None:
             raise ValueError("La date d'observation OT doit être timezone-aware.")
-        if self.passed and any(not finding.strip() for finding in self.findings):
+        if any(not finding.strip() for finding in self.findings):
             raise ValueError("Une observation OT ne peut contenir de finding vide.")
 
     @property

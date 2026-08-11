@@ -174,7 +174,9 @@ def ingest_industrial_batch(
         source_ref=source_ref,
         samples=samples,
     )
-    tag = session.scalar(select(MeasurementTag).where(MeasurementTag.id == tag_id).with_for_update())
+    tag = session.scalar(
+        select(MeasurementTag).where(MeasurementTag.id == tag_id).with_for_update()
+    )
     if tag is None:
         raise ResourceNotFoundError("Tag de mesure", tag_id)
     if tag.status != "active":
@@ -253,7 +255,9 @@ def ingest_industrial_batch(
                 message="L'unité reçue diffère de l'unité validée du tag.",
             )
             continue
-        if isinstance(sample.source_value, bool) or not isinstance(sample.source_value, int | float):
+        if isinstance(sample.source_value, bool) or not isinstance(
+            sample.source_value, int | float
+        ):
             rejected_count += 1
             _append_error(
                 errors,

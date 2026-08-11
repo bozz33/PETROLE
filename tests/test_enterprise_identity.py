@@ -32,7 +32,9 @@ def _policy() -> MfaAssurancePolicy:
     )
 
 
-def _claims(*, issuer: str | None = None, amr: tuple[str, ...] = ("pwd", "webauthn")) -> VerifiedOidcClaims:
+def _claims(
+    *, issuer: str | None = None, amr: tuple[str, ...] = ("pwd", "webauthn")
+) -> VerifiedOidcClaims:
     return VerifiedOidcClaims(
         issuer=issuer or _provider().issuer,
         audiences=("petrole-api",),

@@ -111,16 +111,18 @@ def assess_ot_qualification(
     """Évalue la présence et le résultat des preuves jusqu'à une étape cible."""
 
     by_stage: dict[OtQualificationStage, OtStageEvidence] = {}
-    for item in evidence:
-        if item.stage in by_stage:
-            raise ValueError(f"Une seule preuve OT est autorisée par étape : {item.stage.value}.")
-        by_stage[item.stage] = item
+    for evidence_item in evidence:
+        if evidence_item.stage in by_stage:
+            raise ValueError(
+                f"Une seule preuve OT est autorisée par étape : {evidence_item.stage.value}."
+            )
+        by_stage[evidence_item.stage] = evidence_item
 
     assessments: list[OtStageAssessment] = []
     blocking: list[OtQualificationStage] = []
     for stage in required_stages_through(target_stage):
-        item = by_stage.get(stage)
-        if item is None:
+        stage_evidence = by_stage.get(stage)
+        if stage_evidence is None:
             status = OtGateStatus.MISSING
             blocking.append(stage)
             assessments.append(
@@ -137,7 +139,7 @@ def assess_ot_qualification(
             )
             continue
 
-        status = OtGateStatus.PASSED if item.passed else OtGateStatus.FAILED
+        status = OtGateStatus.PASSED if stage_evidence.passed else OtGateStatus.FAILED
         if status is OtGateStatus.FAILED:
             blocking.append(stage)
         assessments.append(
@@ -145,11 +147,11 @@ def assess_ot_qualification(
                 stage=stage,
                 label=_STAGE_LABELS[stage],
                 status=status,
-                evidence_ref=item.evidence_ref,
-                protocol_ref=item.protocol_ref,
-                environment_ref=item.environment_ref,
-                observed_at=item.observed_at_utc,
-                findings=item.findings,
+                evidence_ref=stage_evidence.evidence_ref,
+                protocol_ref=stage_evidence.protocol_ref,
+                environment_ref=stage_evidence.environment_ref,
+                observed_at=stage_evidence.observed_at_utc,
+                findings=stage_evidence.findings,
             )
         )
 

@@ -39,12 +39,8 @@ def test_pressure_snapshots_use_explicit_time_varying_density() -> None:
         (_properties(1_000.0), _properties(800.0)),
     )
 
-    assert pressure_snapshots[0].pressures_pa == pytest.approx(
-        (980_665.0, 784_532.0)
-    )
-    assert pressure_snapshots[1].pressures_pa == pytest.approx(
-        (784_532.0, 627_625.6)
-    )
+    assert pressure_snapshots[0].pressures_pa == pytest.approx((980_665.0, 784_532.0))
+    assert pressure_snapshots[1].pressures_pa == pytest.approx((784_532.0, 627_625.6))
     assert pressure_snapshots[0].negative_absolute_flags == (False, False)
 
 
@@ -78,9 +74,7 @@ def test_pressure_envelopes_publish_extremes_times_and_negative_count() -> None:
 
 
 def test_pressure_reconstruction_requires_properties_for_every_time_and_node() -> None:
-    snapshots = (
-        MocStateSnapshot(time_s=0.0, heads_m=(10.0, 9.0), flows_m3_s=(0.0, 0.0)),
-    )
+    snapshots = (MocStateSnapshot(time_s=0.0, heads_m=(10.0, 9.0), flows_m3_s=(0.0, 0.0)),)
     with pytest.raises(ValueError, match="exactement tous les nœuds"):
         build_transient_pressure_snapshots(
             snapshots,

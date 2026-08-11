@@ -284,7 +284,9 @@ class SQLiteIndustrialSpool:
                 raise ValueError("Le checkpoint zéro ne doit pas référencer de clé d'idempotence.")
         else:
             if checkpoint.last_idempotency_key is None:
-                raise ValueError("Un checkpoint non nul doit référencer sa clé d'idempotence finale.")
+                raise ValueError(
+                    "Un checkpoint non nul doit référencer sa clé d'idempotence finale."
+                )
             row = self._connection.execute(
                 """
                 SELECT idempotency_key
@@ -296,7 +298,9 @@ class SQLiteIndustrialSpool:
             if row is None:
                 raise ValueError("La séquence finale du checkpoint n'existe plus dans le spool.")
             if str(row["idempotency_key"]) != checkpoint.last_idempotency_key:
-                raise ValueError("La séquence finale ne correspond pas à la clé d'idempotence annoncée.")
+                raise ValueError(
+                    "La séquence finale ne correspond pas à la clé d'idempotence annoncée."
+                )
 
         with self._connection:
             self._upsert_checkpoint(checkpoint)

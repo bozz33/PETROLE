@@ -143,7 +143,7 @@ def assess_temporal_quality(
         else None
     )
 
-    quality_counts = {quality: 0 for quality in sorted(_ALLOWED_QUALITIES)}
+    quality_counts = dict.fromkeys(sorted(_ALLOWED_QUALITIES), 0)
     for sample in samples:
         quality_counts[sample.quality] += 1
     quality_fractions = {quality: count / len(samples) for quality, count in quality_counts.items()}

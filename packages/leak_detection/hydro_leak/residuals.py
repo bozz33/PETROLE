@@ -36,7 +36,11 @@ class MeasurementModelResidualInput:
         )
         if any(not math.isfinite(value) or value < 0 for value in uncertainties):
             raise ValueError("Les incertitudes-types doivent être finies et positives ou nulles.")
-        if not self.si_unit.strip() or not self.measurement_ref.strip() or not self.model_ref.strip():
+        if (
+            not self.si_unit.strip()
+            or not self.measurement_ref.strip()
+            or not self.model_ref.strip()
+        ):
             raise ValueError("Unité et références mesure/modèle sont obligatoires.")
 
     @property

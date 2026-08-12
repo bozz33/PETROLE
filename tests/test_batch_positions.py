@@ -47,9 +47,7 @@ def test_profile_exposes_geometric_capacity() -> None:
 
 
 def test_interfaces_are_located_from_explicit_displaced_volume() -> None:
-    sequence = build_batch_sequence(
-        (_batch("B1", 50.0), _batch("B2", 50.0), _batch("B3", 50.0))
-    )
+    sequence = build_batch_sequence((_batch("B1", 50.0), _batch("B2", 50.0), _batch("B3", 50.0)))
 
     positions = locate_batch_interfaces(
         sequence,
@@ -70,9 +68,7 @@ def test_interfaces_are_located_from_explicit_displaced_volume() -> None:
 
 
 def test_interface_can_be_pending_or_exited_without_hidden_wrapping() -> None:
-    sequence = build_batch_sequence(
-        (_batch("B1", 100.0), _batch("B2", 100.0), _batch("B3", 100.0))
-    )
+    sequence = build_batch_sequence((_batch("B1", 100.0), _batch("B2", 100.0), _batch("B3", 100.0)))
 
     pending = locate_batch_interfaces(
         sequence,

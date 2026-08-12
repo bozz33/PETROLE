@@ -37,9 +37,14 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. La branche 
 - topologie gaz stationnaire indépendante du moteur liquide ;
 - bilan massique nodal `Σm_entrant - Σm_sortant + m_externe` avec flux inverses ;
 - injections/soutirages externes explicites et références de provenance ;
-- résidus nodaux et globaux exposés sans tolérance industrielle codée en dur.
+- résidus nodaux et globaux exposés sans tolérance industrielle codée en dur ;
+- export JSON canonique P6-G de résultats déjà calculés ;
+- version de modèle, références composition/propriétés, hypothèses et diagnostics conservés dans l’export ;
+- empreinte SHA-256 du contenu exporté, sans recalcul scientifique dans la couche de restitution.
 
 La conservation/topologie P6-B est donc implémentée, mais le solveur de conduite gaz stationnaire compressible reste incomplet tant qu’un modèle constitutif de perte de charge n’a pas été sélectionné, documenté et validé.
+
+P6-G dispose maintenant d’une fondation de restitution versionnée. Les rapports gaz complets restent toutefois bloqués par la qualification des moteurs P6-B/P6-F et par les benchmarks indépendants P6-H.
 
 ## 4. Règles scientifiques
 
@@ -49,7 +54,8 @@ La conservation/topologie P6-B est donc implémentée, mais le solveur de condui
 - cartes fournisseur brutes conservées et ajustements versionnés ;
 - extrapolations hors domaine refusées ou signalées explicitement ;
 - line-pack et bilans de masse vérifiables ;
-- les modèles stationnaires et transitoires gaz restent explicitement distincts.
+- les modèles stationnaires et transitoires gaz restent explicitement distincts ;
+- la couche d’export sérialise les résultats qualifiés en amont sans les recalculer.
 
 ## 5. Normes et propriété intellectuelle
 

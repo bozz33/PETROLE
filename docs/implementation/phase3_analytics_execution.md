@@ -55,7 +55,11 @@ Sous-lots :
 - aucune réutilisation de validation/test pour réajuster le modèle ;
 - MAE, RMSE et biais calculés séparément sur les trois jeux ;
 - rejet d’un split qui crée une fuite temporelle ;
-- modèle linéaire utilisé comme baseline explicable, pas comme prédicteur industriel validé.
+- modèle linéaire utilisé comme baseline explicable, pas comme prédicteur industriel validé ;
+- baseline naïve de persistance utilisant uniquement la dernière valeur chronologique du train ;
+- métriques de persistance séparées sur validation et test ;
+- comparaison OLS↔persistance sur populations identiques avec deltas MAE/RMSE/biais absolu ;
+- aucun seuil de victoire ou verdict de publication codé dans la comparaison.
 
 ### P3-E — maintenance conditionnelle non-sûreté
 
@@ -76,6 +80,8 @@ Les capacités prédictives/conditionnelles ne deviennent publiables sur un pilo
 - métriques choisies avant observation du test ;
 - seuils conditionnels justifiés et approuvés ;
 - revue ingénieur des variables et limites d’usage.
+
+La baseline naïve est désormais codée et testée ; les datasets représentatifs, horizons métier et critères d'acceptation restent des gates externes/non résolus.
 
 ## 6. Hors portée
 

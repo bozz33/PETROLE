@@ -38,13 +38,17 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Les fonctio
 - contrat de chaos ciblé sans injection de panne intégrée : politique, scénario, cible, temps de reprise et taux d’erreur sont fournis par le protocole ;
 - évaluation factuelle d’un exercice de chaos avec récupération du service, intégrité des données et isolation des périmètres ;
 - porte de qualification exigeant désormais restauration, migration, charge, chaos, sécurité et readiness positives pour la baseline/environnement référencés ;
+- preuve d'exercice incident avec runbook versionné, temps d'acquittement/reprise, communication et escalade ;
+- contrat P8-I de readiness support liant classes d'incident, phases requises, runbooks actifs versionnés, rôles responsables et revues ;
+- références organisationnelles obligatoires vers politique support, matrice d'escalade, roster de contacts, politique de maintenance et archive de preuve, sans données personnelles dans le contrat ;
+- refus d'une classe requise sans runbook, d'une phase obligatoire non couverte, de doublons de classes/runbooks et d'un runbook actif hors protocole courant ;
 - résolveur de portée organisationnelle : `single_org` utilise l’organisation interne par défaut et refuse toute tentative de sélection croisée ; `multi_org`/`saas` exigent une organisation préalablement résolue par la couche d’identité/autorisation ;
 - registre d’édition normative avec code, édition, éditeur, provenance, acquisition projet et revue ;
 - binding d’un jeu de règles interne versionné vers une édition uniquement lorsqu’elle est marquée acquise et revue ;
 - détection explicite d’un changement d’édition exigeant une nouvelle revue ;
 - aucune conservation du texte normatif protégé dans le registre de gouvernance.
 
-Ces briques ne prouvent aucune HA à elles seules. La preuve requiert une infrastructure réelle ou représentative et des exercices reproductibles. Le contrat de chaos n’exécute lui-même aucune perturbation : il évalue seulement des observations issues d’un exercice externe pré-enregistré.
+Ces briques ne prouvent aucune HA à elles seules. La preuve requiert une infrastructure réelle ou représentative et des exercices reproductibles. Le contrat de chaos n’exécute lui-même aucune perturbation : il évalue seulement des observations issues d’un exercice externe pré-enregistré. De même, la readiness P8-I prouve une couverture documentaire/organisationnelle référencée, pas l'existence d'une astreinte ou d'un SLA réel.
 
 ## 4. Contraintes produit
 
@@ -69,6 +73,8 @@ Ces briques ne prouvent aucune HA à elles seules. La preuve requiert une infras
 ## 6. Gate « produit industriel »
 
 Aucune qualification industrielle n’est déclarée uniquement parce que le logiciel possède HA, sécurité ou observabilité. Le passage nécessite contrats, responsabilités, pilote accepté, support, procédures, exigences locales et validations externes applicables.
+
+La readiness support P8-I reste une précondition documentaire : les personnes réellement disponibles, horaires d'astreinte, contrats/SLA, canaux de notification et exercices représentatifs doivent être vérifiés hors de cette couche avant toute revendication de support industriel.
 
 ## 7. Multi-sites
 

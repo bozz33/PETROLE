@@ -38,6 +38,11 @@ from hydro_leak.validation_campaign import (
     LeakValidationCriterionResult,
     assess_validation_criteria,
 )
+from hydro_leak.validation_dataset import (
+    ExcludedLeakEvent,
+    LeakValidationDatasetPartition,
+    freeze_leak_validation_dataset,
+)
 
 __all__ = [
     "DetectionPerformance",
@@ -47,12 +52,14 @@ __all__ = [
     "EvidenceContribution",
     "EvidenceFusionResult",
     "EvidenceSignal",
+    "ExcludedLeakEvent",
     "LeakAlertObservation",
     "LeakEventLabel",
     "LeakLocationEstimate",
     "LeakValidationAssessment",
     "LeakValidationCriteria",
     "LeakValidationCriterionResult",
+    "LeakValidationDatasetPartition",
     "MatchedLeakEvent",
     "MaterialBalanceResult",
     "MaterialBalanceWindow",
@@ -64,6 +71,7 @@ __all__ = [
     "compute_material_balance",
     "compute_measurement_model_residual",
     "detection_performance",
+    "freeze_leak_validation_dataset",
     "fuse_evidence",
     "match_alerts_to_events",
     "state_delta",

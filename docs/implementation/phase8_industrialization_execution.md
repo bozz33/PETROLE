@@ -34,13 +34,17 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Les fonctio
 - preuve d’exercice de reprise avec chronologie mesurée, RPO/RTO observés, intégrité base, intégrité stockage objet et readiness applicative ;
 - refus d’un drill dont la chronologie est incohérente ;
 - résultat détaillé des violations plutôt qu’un simple booléen de conformité ;
+- preuve de campagne de charge avec objectifs explicitement fournis : latence P95, erreurs, débit et concurrence ;
+- contrat de chaos ciblé sans injection de panne intégrée : politique, scénario, cible, temps de reprise et taux d’erreur sont fournis par le protocole ;
+- évaluation factuelle d’un exercice de chaos avec récupération du service, intégrité des données et isolation des périmètres ;
+- porte de qualification exigeant désormais restauration, migration, charge, chaos, sécurité et readiness positives pour la baseline/environnement référencés ;
 - résolveur de portée organisationnelle : `single_org` utilise l’organisation interne par défaut et refuse toute tentative de sélection croisée ; `multi_org`/`saas` exigent une organisation préalablement résolue par la couche d’identité/autorisation ;
 - registre d’édition normative avec code, édition, éditeur, provenance, acquisition projet et revue ;
 - binding d’un jeu de règles interne versionné vers une édition uniquement lorsqu’elle est marquée acquise et revue ;
 - détection explicite d’un changement d’édition exigeant une nouvelle revue ;
 - aucune conservation du texte normatif protégé dans le registre de gouvernance.
 
-Ces briques ne prouvent aucune HA à elles seules. La preuve requiert une infrastructure réelle ou représentative et des exercices reproductibles.
+Ces briques ne prouvent aucune HA à elles seules. La preuve requiert une infrastructure réelle ou représentative et des exercices reproductibles. Le contrat de chaos n’exécute lui-même aucune perturbation : il évalue seulement des observations issues d’un exercice externe pré-enregistré.
 
 ## 4. Contraintes produit
 

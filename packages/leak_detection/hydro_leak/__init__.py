@@ -32,6 +32,12 @@ from hydro_leak.residuals import (
     MeasurementModelResidualInput,
     compute_measurement_model_residual,
 )
+from hydro_leak.validation_campaign import (
+    LeakValidationAssessment,
+    LeakValidationCriteria,
+    LeakValidationCriterionResult,
+    assess_validation_criteria,
+)
 
 __all__ = [
     "DetectionPerformance",
@@ -44,12 +50,16 @@ __all__ = [
     "LeakAlertObservation",
     "LeakEventLabel",
     "LeakLocationEstimate",
+    "LeakValidationAssessment",
+    "LeakValidationCriteria",
+    "LeakValidationCriterionResult",
     "MatchedLeakEvent",
     "MaterialBalanceResult",
     "MaterialBalanceWindow",
     "MeasurementModelResidual",
     "MeasurementModelResidualInput",
     "TwinStateVariable",
+    "assess_validation_criteria",
     "build_twin_snapshot",
     "compute_material_balance",
     "compute_measurement_model_residual",

@@ -15,6 +15,8 @@ Base de travail : `6d18ef39d16c2dd9ae34128ccf6d87f4788e19bc`, afin de réutilise
 
 PETROLE reste un client analytique **lecture seule**. Aucun endpoint ou connecteur ne doit exposer `Write`, commande d’équipement, appel de méthode procédé, acquittement d’alarme, SIS/ESD ou changement de consigne.
 
+L'acknowledgement OPC UA d'un `NotificationMessage` de Subscription est traité séparément de l'acquittement d'une alarme procédé : le premier est un mécanisme read-only de transport et de retransmission ; le second reste interdit.
+
 ## 3. Sous-lots
 
 1. P5-A — modèle de configuration de connecteur et secrets externalisés ;
@@ -34,6 +36,8 @@ Implémentation alignée sur OPC UA Part 4 v1.05.07 consultée pendant le dével
 Fondations déjà codées :
 
 - politique de services OPC UA autorisés/refusés en lecture seule ;
+- séparation explicite entre `SUBSCRIPTION_ACKNOWLEDGE` autorisé et acquittement d'alarme interdit ;
+- `REPUBLISH` explicitement autorisé comme opération de récupération read-only ;
 - normalisation `DataValue` conservant `StatusCode`, `SourceTimestamp` et `ServerTimestamp` ;
 - valeur `Bad` non utilisable par l’analytique, sans supprimer la preuve de qualité ;
 - valeur `Uncertain` conservée et explicitement signalée ;
@@ -43,11 +47,14 @@ Fondations déjà codées :
 - production explicite des séquences à demander par `Republish`, avec limite de sécurité empêchant une allocation incontrôlée après une reprise incohérente ;
 - simulateur OT-1 déterministe de messages Publish avec `DataValue`, namespace URI + NodeId et provenance ;
 - cache Republish borné permettant de tester récupération d'un trou, éviction et indisponibilité explicite ;
+- simulation d'un SubscriptionAcknowledgement supprimant uniquement un message du cache de retransmission de laboratoire ;
+- plan de reprise qui n'acquitte le message reçu qu'après confirmation de sa persistance durable ;
+- conversion des trous de séquence en demandes Republish explicites, sans interpolation ni fabrication de données ;
 - refus de `Write` et `Call` par le simulateur via la politique read-only commune ;
 - objectifs de santé connecteur fournis par le site : âge maximal de la source, nombre de trous, fraction maximale de qualité `Bad` et reconnexions ;
 - évaluation détaillée de ces objectifs sans seuil OT implicite ni action sur le procédé.
 
-P5-B dispose donc maintenant d'un simulateur comportemental hors ligne. Il ne s'agit pas d'un serveur OPC UA wire-protocol : la session réseau réelle, SecureChannel, les certificats, la trust list, les acknowledgements Publish et les appels Republish réseau restent derrière P5-C et le POC-OS-08 avec la passerelle dédiée retenue par D14.
+P5-B dispose donc maintenant d'un simulateur comportemental hors ligne et P5-D/P5-E d'une fondation de planification Publish/Republish couplée à la durabilité. Il ne s'agit pas d'un serveur OPC UA wire-protocol : la session réseau réelle, SecureChannel, les certificats, la trust list, l'encodage des acknowledgements Publish et les appels Republish réseau restent derrière P5-C et le POC-OS-08 avec la passerelle dédiée retenue par D14.
 
 Exigences minimales du futur connecteur réel : `SignAndEncrypt`, certificats, Endpoint configuré, namespace URI + NodeId stable, qualité réversible, timestamps doubles, backoff et trous de reconnexion visibles.
 

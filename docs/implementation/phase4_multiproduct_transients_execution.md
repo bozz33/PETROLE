@@ -32,9 +32,14 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Cette branc
 - interfaces logiques construites entre lots successifs ;
 - position de chaque interface dans un axe de volume cumulé injecté ;
 - volume total déterministe ;
-- aucun volume de mélange/contamination ajouté implicitement.
+- aucun volume de mélange/contamination ajouté implicitement ;
+- profil volumique de conduite segmenté à partir des longueurs et sections internes fournies ;
+- projection volume→abscisse pour un déplacement piston idéal ;
+- états explicites `pending`, `in_pipeline`, `exited` ;
+- positions inlet/outlet conservées sans bouclage artificiel ;
+- aucune largeur d'interface, dispersion ou contamination déduite par la projection spatiale.
 
-Cette représentation ne calcule pas encore la position spatiale des interfaces, leur dispersion, leur mélange ou leur évolution thermophysique. Ces phénomènes appartiennent à P4-B et aux futurs modèles de transport multiproduit, avec propriétés validées et benchmarks indépendants.
+La représentation calcule donc maintenant une **position spatiale idéale** des interfaces lorsque le volume déplacé cumulé et la géométrie sont explicitement fournis. Elle ne calcule toujours pas leur dispersion, leur mélange, leur contamination ou leur évolution thermophysique. Ces phénomènes appartiennent à P4-B et aux futurs modèles de transport multiproduit, avec propriétés validées et benchmarks indépendants.
 
 ### P4-C/P4-D — MOC et limites élémentaires
 
@@ -58,7 +63,8 @@ La condition de débit imposé est une brique mathématique. Elle ne prétend pa
 - modèles de cavitation ou colonne séparée uniquement après benchmark dédié ;
 - friction instationnaire désactivée tant qu’un modèle et ses références ne sont pas validés ;
 - multiproduit et transitoire restent des moteurs explicitement sélectionnés et versionnés ;
-- aucune largeur d’interface, dispersion ou contamination n’est inventée sans modèle sourcé et validé.
+- aucune largeur d’interface, dispersion ou contamination n’est inventée sans modèle sourcé et validé ;
+- la projection spatiale idéale reste séparée d'un futur modèle physique de mélange.
 
 ## 5. Gates
 

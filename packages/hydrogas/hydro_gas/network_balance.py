@@ -54,7 +54,7 @@ class SteadyGasNetwork:
             raise ValueError("Le réseau gaz doit contenir au moins un noeud.")
 
         node_ids = tuple(node.node_id for node in self.nodes)
-        if len(node_ids) != len(set(node_ids)):
+        if len(node_ids) != len(set(node_ids))):
             raise ValueError("Les identifiants de noeuds gaz doivent être uniques.")
 
         pipe_ids = tuple(pipe.pipe_id for pipe in self.pipes)
@@ -64,7 +64,9 @@ class SteadyGasNetwork:
         known_nodes = set(node_ids)
         for pipe in self.pipes:
             if pipe.from_node_id not in known_nodes or pipe.to_node_id not in known_nodes:
-                raise ValueError("Chaque conduite doit référencer deux noeuds présents dans le réseau.")
+                raise ValueError(
+                    "Chaque conduite doit référencer deux noeuds présents dans le réseau."
+                )
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,9 +173,7 @@ def assess_stationary_mass_balance(
             outgoing_mass_flow_kg_s=outgoing[node.node_id],
             external_mass_flow_kg_s=external[node.node_id],
             residual_kg_s=(
-                incoming[node.node_id]
-                - outgoing[node.node_id]
-                + external[node.node_id]
+                incoming[node.node_id] - outgoing[node.node_id] + external[node.node_id]
             ),
         )
         for node in network.nodes

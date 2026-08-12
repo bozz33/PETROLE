@@ -107,7 +107,9 @@ def freeze_leak_validation_dataset(
         raise ValueError(f"La partition référence des événements absents du dataset : {unknown}.")
     unassigned = tuple(sorted(known - set(assigned)))
     if unassigned:
-        raise ValueError(f"Des événements labellisés ne sont pas affectés explicitement : {unassigned}.")
+        raise ValueError(
+            f"Des événements labellisés ne sont pas affectés explicitement : {unassigned}."
+        )
 
     excluded_by_id = {item.event_id: item for item in excluded_events}
     event_payload = [

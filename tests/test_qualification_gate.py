@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hydro_shared.chaos_evidence import ChaosExperimentAssessment
 from hydro_shared.load_evidence import LoadTestAssessment
 from hydro_shared.migration_evidence import MigrationCompatibilityAssessment, RollbackStrategy
 from hydro_shared.qualification_gate import (
@@ -14,6 +15,7 @@ def _evidence(
     recovery_passed: bool = True,
     migration_passed: bool = True,
     load_passed: bool = True,
+    chaos_passed: bool = True,
     security_scan_passed: bool = True,
     readiness_verified: bool = True,
 ) -> DeploymentQualificationEvidence:
@@ -45,6 +47,19 @@ def _evidence(
             evidence_ref="evidence://load/2026-08-11",
             policy_ref="policy://load/pilot-v1",
         ),
+        chaos=ChaosExperimentAssessment(
+            passed=chaos_passed,
+            violations=() if chaos_passed else ("service_not_recovered",),
+            recovery_time_s=20.0,
+            error_fraction=0.01,
+            service_recovered=chaos_passed,
+            data_integrity_preserved=True,
+            scope_isolation_preserved=True,
+            policy_ref="policy://resilience/pilot-v1",
+            scenario_ref="chaos://postgres-primary-unavailable",
+            target_ref="deployment://pilot/staging",
+            evidence_ref="evidence://chaos/2026-08-11",
+        ),
         security_scan_passed=security_scan_passed,
         readiness_verified=readiness_verified,
     )
@@ -64,6 +79,7 @@ def test_qualification_gate_reports_every_failed_required_gate() -> None:
             recovery_passed=False,
             migration_passed=False,
             load_passed=False,
+            chaos_passed=False,
             security_scan_passed=False,
             readiness_verified=False,
         )
@@ -74,6 +90,7 @@ def test_qualification_gate_reports_every_failed_required_gate() -> None:
         "recovery_drill_failed",
         "migration_compatibility_failed",
         "load_test_failed",
+        "chaos_experiment_failed",
         "security_scan_failed",
         "readiness_not_verified",
     )
@@ -92,6 +109,7 @@ def test_qualification_evidence_requires_traceable_references() -> None:
             recovery=base.recovery,
             migration=base.migration,
             load=base.load,
+            chaos=base.chaos,
             security_scan_passed=True,
             readiness_verified=True,
         )

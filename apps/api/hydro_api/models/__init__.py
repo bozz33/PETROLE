@@ -5,7 +5,10 @@ from typing import cast
 from sqlalchemy import Table
 
 from hydro_api.models.catalog import CatalogItem
-from hydro_api.models.constraints import align_calculation_status_constraint
+from hydro_api.models.constraints import (
+    align_calculation_status_constraint,
+    align_industrial_dataset_nullability,
+)
 from hydro_api.models.core import (
     AuditEvent,
     BackgroundJob,
@@ -44,12 +47,15 @@ from hydro_api.models.governance import (
 )
 from hydro_api.models.network import AssetInstance, NetworkEdge, NetworkNode
 
-# La contrainte de statut est dérivée de l'énumération publique afin d'éviter
-# toute divergence entre le contrat API, les métadonnées et les migrations.
-# ``CalculationRun.__table__`` est typé ``FromClause`` par SQLAlchemy, mais
-# l'objet concret est une ``Table`` à l'exécution ; le ``cast`` explicite le
-# garantit sans ``type: ignore``.
+# Les adaptations de métadonnées sont appliquées avant qu'Alembic ou les
+# services n'utilisent Base.metadata. Elles maintiennent une source de vérité
+# commune entre contrat API, modèle SQLAlchemy et migrations.
 align_calculation_status_constraint(cast("Table", CalculationRun.__table__))
+align_industrial_dataset_nullability(
+    cast("Table", TimeSeriesImport.__table__),
+    cast("Table", SampleRaw.__table__),
+    cast("Table", MeasurementResidual.__table__),
+)
 
 __all__ = [
     "AssetInstance",

@@ -33,6 +33,8 @@ def test_default_opcua_policy_is_read_only() -> None:
         OpcUaOperation.READ,
         OpcUaOperation.SUBSCRIBE,
         OpcUaOperation.HISTORY_READ,
+        OpcUaOperation.REPUBLISH,
+        OpcUaOperation.SUBSCRIPTION_ACKNOWLEDGE,
     }
     for operation in policy.allowed_operations:
         assert_read_only_operation(operation)
@@ -53,6 +55,16 @@ def test_process_modifying_operations_are_rejected(operation: OpcUaOperation) ->
 
     with pytest.raises(ValidationError, match="interdites"):
         _policy(allowed_operations=[OpcUaOperation.READ, operation])
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [OpcUaOperation.REPUBLISH, OpcUaOperation.SUBSCRIPTION_ACKNOWLEDGE],
+)
+def test_subscription_recovery_operations_remain_read_only(operation: OpcUaOperation) -> None:
+    assert_read_only_operation(operation)
+    policy = _policy(allowed_operations=[OpcUaOperation.READ, operation])
+    assert operation in policy.allowed_operations
 
 
 def test_pilot_policy_requires_sign_and_encrypt_and_namespace_uri() -> None:

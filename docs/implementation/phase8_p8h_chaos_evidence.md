@@ -17,20 +17,21 @@ Statut : contrat de preuve et évaluation déterministe implémentés, **sans mo
 - référence du scénario ;
 - cible précise ;
 - temps maximal de reprise ;
-- fraction maximale d'erreurs ;
-- exigences explicites d'intégrité des données et d'isolation des périmètres.
+- fraction maximale d'erreurs.
 
 L'évidence observée fournit ensuite le temps de reprise, le nombre de requêtes, les échecs et les constats de récupération, intégrité et isolation.
 
+L'intégrité des données et l'isolation des périmètres ne sont **pas** des options de protocole : ce sont des invariants produit Phase 8. Toute violation de l'un de ces deux invariants fait échouer l'évaluation, même si les objectifs de temps de reprise et de taux d'erreur sont respectés.
+
 ## Évaluation
 
-`assess_chaos_experiment(...)` compare les observations aux seuls objectifs fournis. Les violations possibles sont explicites :
+`assess_chaos_experiment(...)` compare les observations aux objectifs fournis et aux invariants produit. Les violations possibles sont explicites :
 
 - service non rétabli ;
 - temps de reprise supérieur à l'objectif ;
 - fraction d'erreurs supérieure à l'objectif ;
-- intégrité des données non préservée lorsqu'elle est exigée ;
-- isolation de périmètre non préservée lorsqu'elle est exigée.
+- intégrité des données non préservée ;
+- isolation de périmètre non préservée.
 
 Aucune tolérance cachée, aucun scénario par défaut et aucune injection automatique ne sont présents.
 
@@ -46,7 +47,7 @@ Cette porte reste une qualification **logicielle et environnementale**. Elle ne 
 
 - scénario conforme ;
 - accumulation de toutes les violations observées ;
-- activation explicite des exigences d'intégrité/isolation ;
+- caractère non négociable de l'intégrité des données et de l'isolation ;
 - validation des références, délais, ratios et compteurs ;
 - intégration du résultat dans `tests/test_qualification_gate.py`.
 

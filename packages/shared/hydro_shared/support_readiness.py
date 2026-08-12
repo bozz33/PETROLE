@@ -178,9 +178,7 @@ def assess_support_readiness(
                     violations=("runbook_missing",),
                 )
             )
-            global_violations.append(
-                f"runbook_missing:{requirement.incident_class_ref}"
-            )
+            global_violations.append(f"runbook_missing:{requirement.incident_class_ref}")
             continue
 
         missing_phases = tuple(

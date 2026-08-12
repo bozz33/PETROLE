@@ -54,7 +54,7 @@ class SteadyGasNetwork:
             raise ValueError("Le réseau gaz doit contenir au moins un noeud.")
 
         node_ids = tuple(node.node_id for node in self.nodes)
-        if len(node_ids) != len(set(node_ids))):
+        if len(node_ids) != len(set(node_ids)):
             raise ValueError("Les identifiants de noeuds gaz doivent être uniques.")
 
         pipe_ids = tuple(pipe.pipe_id for pipe in self.pipes)

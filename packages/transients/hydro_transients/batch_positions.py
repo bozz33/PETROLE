@@ -110,10 +110,7 @@ def locate_batch_interfaces(
     valeur supérieure à la capacité interne signifie qu'elle a quitté la ligne.
     """
 
-    if (
-        not math.isfinite(cumulative_displaced_volume_m3)
-        or cumulative_displaced_volume_m3 < 0
-    ):
+    if not math.isfinite(cumulative_displaced_volume_m3) or cumulative_displaced_volume_m3 < 0:
         raise ValueError("Le volume déplacé cumulé doit être fini et positif ou nul.")
 
     capacity = profile.total_internal_volume_m3

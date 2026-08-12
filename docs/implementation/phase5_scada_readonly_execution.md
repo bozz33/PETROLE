@@ -41,10 +41,13 @@ Fondations déjà codées :
 - détection de doublons, messages anciens et trous de séquence ;
 - prise en compte du rollover 32 bits non nul ;
 - production explicite des séquences à demander par `Republish`, avec limite de sécurité empêchant une allocation incontrôlée après une reprise incohérente ;
+- simulateur OT-1 déterministe de messages Publish avec `DataValue`, namespace URI + NodeId et provenance ;
+- cache Republish borné permettant de tester récupération d'un trou, éviction et indisponibilité explicite ;
+- refus de `Write` et `Call` par le simulateur via la politique read-only commune ;
 - objectifs de santé connecteur fournis par le site : âge maximal de la source, nombre de trous, fraction maximale de qualité `Bad` et reconnexions ;
 - évaluation détaillée de ces objectifs sans seuil OT implicite ni action sur le procédé.
 
-La couche actuelle **ne réalise pas encore** la session réseau OPC UA, les certificats, la trust list, les acknowledgements Publish ni les appels Republish : ces opérations restent derrière P5-B/P5-C et la qualification sur simulateur.
+P5-B dispose donc maintenant d'un simulateur comportemental hors ligne. Il ne s'agit pas d'un serveur OPC UA wire-protocol : la session réseau réelle, SecureChannel, les certificats, la trust list, les acknowledgements Publish et les appels Republish réseau restent derrière P5-C et le POC-OS-08 avec la passerelle dédiée retenue par D14.
 
 Exigences minimales du futur connecteur réel : `SignAndEncrypt`, certificats, Endpoint configuré, namespace URI + NodeId stable, qualité réversible, timestamps doubles, backoff et trous de reconnexion visibles.
 

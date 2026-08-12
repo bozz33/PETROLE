@@ -40,11 +40,17 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. La branche 
 - résidus nodaux et globaux exposés sans tolérance industrielle codée en dur ;
 - export JSON canonique P6-G de résultats déjà calculés ;
 - version de modèle, références composition/propriétés, hypothèses et diagnostics conservés dans l’export ;
-- empreinte SHA-256 du contenu exporté, sans recalcul scientifique dans la couche de restitution.
+- empreinte SHA-256 du contenu exporté, sans recalcul scientifique dans la couche de restitution ;
+- contrat P6-H de benchmark externe indépendant du format interne du solveur de référence ;
+- version, formulation, format et empreintes entrée/sortie du solveur externe obligatoires ;
+- comparaison observation par observation avec grandeur, localisation, unité et provenance explicites ;
+- erreurs signée, absolue et relative calculées sans seuil implicite ;
+- critères optionnels mais obligatoirement pré-enregistrés et sourcés ;
+- observation sans critère conservée comme non évaluée, jamais transformée en succès.
 
 La conservation/topologie P6-B est donc implémentée, mais le solveur de conduite gaz stationnaire compressible reste incomplet tant qu’un modèle constitutif de perte de charge n’a pas été sélectionné, documenté et validé.
 
-P6-G dispose maintenant d’une fondation de restitution versionnée. Les rapports gaz complets restent toutefois bloqués par la qualification des moteurs P6-B/P6-F et par les benchmarks indépendants P6-H.
+P6-G dispose maintenant d’une fondation de restitution versionnée. P6-H dispose d'un contrat reproductible pour comparer PETROLE à GasModels.jl ou à un autre solveur externe sans coupler le modèle persistant PETROLE à leur sérialisation. Les rapports gaz complets restent toutefois bloqués par la qualification des moteurs P6-B/P6-F et par l'exécution de benchmarks indépendants réels.
 
 ## 4. Règles scientifiques
 
@@ -55,7 +61,9 @@ P6-G dispose maintenant d’une fondation de restitution versionnée. Les rappor
 - extrapolations hors domaine refusées ou signalées explicitement ;
 - line-pack et bilans de masse vérifiables ;
 - les modèles stationnaires et transitoires gaz restent explicitement distincts ;
-- la couche d’export sérialise les résultats qualifiés en amont sans les recalculer.
+- la couche d’export sérialise les résultats qualifiés en amont sans les recalculer ;
+- un solveur externe est identifié par sa version, sa formulation, son format et les empreintes des cas réellement exécutés ;
+- aucune différence cross-solver n'est présentée comme validation si les critères n'ont pas été définis avant la comparaison.
 
 ## 5. Normes et propriété intellectuelle
 

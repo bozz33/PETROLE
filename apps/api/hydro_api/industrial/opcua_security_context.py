@@ -21,7 +21,9 @@ _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 def _normalize_thumbprint(value: str) -> str:
     normalized = value.replace(":", "").strip().lower()
     if not _SHA256_RE.fullmatch(normalized):
-        raise ValueError("Une empreinte de certificat SHA-256 doit contenir 64 caractères hexadécimaux.")
+        raise ValueError(
+            "Une empreinte de certificat SHA-256 doit contenir 64 caractères hexadécimaux."
+        )
     return normalized
 
 
@@ -58,7 +60,9 @@ class OpcUaCertificateMetadata:
             raise ValueError("La période de validité du certificat est incohérente.")
         object.__setattr__(self, "not_before_utc", not_before)
         object.__setattr__(self, "not_after_utc", not_after)
-        normalized_names = tuple(dict.fromkeys(name.strip().lower() for name in self.dns_names if name.strip()))
+        normalized_names = tuple(
+            dict.fromkeys(name.strip().lower() for name in self.dns_names if name.strip())
+        )
         object.__setattr__(self, "dns_names", normalized_names)
 
 
@@ -76,8 +80,12 @@ class OpcUaTrustListSnapshot:
         if not self.trust_list_ref.strip() or not self.evidence_ref.strip():
             raise ValueError("La trust-list et sa preuve doivent être référencées.")
         object.__setattr__(self, "content_sha256", _normalize_thumbprint(self.content_sha256))
-        trusted = tuple(dict.fromkeys(_normalize_thumbprint(value) for value in self.trusted_thumbprints_sha256))
-        revoked = tuple(dict.fromkeys(_normalize_thumbprint(value) for value in self.revoked_thumbprints_sha256))
+        trusted = tuple(
+            dict.fromkeys(_normalize_thumbprint(value) for value in self.trusted_thumbprints_sha256)
+        )
+        revoked = tuple(
+            dict.fromkeys(_normalize_thumbprint(value) for value in self.revoked_thumbprints_sha256)
+        )
         object.__setattr__(self, "trusted_thumbprints_sha256", trusted)
         object.__setattr__(self, "revoked_thumbprints_sha256", revoked)
 
@@ -96,9 +104,13 @@ class OpcUaSecurityApproval:
 
     def __post_init__(self) -> None:
         if not self.approval_ref.strip() or not self.expected_server_application_uri.strip():
-            raise ValueError("La référence d'approbation et l'ApplicationUri serveur sont obligatoires.")
+            raise ValueError(
+                "La référence d'approbation et l'ApplicationUri serveur sont obligatoires."
+            )
         policies = tuple(
-            dict.fromkeys(value.strip() for value in self.approved_security_policy_uris if value.strip())
+            dict.fromkeys(
+                value.strip() for value in self.approved_security_policy_uris if value.strip()
+            )
         )
         if not policies:
             raise ValueError("Au moins une SecurityPolicy OPC UA approuvée est obligatoire.")

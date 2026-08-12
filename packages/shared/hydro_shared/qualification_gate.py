@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from hydro_shared.chaos_evidence import ChaosExperimentAssessment
 from hydro_shared.load_evidence import LoadTestAssessment
 from hydro_shared.migration_evidence import MigrationCompatibilityAssessment
 from hydro_shared.recovery import RecoveryDrillAssessment
@@ -27,6 +28,7 @@ class DeploymentQualificationEvidence:
     recovery: RecoveryDrillAssessment
     migration: MigrationCompatibilityAssessment
     load: LoadTestAssessment
+    chaos: ChaosExperimentAssessment
     security_scan_passed: bool
     readiness_verified: bool
 
@@ -67,6 +69,8 @@ def assess_deployment_qualification(
         violations.append("migration_compatibility_failed")
     if not evidence.load.passed:
         violations.append("load_test_failed")
+    if not evidence.chaos.passed:
+        violations.append("chaos_experiment_failed")
     if not evidence.security_scan_passed:
         violations.append("security_scan_failed")
     if not evidence.readiness_verified:

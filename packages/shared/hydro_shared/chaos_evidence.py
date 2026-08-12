@@ -20,8 +20,6 @@ class ChaosExperimentObjectives:
     target_ref: str
     maximum_recovery_time_s: float
     maximum_error_fraction: float
-    require_data_integrity: bool
-    require_scope_isolation: bool
 
     def __post_init__(self) -> None:
         references = (self.policy_ref, self.scenario_ref, self.target_ref)
@@ -85,7 +83,12 @@ def assess_chaos_experiment(
     objectives: ChaosExperimentObjectives,
     evidence: ChaosExperimentEvidence,
 ) -> ChaosExperimentAssessment:
-    """Compare l'exercice aux objectifs sans tolérance ni scénario implicite."""
+    """Compare l'exercice aux objectifs sans tolérance ni scénario implicite.
+
+    L'intégrité des données et l'isolation des périmètres sont des invariants
+    produit Phase 8 : elles restent obligatoires quel que soit le scénario ou
+    le protocole d'exercice.
+    """
 
     violations: list[str] = []
     if not evidence.service_recovered:
@@ -94,9 +97,9 @@ def assess_chaos_experiment(
         violations.append("recovery_time_above_objective")
     if evidence.error_fraction > objectives.maximum_error_fraction:
         violations.append("error_fraction_above_objective")
-    if objectives.require_data_integrity and not evidence.data_integrity_preserved:
+    if not evidence.data_integrity_preserved:
         violations.append("data_integrity_not_preserved")
-    if objectives.require_scope_isolation and not evidence.scope_isolation_preserved:
+    if not evidence.scope_isolation_preserved:
         violations.append("scope_isolation_not_preserved")
 
     return ChaosExperimentAssessment(

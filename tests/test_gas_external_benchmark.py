@@ -51,9 +51,7 @@ def test_external_benchmark_compares_values_without_hidden_threshold() -> None:
         protocol_ref="protocol://phase6/p6h/v1",
         petrole_engine_version="gas-engine-test",
         external_solver=_solver(),
-        observations=(
-            _observation("J1", petrole_value=5_000_100.0, reference_value=5_000_000.0),
-        ),
+        observations=(_observation("J1", petrole_value=5_000_100.0, reference_value=5_000_000.0),),
     )
 
     result = assessment.observations[0]

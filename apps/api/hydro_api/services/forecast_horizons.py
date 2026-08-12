@@ -68,11 +68,15 @@ class ForecastHorizonEvaluationPoint:
     def __post_init__(self) -> None:
         required = (self.point_ref, self.prediction_source_ref, self.observation_source_ref)
         if any(not value.strip() for value in required):
-            raise ValueError("Le point et les provenances prédiction/observation sont obligatoires.")
+            raise ValueError(
+                "Le point et les provenances prédiction/observation sont obligatoires."
+            )
         if self.issued_at.tzinfo is None or self.target_timestamp.tzinfo is None:
             raise ValueError("Les timestamps d'horizon doivent être timezone-aware.")
         if self.target_timestamp.astimezone(UTC) <= self.issued_at.astimezone(UTC):
-            raise ValueError("La cible de prévision doit être strictement postérieure à son émission.")
+            raise ValueError(
+                "La cible de prévision doit être strictement postérieure à son émission."
+            )
         if not math.isfinite(self.predicted_value_si) or not math.isfinite(self.observed_value_si):
             raise ValueError("Les valeurs prédites et observées doivent être finies.")
 
@@ -119,7 +123,9 @@ def evaluate_forecast_horizon(
                 f"Le point {point.point_ref} ne respecte pas l'horizon {definition.horizon_ref}."
             )
         if previous_issue is not None and issued == previous_issue:
-            raise ValueError("Deux points d'horizon ne peuvent pas partager le même instant d'émission.")
+            raise ValueError(
+                "Deux points d'horizon ne peuvent pas partager le même instant d'émission."
+            )
         previous_issue = issued
         residuals.append(point.predicted_value_si - point.observed_value_si)
 

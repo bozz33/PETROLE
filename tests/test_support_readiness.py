@@ -125,9 +125,7 @@ def test_support_readiness_reports_missing_runbook_and_missing_phases() -> None:
     )
 
     assert assessment.passed is False
-    assert assessment.class_assessments[0].missing_phases == (
-        IncidentResponsePhase.RESTORE,
-    )
+    assert assessment.class_assessments[0].missing_phases == (IncidentResponsePhase.RESTORE,)
     assert assessment.class_assessments[1].violations == ("runbook_missing",)
     assert assessment.violations == (
         "phase_missing:restore:incident://database-unavailable",
@@ -159,17 +157,12 @@ def test_support_readiness_does_not_ignore_orphan_active_runbooks() -> None:
     )
 
     assert assessment.passed is False
-    assert assessment.violations == (
-        "runbook_without_active_requirement:incident://legacy-class",
-    )
+    assert assessment.violations == ("runbook_without_active_requirement:incident://legacy-class",)
 
 
 def test_support_runbook_requires_content_identity_review_and_covered_phase() -> None:
     with pytest.raises(ValueError, match="SHA-256"):
-        _runbook(
-            "incident://db",
-            (IncidentResponsePhase.DETECT,),
-        ).__class__(
+        SupportRunbookDescriptor(
             incident_class_ref="incident://db",
             runbook_ref="runbook://db",
             version="1.0",
@@ -238,8 +231,16 @@ def test_support_readiness_rejects_duplicate_requirements_and_runbook_classes() 
             protocol_ref="protocol://support/pilot-v1",
             requirements=(requirement,),
             runbooks=(
-                _runbook("incident://db", (IncidentResponsePhase.RESTORE,), runbook_ref="runbook://db/a"),
-                _runbook("incident://db", (IncidentResponsePhase.RESTORE,), runbook_ref="runbook://db/b"),
+                _runbook(
+                    "incident://db",
+                    (IncidentResponsePhase.RESTORE,),
+                    runbook_ref="runbook://db/a",
+                ),
+                _runbook(
+                    "incident://db",
+                    (IncidentResponsePhase.RESTORE,),
+                    runbook_ref="runbook://db/b",
+                ),
             ),
             organization=_organization(),
             assessed_at=NOW,

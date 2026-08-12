@@ -59,7 +59,12 @@ Sous-lots :
 - baseline naïve de persistance utilisant uniquement la dernière valeur chronologique du train ;
 - métriques de persistance séparées sur validation et test ;
 - comparaison OLS↔persistance sur populations identiques avec deltas MAE/RMSE/biais absolu ;
-- aucun seuil de victoire ou verdict de publication codé dans la comparaison.
+- aucun seuil de victoire ou verdict de publication codé dans la comparaison ;
+- horizon métier représenté explicitement par une référence, une cible, un usage, une décision, une provenance, un intervalle d’échantillonnage et un nombre de pas ;
+- aucune durée d’horizon n’est choisie par défaut dans PETROLE ;
+- évaluation horizon-scoped refusant tout point dont `target_timestamp - issued_at` diffère du lead-time convenu ;
+- MAE/RMSE/biais calculés uniquement sur des points appartenant au même horizon ;
+- provenances de prédictions et observations conservées dans l’évaluation d’horizon.
 
 ### P3-E — maintenance conditionnelle non-sûreté
 
@@ -81,7 +86,7 @@ Les capacités prédictives/conditionnelles ne deviennent publiables sur un pilo
 - seuils conditionnels justifiés et approuvés ;
 - revue ingénieur des variables et limites d’usage.
 
-La baseline naïve est désormais codée et testée ; les datasets représentatifs, horizons métier et critères d'acceptation restent des gates externes/non résolus.
+La baseline naïve et le contrat exécutable d’horizon sont désormais codés et testés. Les données représentatives, le choix effectif des horizons avec le pilote et les critères d'acceptation restent des gates externes/non résolus.
 
 ## 6. Hors portée
 

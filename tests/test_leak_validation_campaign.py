@@ -122,7 +122,7 @@ def test_campaign_criteria_require_explicit_source_and_at_least_one_threshold() 
 
 
 def test_campaign_criteria_reject_invalid_ratios_delays_and_sample_counts() -> None:
-    with pytest.raises(ValueError, match="\[0, 1\]"):
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
         LeakValidationCriteria(source_ref="protocol://bad-ratio", minimum_recall=1.1)
 
     with pytest.raises(ValueError, match="délai"):

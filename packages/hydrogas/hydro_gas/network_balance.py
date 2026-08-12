@@ -149,8 +149,8 @@ def assess_stationary_mass_balance(
         raise ValueError("Chaque frontière gaz doit référencer un noeud présent dans le réseau.")
 
     flows_by_pipe = {flow.pipe_id: flow for flow in pipe_flows}
-    incoming = {node_id: 0.0 for node_id in known_node_ids}
-    outgoing = {node_id: 0.0 for node_id in known_node_ids}
+    incoming = dict.fromkeys(known_node_ids, 0.0)
+    outgoing = dict.fromkeys(known_node_ids, 0.0)
 
     for pipe in network.pipes:
         mass_flow = flows_by_pipe[pipe.pipe_id].mass_flow_kg_s
@@ -162,7 +162,7 @@ def assess_stationary_mass_balance(
             incoming[pipe.from_node_id] += reverse_flow
             outgoing[pipe.to_node_id] += reverse_flow
 
-    external = {node_id: 0.0 for node_id in known_node_ids}
+    external = dict.fromkeys(known_node_ids, 0.0)
     for boundary in boundary_flows:
         external[boundary.node_id] += boundary.mass_flow_kg_s
 

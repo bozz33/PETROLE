@@ -35,13 +35,18 @@ class LeakValidationCriteria:
             self.minimum_specificity,
             self.maximum_false_positive_rate,
         )
-        if any(value is not None and (not math.isfinite(value) or not 0 <= value <= 1) for value in ratio_fields):
+        if any(
+            value is not None and (not math.isfinite(value) or not 0 <= value <= 1)
+            for value in ratio_fields
+        ):
             raise ValueError("Les critères de ratio doivent appartenir à [0, 1].")
         delay_fields = (
             self.maximum_mean_detection_delay_s,
             self.maximum_detection_delay_s,
         )
-        if any(value is not None and (not math.isfinite(value) or value < 0) for value in delay_fields):
+        if any(
+            value is not None and (not math.isfinite(value) or value < 0) for value in delay_fields
+        ):
             raise ValueError("Les critères de délai doivent être finis et positifs ou nuls.")
         if self.minimum_sample_count is not None and self.minimum_sample_count < 1:
             raise ValueError("Le nombre minimal d'échantillons doit être strictement positif.")
@@ -80,7 +85,9 @@ class LeakValidationAssessment:
 
     @property
     def all_evaluable_criteria_passed(self) -> bool | None:
-        evaluable = [result.passed for result in self.criterion_results if result.passed is not None]
+        evaluable = [
+            result.passed for result in self.criterion_results if result.passed is not None
+        ]
         if not evaluable:
             return None
         return all(evaluable)
@@ -158,7 +165,9 @@ def assess_validation_criteria(
     )
     for criterion, observed, required in minimum_metrics:
         if required is not None:
-            results.append(_minimum_result(criterion=criterion, observed=observed, required=required))
+            results.append(
+                _minimum_result(criterion=criterion, observed=observed, required=required)
+            )
 
     maximum_metrics = (
         (
@@ -179,7 +188,9 @@ def assess_validation_criteria(
     )
     for criterion, observed, required in maximum_metrics:
         if required is not None:
-            results.append(_maximum_result(criterion=criterion, observed=observed, required=required))
+            results.append(
+                _maximum_result(criterion=criterion, observed=observed, required=required)
+            )
 
     return LeakValidationAssessment(
         criteria_source_ref=criteria.source_ref,

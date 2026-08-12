@@ -36,6 +36,7 @@ from hydro_gas.network_balance import (
     assess_stationary_mass_balance,
 )
 from hydro_gas.properties import GasState, gas_density_from_z, linepack_mass
+from hydro_gas.result_export import GasResultExportArtifact, export_gas_results_json
 from hydro_gas.station import (
     CompressorStationConfiguration,
     CompressorUnitConfiguration,
@@ -67,6 +68,7 @@ __all__ = [
     "GasNetworkMassBalanceResult",
     "GasNodeMassBalance",
     "GasPipeMassFlow",
+    "GasResultExportArtifact",
     "GasState",
     "StationCoolerConfiguration",
     "StationValveConfiguration",
@@ -78,6 +80,7 @@ __all__ = [
     "assess_stationary_mass_balance",
     "compute_segmented_linepack",
     "evaluate_coolprop_properties",
+    "export_gas_results_json",
     "gas_density_from_z",
     "interpolate_compressor_map",
     "linepack_mass",

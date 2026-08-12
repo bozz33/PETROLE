@@ -32,9 +32,17 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Cette branc
 - aucun seuil de fuite implicite ni génération d’alarme ;
 - variables de jumeau en SI avec unité et référence de provenance obligatoires ;
 - snapshots immuables ordonnés, horodatés UTC et adressés par empreinte `sha256` canonique ;
-- comparaison de snapshots uniquement pour une même version de modèle, séquence croissante et unités cohérentes.
+- comparaison de snapshots uniquement pour une même version de modèle, séquence croissante et unités cohérentes ;
+- matching explicite événements labellisés ↔ alertes observées, sans fenêtre temporelle cachée ;
+- fusion de preuves pondérées sans seuil de fuite implicite ;
+- contrat de localisation avec estimation et intervalle d'incertitude fournis explicitement ;
+- critères de campagne P7-I pré-enregistrés avec provenance obligatoire ;
+- évaluation factuelle de précision, rappel, spécificité, taux de faux positifs, délais et taille de campagne contre les seuls critères configurés ;
+- métrique absente conservée comme non évaluable au lieu d'être interprétée comme un succès.
 
-Le snapshot versionné est une brique de traçabilité. Il ne constitue pas encore l’estimation d’état P7-A, le RTTM P7-B, un détecteur P7-D ou une localisation P7-F.
+Le snapshot versionné est une brique de traçabilité. Il ne constitue pas encore l’estimation d’état P7-A, le RTTM P7-B, un détecteur P7-D ou une localisation P7-F opérationnelle.
+
+La fondation P7-I permet désormais de figer et évaluer les critères de campagne, mais elle ne ferme pas la gate de validation : les données labellisées/essais contrôlés, les seuils approuvés par l'opérateur et la revue indépendante restent nécessaires.
 
 ## 4. Règles non négociables
 
@@ -43,7 +51,9 @@ Le snapshot versionné est une brique de traçabilité. Il ne constitue pas enco
 - les seuils et objectifs sont convenus avec l’opérateur, jamais codés arbitrairement ;
 - incertitudes de mesure, synchronisation et indisponibilités sont incluses dans l’analyse ;
 - faux positifs, faux négatifs, sensibilité, temps de détection et disponibilité sont mesurés ;
-- séparation entraînement/calibration/validation/test si des méthodes apprenantes sont utilisées.
+- séparation entraînement/calibration/validation/test si des méthodes apprenantes sont utilisées ;
+- un critère P7-I sans métrique observable reste explicitement non évaluable ;
+- la décision finale Go/No-Go reste humaine et indépendante du calcul des métriques.
 
 ## 5. Référentiel API
 

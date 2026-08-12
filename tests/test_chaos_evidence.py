@@ -16,8 +16,6 @@ def _objectives(**overrides) -> ChaosExperimentObjectives:
         "target_ref": "deployment://pilot/staging",
         "maximum_recovery_time_s": 60.0,
         "maximum_error_fraction": 0.05,
-        "require_data_integrity": True,
-        "require_scope_isolation": True,
     }
     payload.update(overrides)
     return ChaosExperimentObjectives(**payload)
@@ -69,14 +67,20 @@ def test_chaos_assessment_reports_all_observed_violations() -> None:
     )
 
 
-def test_optional_integrity_checks_are_controlled_by_explicit_protocol_flags() -> None:
-    assessment = assess_chaos_experiment(
-        _objectives(require_data_integrity=False, require_scope_isolation=False),
-        _evidence(data_integrity_preserved=False, scope_isolation_preserved=False),
+def test_data_integrity_and_scope_isolation_are_non_negotiable() -> None:
+    data_failure = assess_chaos_experiment(
+        _objectives(),
+        _evidence(data_integrity_preserved=False),
+    )
+    scope_failure = assess_chaos_experiment(
+        _objectives(),
+        _evidence(scope_isolation_preserved=False),
     )
 
-    assert assessment.passed is True
-    assert assessment.violations == ()
+    assert data_failure.passed is False
+    assert data_failure.violations == ("data_integrity_not_preserved",)
+    assert scope_failure.passed is False
+    assert scope_failure.violations == ("scope_isolation_not_preserved",)
 
 
 def test_chaos_objectives_reject_invalid_references_and_bounds() -> None:

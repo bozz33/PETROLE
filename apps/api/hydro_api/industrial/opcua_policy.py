@@ -19,9 +19,12 @@ class OpcUaOperation(StrEnum):
     READ = "read"
     SUBSCRIBE = "subscribe"
     HISTORY_READ = "history_read"
+    REPUBLISH = "republish"
+    SUBSCRIPTION_ACKNOWLEDGE = "subscription_acknowledge"
     WRITE = "write"
     CALL = "call"
     PUBLISH_EVENT = "publish_event"
+    # Acquittement d'alarme/événement procédé : reste explicitement interdit.
     ACKNOWLEDGE = "acknowledge"
 
 
@@ -31,6 +34,8 @@ READ_ONLY_OPERATIONS = frozenset(
         OpcUaOperation.READ,
         OpcUaOperation.SUBSCRIBE,
         OpcUaOperation.HISTORY_READ,
+        OpcUaOperation.REPUBLISH,
+        OpcUaOperation.SUBSCRIPTION_ACKNOWLEDGE,
     }
 )
 
@@ -56,6 +61,8 @@ class OpcUaEndpointPolicy(BaseModel):
             OpcUaOperation.READ,
             OpcUaOperation.SUBSCRIBE,
             OpcUaOperation.HISTORY_READ,
+            OpcUaOperation.REPUBLISH,
+            OpcUaOperation.SUBSCRIPTION_ACKNOWLEDGE,
         ]
     )
 

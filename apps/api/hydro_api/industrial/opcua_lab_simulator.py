@@ -111,7 +111,7 @@ class OpcUaReadOnlyLabSimulator:
     def republish(self, sequence_number: int) -> SimulatedNotificationMessage:
         """Retourne exactement le message encore disponible pour Republish."""
 
-        self.authorize_client_operation(OpcUaOperation.SUBSCRIBE)
+        self.authorize_client_operation(OpcUaOperation.REPUBLISH)
         next_sequence_number(sequence_number)
         try:
             return self._republish_cache[sequence_number]
@@ -119,6 +119,22 @@ class OpcUaReadOnlyLabSimulator:
             raise KeyError(
                 f"La séquence {sequence_number} n'est plus disponible dans le cache Republish simulé."
             ) from exc
+
+    def acknowledge(self, sequence_number: int) -> bool:
+        """Simule un SubscriptionAcknowledgement, jamais un acquittement d'alarme.
+
+        ``True`` indique qu'un message retransmissible existait et a été retiré
+        du cache. ``False`` garde explicite le cas d'un numéro inconnu ou déjà
+        évincé, sans fabriquer un StatusCode réseau.
+        """
+
+        self.authorize_client_operation(OpcUaOperation.SUBSCRIPTION_ACKNOWLEDGE)
+        next_sequence_number(sequence_number)
+        if sequence_number not in self._republish_cache:
+            return False
+        self._republish_cache.pop(sequence_number)
+        self._cache_order.remove(sequence_number)
+        return True
 
     def available_republish_sequences(self) -> tuple[int, ...]:
         """Expose l'ordre du cache pour les assertions de qualification OT-1."""

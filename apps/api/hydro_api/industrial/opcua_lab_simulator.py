@@ -49,7 +49,9 @@ class SimulatedNotificationMessage:
         if self.publish_timestamp.tzinfo is None:
             raise ValueError("Le timestamp Publish simulé doit être timezone-aware.")
         if not self.monitored_items:
-            raise ValueError("Un message de données simulé doit contenir au moins un item surveillé.")
+            raise ValueError(
+                "Un message de données simulé doit contenir au moins un item surveillé."
+            )
 
     @property
     def publish_timestamp_utc(self) -> datetime:

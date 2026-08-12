@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -12,7 +12,7 @@ from hydro_api.industrial.opcua_security_context import (
     assess_opcua_security_context,
 )
 
-NOW = datetime(2026, 8, 12, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 12, 12, 0, tzinfo=UTC)
 CLIENT_SHA = "11" * 32
 SERVER_SHA = "22" * 32
 TRUST_SHA = "33" * 32

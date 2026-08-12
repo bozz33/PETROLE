@@ -38,11 +38,16 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. Cette branc
 - contrat de localisation avec estimation et intervalle d'incertitude fournis explicitement ;
 - critères de campagne P7-I pré-enregistrés avec provenance obligatoire ;
 - évaluation factuelle de précision, rappel, spécificité, taux de faux positifs, délais et taille de campagne contre les seuls critères configurés ;
-- métrique absente conservée comme non évaluable au lieu d'être interprétée comme un succès.
+- métrique absente conservée comme non évaluable au lieu d'être interprétée comme un succès ;
+- partition P7-I exhaustive des événements labellisés entre calibration, validation, test indépendant et exclusions justifiées ;
+- jeu de test indépendant obligatoirement non vide ;
+- refus des événements dupliqués, chevauchants entre partitions, inconnus ou laissés sans affectation ;
+- exclusions obligatoirement accompagnées d'une référence de motif et d'une preuve ;
+- empreinte SHA-256 canonique de la partition incluant provenance des labels et exclusions, indépendante de l'ordre d'entrée.
 
 Le snapshot versionné est une brique de traçabilité. Il ne constitue pas encore l’estimation d’état P7-A, le RTTM P7-B, un détecteur P7-D ou une localisation P7-F opérationnelle.
 
-La fondation P7-I permet désormais de figer et évaluer les critères de campagne, mais elle ne ferme pas la gate de validation : les données labellisées/essais contrôlés, les seuils approuvés par l'opérateur et la revue indépendante restent nécessaires.
+La fondation P7-I permet désormais de figer le dataset, sa partition et les critères de campagne, mais elle ne ferme pas la gate de validation : les données labellisées/essais contrôlés, les seuils approuvés par l'opérateur et la revue indépendante restent nécessaires.
 
 ## 4. Règles non négociables
 
@@ -52,6 +57,7 @@ La fondation P7-I permet désormais de figer et évaluer les critères de campag
 - incertitudes de mesure, synchronisation et indisponibilités sont incluses dans l’analyse ;
 - faux positifs, faux négatifs, sensibilité, temps de détection et disponibilité sont mesurés ;
 - séparation entraînement/calibration/validation/test si des méthodes apprenantes sont utilisées ;
+- toute exclusion d'un événement labellisé reste explicite et prouvée ;
 - un critère P7-I sans métrique observable reste explicitement non évaluable ;
 - la décision finale Go/No-Go reste humaine et indépendante du calcul des métriques.
 
@@ -64,6 +70,7 @@ API RP 1175 définit le cadre de gestion du programme de détection ; API RP 113
 - Phase 5 read-only qualifiée ;
 - données synchronisées et métrologie documentée ;
 - événements labellisés ou essais de fuite contrôlés ;
+- partition du dataset et exclusions figées avant évaluation ;
 - critères de performance pré-enregistrés ;
 - procédure opérateur de traitement des alertes ;
 - revue indépendante de la campagne.

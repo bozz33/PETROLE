@@ -33,9 +33,13 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. La branche 
 - cartes compresseur avec provenance/version obligatoires ;
 - interpolation à l’intérieur du domaine fourni en débit et vitesse ;
 - refus systématique de l’extrapolation hors carte ;
-- validation des rendements, ordres de points et lignes de vitesse.
+- validation des rendements, ordres de points et lignes de vitesse ;
+- topologie gaz stationnaire indépendante du moteur liquide ;
+- bilan massique nodal `Σm_entrant - Σm_sortant + m_externe` avec flux inverses ;
+- injections/soutirages externes explicites et références de provenance ;
+- résidus nodaux et globaux exposés sans tolérance industrielle codée en dur.
 
-Ces fondations ne constituent pas encore un solveur de gazoduc stationnaire ni une station de compression complète.
+La conservation/topologie P6-B est donc implémentée, mais le solveur de conduite gaz stationnaire compressible reste incomplet tant qu’un modèle constitutif de perte de charge n’a pas été sélectionné, documenté et validé.
 
 ## 4. Règles scientifiques
 

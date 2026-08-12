@@ -75,7 +75,9 @@ def _compare_metrics(
     baseline: ForecastMetrics,
 ) -> ForecastMetricComparison:
     if model.sample_count != baseline.sample_count:
-        raise ValueError("Le modèle et la baseline doivent être évalués sur le même nombre de points.")
+        raise ValueError(
+            "Le modèle et la baseline doivent être évalués sur le même nombre de points."
+        )
     return ForecastMetricComparison(
         model_metrics=model,
         baseline_metrics=baseline,

@@ -50,6 +50,20 @@ def test_simulator_supports_gap_detection_and_republish_recovery() -> None:
     assert recovered.monitored_items[0].data_value.value == pytest.approx(2.0)
 
 
+def test_subscription_acknowledgement_removes_only_transport_message() -> None:
+    simulator = OpcUaReadOnlyLabSimulator(
+        subscription_id="SUB-ACK",
+        source_ref="simulator://ot-1/ack",
+    )
+    message = simulator.publish((_item(),), publish_timestamp=datetime.now(UTC))
+
+    assert simulator.acknowledge(message.sequence_number) is True
+    assert simulator.available_republish_sequences() == ()
+    assert simulator.acknowledge(message.sequence_number) is False
+    with pytest.raises(KeyError, match="n'est plus disponible"):
+        simulator.republish(message.sequence_number)
+
+
 def test_simulator_evicts_old_republish_messages_deterministically() -> None:
     simulator = OpcUaReadOnlyLabSimulator(
         subscription_id="SUB-001",

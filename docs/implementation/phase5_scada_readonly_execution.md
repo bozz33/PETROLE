@@ -52,9 +52,12 @@ Fondations déjà codées :
 - conversion des trous de séquence en demandes Republish explicites, sans interpolation ni fabrication de données ;
 - refus de `Write` et `Call` par le simulateur via la politique read-only commune ;
 - objectifs de santé connecteur fournis par le site : âge maximal de la source, nombre de trous, fraction maximale de qualité `Bad` et reconnexions ;
-- évaluation détaillée de ces objectifs sans seuil OT implicite ni action sur le procédé.
+- évaluation détaillée de ces objectifs sans seuil OT implicite ni action sur le procédé ;
+- gate P5-C de preuves X.509 : politique explicitement approuvée, certificat client référencé, certificat serveur valide, trust-list versionnée, révocation, `ApplicationUri` et identité DNS de l'endpoint ;
+- aucune `SecurityPolicy` choisie par défaut dans PETROLE : la décision reste fournie par la revue OT du site ;
+- aucune clé privée, aucun secret et aucun certificat brut persisté dans le contrat de preuve P5-C.
 
-P5-B dispose donc maintenant d'un simulateur comportemental hors ligne et P5-D/P5-E d'une fondation de planification Publish/Republish couplée à la durabilité. Il ne s'agit pas d'un serveur OPC UA wire-protocol : la session réseau réelle, SecureChannel, les certificats, la trust list, l'encodage des acknowledgements Publish et les appels Republish réseau restent derrière P5-C et le POC-OS-08 avec la passerelle dédiée retenue par D14.
+P5-B dispose donc maintenant d'un simulateur comportemental hors ligne, P5-D/P5-E d'une fondation de planification Publish/Republish couplée à la durabilité, et P5-C d'un gate de sécurité déterministe avant connexion. Il ne s'agit toujours pas d'un client OPC UA wire-protocol : la session réseau réelle, le SecureChannel, le chargement des certificats/clefs, le CertificateGroup/trust-list, l'encodage des acknowledgements Publish et les appels Republish réseau restent derrière POC-OS-08 avec la passerelle dédiée open62541 retenue par D14.
 
 Exigences minimales du futur connecteur réel : `SignAndEncrypt`, certificats, Endpoint configuré, namespace URI + NodeId stable, qualité réversible, timestamps doubles, backoff et trous de reconnexion visibles.
 

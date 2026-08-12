@@ -43,7 +43,9 @@ class ExternalGasSolverEvidence:
             self.source_ref,
         )
         if any(not value.strip() for value in required):
-            raise ValueError("Solveur, version, formulation, format et provenance sont obligatoires.")
+            raise ValueError(
+                "Solveur, version, formulation, format et provenance sont obligatoires."
+            )
         object.__setattr__(self, "input_sha256", _sha256(self.input_sha256, "input_sha256"))
         object.__setattr__(self, "output_sha256", _sha256(self.output_sha256, "output_sha256"))
 
@@ -71,7 +73,9 @@ class GasBenchmarkObservation:
             self.reference_source_ref,
         )
         if any(not value.strip() for value in required):
-            raise ValueError("Identité, grandeur, localisation, unité et provenances sont obligatoires.")
+            raise ValueError(
+                "Identité, grandeur, localisation, unité et provenances sont obligatoires."
+            )
         if not math.isfinite(self.petrole_value) or not math.isfinite(self.reference_value):
             raise ValueError("Les valeurs de benchmark doivent être finies.")
 

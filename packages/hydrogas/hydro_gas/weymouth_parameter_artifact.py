@@ -37,9 +37,13 @@ def _load_document(content: bytes) -> dict[str, object]:
     try:
         document = json.loads(content)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError("Le contenu de l'artefact paramètres doit être un JSON UTF-8 valide.") from exc
+        raise ValueError(
+            "Le contenu de l'artefact paramètres doit être un JSON UTF-8 valide."
+        ) from exc
     if not isinstance(document, dict) or any(not isinstance(key, str) for key in document):
-        raise ValueError("Le contenu de l'artefact paramètres doit être un objet JSON à clés texte.")
+        raise ValueError(
+            "Le contenu de l'artefact paramètres doit être un objet JSON à clés texte."
+        )
     return document
 
 
@@ -64,7 +68,9 @@ class WeymouthSiParameterArtifact:
         if any(not value.strip() for value in references):
             raise ValueError("Les références et l'identifiant de conduite sont obligatoires.")
         if not _SHA256_RE.fullmatch(self.sha256):
-            raise ValueError("L'empreinte de l'artefact doit être un SHA-256 hexadécimal minuscule.")
+            raise ValueError(
+                "L'empreinte de l'artefact doit être un SHA-256 hexadécimal minuscule."
+            )
         actual_sha256 = hashlib.sha256(self.content).hexdigest()
         if actual_sha256 != self.sha256:
             raise ValueError("Le contenu de l'artefact ne correspond pas à son SHA-256.")

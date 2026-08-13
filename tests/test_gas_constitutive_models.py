@@ -32,7 +32,9 @@ def _descriptor(
     *,
     model_id: str = "steady-model-a",
     version: str = "1.0",
-    qualification: GasConstitutiveQualification = GasConstitutiveQualification.BENCHMARK_READY,
+    qualification: GasConstitutiveQualification = (
+        GasConstitutiveQualification.BENCHMARK_READY
+    ),
     evidence: tuple[str, ...] = (),
 ) -> GasPipeConstitutiveModelDescriptor:
     return GasPipeConstitutiveModelDescriptor(
@@ -138,7 +140,7 @@ def test_manifest_reports_unbound_network_pipe() -> None:
 
 
 def test_benchmarked_descriptor_requires_qualification_evidence() -> None:
-    with pytest.raises(ValueError, match="benchmark.*preuves"):
+    with pytest.raises(ValueError, match=r"benchmark.*preuves"):
         _descriptor(qualification=GasConstitutiveQualification.BENCHMARKED)
 
     descriptor = _descriptor(
@@ -158,7 +160,9 @@ def test_descriptor_requires_domain_and_assumptions() -> None:
         "parameter_schema_ref": "schema://a",
     }
     with pytest.raises(ValueError, match="domaine de validité"):
-        GasPipeConstitutiveModelDescriptor(domain_refs=(), assumptions=("steady",), **kwargs)
+        GasPipeConstitutiveModelDescriptor(
+            domain_refs=(), assumptions=("steady",), **kwargs
+        )
     with pytest.raises(ValueError, match="hypothèses"):
         GasPipeConstitutiveModelDescriptor(
             domain_refs=("domain://a",), assumptions=(), **kwargs
@@ -180,7 +184,7 @@ def test_binding_requires_sha256_parameter_fingerprint() -> None:
 
 
 def test_manifest_rejects_duplicate_model_version_or_pipe_binding() -> None:
-    with pytest.raises(ValueError, match="modèle/version.*uniques"):
+    with pytest.raises(ValueError, match=r"modèle/version.*uniques"):
         GasConstitutiveManifest(
             descriptors=(_descriptor(), _descriptor()),
             bindings=(_binding("P1"),),

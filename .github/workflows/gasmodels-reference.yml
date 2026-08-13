@@ -1,0 +1,95 @@
+name: Référence GasModels P6-H
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/gasmodels-reference.yml"
+      - "tools/gasmodels_reference/**"
+
+permissions:
+  contents: read
+
+jobs:
+  gasmodels-wp-reference:
+    name: GasModels 0.13.4 — case-6-gf — WP/Ipopt
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    env:
+      GASMODELS_COMMIT: 21422f18e7e328732ec8edd7995446d33f58e789
+      GASMODELS_SOURCE_DIR: ${{ github.workspace }}/external/GasModels.jl
+      PETROLE_REFERENCE_OUTPUT_DIR: ${{ github.workspace }}/validation/gasmodels
+
+    steps:
+      - name: Récupérer PETROLE
+        uses: actions/checkout@v4
+
+      - name: Récupérer GasModels au commit de référence
+        uses: actions/checkout@v4
+        with:
+          repository: lanl-ansi/GasModels.jl
+          ref: ${{ env.GASMODELS_COMMIT }}
+          path: external/GasModels.jl
+          persist-credentials: false
+
+      - name: Installer Julia 1.10
+        uses: julia-actions/setup-julia@4a12c5f801ca5ef0458bba44687563ef276522dd # v3.0.0
+        with:
+          version: "1.10"
+          arch: x64
+          show-versioninfo: "true"
+
+      - name: Résoudre l'environnement de référence
+        shell: bash
+        run: |
+          julia --project=tools/gasmodels_reference -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path="external/GasModels.jl"))
+            Pkg.resolve()
+            Pkg.instantiate()
+            Pkg.precompile()
+          '
+
+      - name: Vérifier les versions réellement résolues
+        shell: bash
+        run: |
+          julia --project=tools/gasmodels_reference -e '
+            using GasModels, Ipopt
+            @assert string(Base.pkgversion(GasModels)) == "0.13.4"
+            println("GasModels=", Base.pkgversion(GasModels))
+            println("Ipopt=", Base.pkgversion(Ipopt))
+            println("Julia=", VERSION)
+          '
+          test "$(git -C external/GasModels.jl rev-parse HEAD)" = "$GASMODELS_COMMIT"
+
+      - name: Exécuter la référence WPGasModel
+        shell: bash
+        run: julia --project=tools/gasmodels_reference tools/gasmodels_reference/run_case6_wp.jl
+
+      - name: Sceller les artefacts de preuve
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p validation/gasmodels
+          if [ -f validation/gasmodels/case-6-gf-wp-reference.json ]; then
+            sha256sum validation/gasmodels/case-6-gf-wp-reference.json \
+              > validation/gasmodels/case-6-gf-wp-reference.json.sha256
+          fi
+          if [ -f tools/gasmodels_reference/Manifest.toml ]; then
+            cp tools/gasmodels_reference/Manifest.toml validation/gasmodels/Manifest.toml
+            sha256sum validation/gasmodels/Manifest.toml \
+              > validation/gasmodels/Manifest.toml.sha256
+          fi
+          git -C external/GasModels.jl rev-parse HEAD \
+            > validation/gasmodels/gasmodels-commit.txt
+          julia --version > validation/gasmodels/julia-version.txt
+
+      - name: Archiver la référence non certifiante
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gasmodels-case-6-gf-wp-reference
+          path: validation/gasmodels/
+          if-no-files-found: error
+          retention-days: 30

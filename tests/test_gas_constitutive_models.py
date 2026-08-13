@@ -32,9 +32,7 @@ def _descriptor(
     *,
     model_id: str = "steady-model-a",
     version: str = "1.0",
-    qualification: GasConstitutiveQualification = (
-        GasConstitutiveQualification.BENCHMARK_READY
-    ),
+    qualification: GasConstitutiveQualification = (GasConstitutiveQualification.BENCHMARK_READY),
     evidence: tuple[str, ...] = (),
 ) -> GasPipeConstitutiveModelDescriptor:
     return GasPipeConstitutiveModelDescriptor(
@@ -160,13 +158,9 @@ def test_descriptor_requires_domain_and_assumptions() -> None:
         "parameter_schema_ref": "schema://a",
     }
     with pytest.raises(ValueError, match="domaine de validité"):
-        GasPipeConstitutiveModelDescriptor(
-            domain_refs=(), assumptions=("steady",), **kwargs
-        )
+        GasPipeConstitutiveModelDescriptor(domain_refs=(), assumptions=("steady",), **kwargs)
     with pytest.raises(ValueError, match="hypothèses"):
-        GasPipeConstitutiveModelDescriptor(
-            domain_refs=("domain://a",), assumptions=(), **kwargs
-        )
+        GasPipeConstitutiveModelDescriptor(domain_refs=("domain://a",), assumptions=(), **kwargs)
 
 
 def test_binding_requires_sha256_parameter_fingerprint() -> None:

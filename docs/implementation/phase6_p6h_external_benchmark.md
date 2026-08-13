@@ -87,7 +87,8 @@ Le runner conserve sans conversion implicite :
 
 - pressions de jonctions `p` en valeur de sortie GasModels ;
 - débits de conduites `f` ;
-- débits et ratios des compresseurs ;
+- débits des compresseurs `f` ;
+- ratios des compresseurs extraits du champ `r` réellement utilisé par les tests GasModels 0.13.4, puis exposés sous le nom explicite `ratio` dans l'artefact PETROLE ;
 - débits des deliveries, receipts et transfers lorsqu'ils sont présents ;
 - statut de terminaison ;
 - objectif ;
@@ -96,7 +97,9 @@ Le runner conserve sans conversion implicite :
 - commit GasModels ;
 - hashes du cas, du projet Julia, du Manifest et du résultat JSON.
 
-Les grandeurs de solution sont étiquetées `_pu`. Le runner ne fabrique aucune conversion SI ; toute conversion future devra être explicite, testée et attachée à la version GasModels concernée.
+Les pressions et débits de solution sont étiquetés `_pu`. Le ratio compresseur est conservé comme grandeur sans dimension sous le champ `ratio`, sans suffixe `_pu`. Le runner ne fabrique aucune conversion SI ; toute conversion future devra être explicite, testée et attachée à la version GasModels concernée.
+
+Le commit épinglé présente une divergence documentaire à connaître : la page de format de résultat montre un champ compresseur `ratio`, alors que `test/common.jl` vérifie le champ `r`. Le runner suit le comportement effectivement vérifié par les tests de la version 0.13.4 et enregistre cette référence dans l'artefact, afin que cette convention ne soit pas implicite.
 
 ### Contrôle upstream distinct du benchmark PETROLE
 

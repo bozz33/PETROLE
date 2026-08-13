@@ -118,7 +118,7 @@ Le test `tests/test_gas_weymouth_si.py` applique l'évaluateur aux quatre condui
 | --- | ---: |
 | 1 | `0.0` |
 | 2 | `1.04248046875` |
-| 3 | `1.06005859375` |
+| 3 | `1.06103515625` |
 | 4 | `-33.4970703125` |
 
 Ces nombres ne sont accompagnés d'aucun seuil d'acceptation PETROLE. Ils servent à rendre reproductible le diagnostic obtenu à partir de l'artefact externe, pas à déclarer le modèle validé.

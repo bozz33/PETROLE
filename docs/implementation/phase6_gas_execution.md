@@ -44,6 +44,11 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. La branche 
 - binding constitutif unique par conduite vers un modèle/version et un jeu de paramètres identifié par SHA-256 ;
 - références séparées de géométrie, propriétés gaz et provenance du binding ;
 - diagnostic de manifeste distinguant conduite non liée, binding étranger au réseau, modèle inconnu et modèle non prêt benchmark ;
+- évaluateur P6-B du résidu Weymouth en SI, limité à `p_to² - p_from² + K f|f|` sur une observation fournie ;
+- coefficient `K = λ L a² / (D A²)` calculé uniquement depuis longueur, diamètre, friction et vitesse du son explicitement fournis ;
+- signe du débit conservé, y compris pour flux inverse ;
+- aucun seuil `PASS/FAIL`, aucune résolution pression-débit et aucune convergence réseau dans l'évaluateur Weymouth ;
+- non-régression du résidu sur les quatre conduites du cas GasModels P6-H exécuté et hashé ;
 - sélection énergétique discrète P6-F sur plans déjà évalués ;
 - preuve explicite de chaque contrainte obligatoire, sans faisabilité implicite ;
 - candidat violant une contrainte exclu même si son énergie est inférieure ;
@@ -58,13 +63,15 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. La branche 
 - comparaison observation par observation avec grandeur, localisation, unité et provenance explicites ;
 - erreurs signée, absolue et relative calculées sans seuil implicite ;
 - critères optionnels mais obligatoirement pré-enregistrés et sourcés ;
-- observation sans critère conservée comme non évaluée, jamais transformée en succès.
+- observation sans critère conservée comme non évaluée, jamais transformée en succès ;
+- runner GasModels 0.13.4 réellement exécuté sur `case-6-gf.m` avec `WPGasModel`/Ipopt, artefact v2 archivé et hashé ;
+- pressions, débits et ratios compresseurs de la référence conservés sans conversion SI implicite dans le runner externe.
 
-La conservation/topologie P6-B est implémentée et le choix d'un modèle constitutif est désormais traçable par manifeste. Le solveur de conduite gaz stationnaire compressible reste toutefois incomplet : aucune équation de perte de charge n'est encore exécutable tant qu'une formulation cible, ses paramètres, son domaine et ses benchmarks indépendants n'ont pas été sélectionnés et validés.
+La conservation/topologie P6-B est implémentée, le choix d'un modèle constitutif est traçable par manifeste et une première équation constitutive peut maintenant être **évaluée comme résidu SI** sur des valeurs fournies. Le solveur de conduite gaz stationnaire compressible reste toutefois incomplet : PETROLE ne déduit encore ni débit ni pression et ne résout aucun réseau non linéaire.
 
 P6-F dispose désormais d'une première fondation d'énumération filtrée conforme à D07 : la couche de décision consomme uniquement des plans et preuves calculés en amont. Elle ne constitue pas encore un NLP/MILP/MINLP couplé à la physique gaz et n'autorise aucune commande compresseur.
 
-P6-G dispose maintenant d’une fondation de restitution versionnée. P6-H dispose d'un contrat reproductible pour comparer PETROLE à GasModels.jl ou à un autre solveur externe sans coupler le modèle persistant PETROLE à leur sérialisation. Les rapports gaz complets restent toutefois bloqués par la qualification du moteur P6-B, la qualification des évaluateurs amont de P6-F et par l'exécution de benchmarks indépendants réels.
+P6-G dispose maintenant d’une fondation de restitution versionnée. P6-H dispose d'un contrat reproductible et d'une première exécution GasModels réelle pour comparer PETROLE à un solveur externe sans coupler le modèle persistant PETROLE à sa sérialisation. Cette référence ne valide pas encore P6-B : les critères PETROLE doivent être pré-enregistrés, les paramètres/formulations qualifiés et les cas indépendants multipliés avant toute conclusion scientifique.
 
 ## 4. Règles scientifiques
 
@@ -76,7 +83,8 @@ P6-G dispose maintenant d’une fondation de restitution versionnée. P6-H dispo
 - line-pack et bilans de masse vérifiables ;
 - les modèles stationnaires et transitoires gaz restent explicitement distincts ;
 - le bilan nodal, le modèle constitutif de conduite et le modèle compresseur restent des couches distinctes ;
-- aucune équation de conduite ne devient active sans modèle/version, domaine, hypothèses, paramètres et provenance explicites ;
+- aucune équation de conduite ne devient solveur réseau sans modèle/version, domaine, hypothèses, paramètres et provenance explicites ;
+- un résidu algébrique proche de zéro n'est jamais transformé seul en validation d'un modèle ;
 - `benchmark_ready` et `benchmarked` sont des états techniques de validation interne, jamais une certification ;
 - la sélection énergétique ne recalcule jamais la physique : énergie et preuves de contraintes viennent de modèles amont versionnés ;
 - aucun plan sans preuve explicite de contraintes n'est déclaré faisable ;
@@ -96,7 +104,7 @@ Les pages officielles ASME/ISO/API servent à vérifier l’existence, le statut
 - cas indépendants de validation ;
 - revue par un ingénieur gaz/thermofluides ;
 - documentation des limites et incertitudes ;
-- avant l'évaluateur constitutif P6-B : formulation, paramètres, domaine et source explicitement sélectionnés ;
+- avant solveur P6-B : formulation, paramètres, domaine, source et critères de benchmark explicitement sélectionnés ;
 - avant NLP/MILP/MINLP réseau : loi constitutive P6-B validée et fonction objectif/contraintes sourcées.
 
 ## 7. Hors portée

@@ -62,6 +62,12 @@ from hydro_gas.station import (
     StationValveConfiguration,
     StationValveRole,
 )
+from hydro_gas.weymouth_si import (
+    WeymouthSiObservation,
+    WeymouthSiPipeParameters,
+    WeymouthSiResidual,
+    evaluate_weymouth_si_residual,
+)
 
 __all__ = [
     "CompressorEnvelopeAssessment",
@@ -104,11 +110,15 @@ __all__ = [
     "SteadyGasNetwork",
     "SteadyGasNode",
     "SteadyGasPipe",
+    "WeymouthSiObservation",
+    "WeymouthSiPipeParameters",
+    "WeymouthSiResidual",
     "assess_compressor_envelope",
     "assess_constitutive_manifest",
     "assess_stationary_mass_balance",
     "compute_segmented_linepack",
     "evaluate_coolprop_properties",
+    "evaluate_weymouth_si_residual",
     "export_gas_results_json",
     "gas_density_from_z",
     "interpolate_compressor_map",

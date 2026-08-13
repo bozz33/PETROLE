@@ -111,9 +111,7 @@ def evaluate_weymouth_si_residual(
         - observation.from_pressure_pa * observation.from_pressure_pa
     )
     coefficient = parameters.resistance_coefficient_pa2_per_kg_s2
-    friction_term_pa2 = (
-        coefficient * observation.mass_flow_kg_s * abs(observation.mass_flow_kg_s)
-    )
+    friction_term_pa2 = coefficient * observation.mass_flow_kg_s * abs(observation.mass_flow_kg_s)
     residual_pa2 = pressure_squared_difference_pa2 + friction_term_pa2
 
     return WeymouthSiResidual(

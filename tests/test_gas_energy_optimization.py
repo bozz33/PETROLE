@@ -128,7 +128,7 @@ def test_candidate_rejects_invalid_energy_duration_and_duplicate_constraints() -
         )
 
     duplicated = (_constraint("envelope"), _constraint("envelope"))
-    with pytest.raises(ValueError, match="contraintes.*uniques"):
+    with pytest.raises(ValueError, match=r"contraintes.*uniques"):
         _candidate("duplicate-constraint", 10.0, constraints=duplicated)
 
 
@@ -136,7 +136,7 @@ def test_selection_rejects_empty_space_and_duplicate_candidate_ids() -> None:
     with pytest.raises(ValueError, match="Au moins un candidat"):
         select_minimum_energy_dispatch(())
 
-    with pytest.raises(ValueError, match="candidats énergétiques.*uniques"):
+    with pytest.raises(ValueError, match=r"candidats énergétiques.*uniques"):
         select_minimum_energy_dispatch((_candidate("same", 10.0), _candidate("same", 20.0)))
 
 

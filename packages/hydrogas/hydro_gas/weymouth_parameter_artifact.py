@@ -27,10 +27,7 @@ _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _expected_equation_ref() -> str:
-    return (
-        "GasModels.jl/docs/src/math-model.md@"
-        f"{WEYMOUTH_SI_SOURCE_COMMIT}#steady-state-weymouth"
-    )
+    return f"GasModels.jl/docs/src/math-model.md@{WEYMOUTH_SI_SOURCE_COMMIT}#steady-state-weymouth"
 
 
 def _load_document(content: bytes) -> dict[str, object]:

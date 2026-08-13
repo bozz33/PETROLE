@@ -142,7 +142,7 @@ function main()
     end
 
     println("Référence GasModels écrite : $output_path")
-    println("input_sha256=$(artifact[\"case\"][\"input_sha256\"])")
+    println("input_sha256=", artifact["case"]["input_sha256"])
     println("output_sha256=$(sha256_file(output_path))")
     println("termination_status=$termination_status")
     println("objective=$objective")

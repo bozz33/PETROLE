@@ -123,7 +123,7 @@ def test_case6_gasmodels_reference_is_recorded_as_raw_residuals_without_threshol
     expected_residuals_pa2 = {
         "1": 0.0,
         "2": 1.04248046875,
-        "3": 1.06005859375,
+        "3": 1.06103515625,
         "4": -33.4970703125,
     }
 

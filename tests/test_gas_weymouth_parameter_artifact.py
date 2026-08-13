@@ -14,6 +14,7 @@ from hydro_gas.weymouth_parameter_artifact import (
     WEYMOUTH_SI_MODEL_ID,
     WEYMOUTH_SI_MODEL_VERSION,
     WEYMOUTH_SI_PARAMETER_SCHEMA_VERSION,
+    WeymouthSiParameterArtifact,
     build_weymouth_si_binding,
     export_weymouth_si_parameter_artifact,
     weymouth_si_reference_descriptor,
@@ -55,7 +56,7 @@ def _parameters(
     )
 
 
-def _artifact(pipe_id: str):
+def _artifact(pipe_id: str) -> WeymouthSiParameterArtifact:
     _, _, diameter_m, length_m, friction_factor = _CASE_PIPE_DATA[pipe_id]
     return export_weymouth_si_parameter_artifact(
         _parameters(

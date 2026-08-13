@@ -137,9 +137,7 @@ def test_selection_rejects_empty_space_and_duplicate_candidate_ids() -> None:
         select_minimum_energy_dispatch(())
 
     with pytest.raises(ValueError, match="candidats énergétiques.*uniques"):
-        select_minimum_energy_dispatch(
-            (_candidate("same", 10.0), _candidate("same", 20.0))
-        )
+        select_minimum_energy_dispatch((_candidate("same", 10.0), _candidate("same", 20.0)))
 
 
 def test_candidate_preserves_traceability_and_deduplicates_operating_refs() -> None:

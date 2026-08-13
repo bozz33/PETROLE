@@ -55,7 +55,9 @@ class GasPipeConstitutiveModelDescriptor:
                 "sa source et son schéma de paramètres sont obligatoires."
             )
 
-        domains = tuple(dict.fromkeys(value.strip() for value in self.domain_refs if value.strip()))
+        domains = tuple(
+            dict.fromkeys(value.strip() for value in self.domain_refs if value.strip())
+        )
         assumptions = tuple(
             dict.fromkeys(value.strip() for value in self.assumptions if value.strip())
         )
@@ -111,7 +113,8 @@ class GasPipeConstitutiveBinding:
         normalized_hash = self.parameter_set_sha256.strip().lower()
         if not _SHA256_RE.fullmatch(normalized_hash):
             raise ValueError(
-                "L'empreinte du jeu de paramètres doit être un SHA-256 hexadécimal de 64 caractères."
+                "L'empreinte du jeu de paramètres doit être un SHA-256 hexadécimal "
+                "de 64 caractères."
             )
         object.__setattr__(self, "parameter_set_sha256", normalized_hash)
 
@@ -170,7 +173,9 @@ def assess_constitutive_manifest(
     network_pipe_ids = {pipe.pipe_id for pipe in network.pipes}
     bindings_by_pipe = {binding.pipe_id: binding for binding in manifest.bindings}
     binding_pipe_ids = set(bindings_by_pipe)
-    descriptors_by_key = {descriptor.key: descriptor for descriptor in manifest.descriptors}
+    descriptors_by_key = {
+        descriptor.key: descriptor for descriptor in manifest.descriptors
+    }
 
     unbound = tuple(sorted(network_pipe_ids - binding_pipe_ids))
     unknown_pipes = tuple(sorted(binding_pipe_ids - network_pipe_ids))

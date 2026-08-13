@@ -10,13 +10,8 @@ from hydro_gas.weymouth_si import (
     evaluate_weymouth_si_residual,
 )
 
-_EQUATION_REF = (
-    "GasModels.jl/docs/src/math-model.md@21422f18e7e328732ec8edd7995446d33f58e789"
-)
-_CASE_REF = (
-    "GasModels.jl/test/data/matgas/case-6-gf.m@"
-    "21422f18e7e328732ec8edd7995446d33f58e789"
-)
+_EQUATION_REF = "GasModels.jl/docs/src/math-model.md@21422f18e7e328732ec8edd7995446d33f58e789"
+_CASE_REF = "GasModels.jl/test/data/matgas/case-6-gf.m@21422f18e7e328732ec8edd7995446d33f58e789"
 _REFERENCE_ARTIFACT = (
     "github-actions://bozz33/PETROLE/31657331294/9164893821/"
     "sha256:1ad529221dc0f4e05e30f0e73c1e01b8b4c80925f65d135a4c9b908a902e386e"

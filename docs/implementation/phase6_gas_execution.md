@@ -38,6 +38,12 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. La branche 
 - bilan massique nodal `Σm_entrant - Σm_sortant + m_externe` avec flux inverses ;
 - injections/soutirages externes explicites et références de provenance ;
 - résidus nodaux et globaux exposés sans tolérance industrielle codée en dur ;
+- sélection énergétique discrète P6-F sur plans déjà évalués ;
+- preuve explicite de chaque contrainte obligatoire, sans faisabilité implicite ;
+- candidat violant une contrainte exclu même si son énergie est inférieure ;
+- classement déterministe par énergie totale puis identifiant ;
+- infaisabilité explicite sans solution de secours inventée ;
+- optimalité P6-F limitée à l'ensemble discret fourni, sans prétention d'optimalité continue/réseau ;
 - export JSON canonique P6-G de résultats déjà calculés ;
 - version de modèle, références composition/propriétés, hypothèses et diagnostics conservés dans l’export ;
 - empreinte SHA-256 du contenu exporté, sans recalcul scientifique dans la couche de restitution ;
@@ -50,7 +56,9 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. La branche 
 
 La conservation/topologie P6-B est donc implémentée, mais le solveur de conduite gaz stationnaire compressible reste incomplet tant qu’un modèle constitutif de perte de charge n’a pas été sélectionné, documenté et validé.
 
-P6-G dispose maintenant d’une fondation de restitution versionnée. P6-H dispose d'un contrat reproductible pour comparer PETROLE à GasModels.jl ou à un autre solveur externe sans coupler le modèle persistant PETROLE à leur sérialisation. Les rapports gaz complets restent toutefois bloqués par la qualification des moteurs P6-B/P6-F et par l'exécution de benchmarks indépendants réels.
+P6-F dispose désormais d'une première fondation d'énumération filtrée conforme à D07 : la couche de décision consomme uniquement des plans et preuves calculés en amont. Elle ne constitue pas encore un NLP/MILP/MINLP couplé à la physique gaz et n'autorise aucune commande compresseur.
+
+P6-G dispose maintenant d’une fondation de restitution versionnée. P6-H dispose d'un contrat reproductible pour comparer PETROLE à GasModels.jl ou à un autre solveur externe sans coupler le modèle persistant PETROLE à leur sérialisation. Les rapports gaz complets restent toutefois bloqués par la qualification du moteur P6-B, la qualification des évaluateurs amont de P6-F et par l'exécution de benchmarks indépendants réels.
 
 ## 4. Règles scientifiques
 
@@ -61,6 +69,9 @@ P6-G dispose maintenant d’une fondation de restitution versionnée. P6-H dispo
 - extrapolations hors domaine refusées ou signalées explicitement ;
 - line-pack et bilans de masse vérifiables ;
 - les modèles stationnaires et transitoires gaz restent explicitement distincts ;
+- la sélection énergétique ne recalcule jamais la physique : énergie et preuves de contraintes viennent de modèles amont versionnés ;
+- aucun plan sans preuve explicite de contraintes n'est déclaré faisable ;
+- `optimality_gap=0` d'une sélection discrète signifie seulement que l'espace fourni a été entièrement parcouru ;
 - la couche d’export sérialise les résultats qualifiés en amont sans les recalculer ;
 - un solveur externe est identifié par sa version, sa formulation, son format et les empreintes des cas réellement exécutés ;
 - aucune différence cross-solver n'est présentée comme validation si les critères n'ont pas été définis avant la comparaison.
@@ -75,7 +86,8 @@ Les pages officielles ASME/ISO/API servent à vérifier l’existence, le statut
 - cartes compresseurs réelles ou jeux de référence publics ;
 - cas indépendants de validation ;
 - revue par un ingénieur gaz/thermofluides ;
-- documentation des limites et incertitudes.
+- documentation des limites et incertitudes ;
+- avant NLP/MILP/MINLP réseau : loi constitutive P6-B validée et fonction objectif/contraintes sourcées.
 
 ## 7. Hors portée
 

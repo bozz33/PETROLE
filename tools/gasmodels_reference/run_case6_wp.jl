@@ -24,18 +24,22 @@ function require_finite_float(value, label::String)::Float64
     return number
 end
 
-function numeric_component_rows(solution::Dict, component_name::String, fields::Vector{String})
+function numeric_component_rows(
+    solution::Dict,
+    component_name::String,
+    fields::Vector{Pair{String, String}},
+)
     components = get(solution, component_name, Dict{String, Any}())
     rows = Vector{Dict{String, Any}}()
 
     for component_id in sort(collect(keys(components)))
         source = components[component_id]
         row = Dict{String, Any}("id" => component_id)
-        for field in fields
-            if haskey(source, field)
-                row[field * "_pu"] = require_finite_float(
-                    source[field],
-                    "$component_name/$component_id/$field",
+        for (source_field, artifact_field) in fields
+            if haskey(source, source_field)
+                row[artifact_field] = require_finite_float(
+                    source[source_field],
+                    "$component_name/$component_id/$source_field",
                 )
             end
         end
@@ -77,7 +81,7 @@ function main()
     solution = result["solution"]
 
     artifact = Dict{String, Any}(
-        "schema_version" => "petrole-gasmodels-reference-v1",
+        "schema_version" => "petrole-gasmodels-reference-v2",
         "reference_only" => true,
         "certification_claim" => false,
         "solver" => Dict(
@@ -109,6 +113,7 @@ function main()
         ),
         "upstream_test_criteria" => Dict(
             "source_ref" => "GasModels.jl/test/gf.jl@$EXPECTED_GASMODELS_COMMIT",
+            "compressor_ratio_check_ref" => "GasModels.jl/test/common.jl@$EXPECTED_GASMODELS_COMMIT",
             "accepted_termination_statuses" => sort(collect(ACCEPTED_TERMINATION_STATUSES)),
             "objective_target" => 0.0,
             "objective_absolute_tolerance" => UPSTREAM_OBJECTIVE_ATOL,
@@ -118,18 +123,23 @@ function main()
             "termination_status" => termination_status,
             "objective" => objective,
             "solve_time_s" => get(result, "solve_time", nothing),
-            "junction" => numeric_component_rows(solution, "junction", ["p"]),
-            "pipe" => numeric_component_rows(solution, "pipe", ["f"]),
-            "compressor" => numeric_component_rows(solution, "compressor", ["f", "ratio"]),
-            "delivery" => numeric_component_rows(solution, "delivery", ["fd"]),
-            "receipt" => numeric_component_rows(solution, "receipt", ["fg"]),
-            "transfer" => numeric_component_rows(solution, "transfer", ["ft"]),
+            "junction" => numeric_component_rows(solution, "junction", ["p" => "p_pu"]),
+            "pipe" => numeric_component_rows(solution, "pipe", ["f" => "f_pu"]),
+            "compressor" => numeric_component_rows(
+                solution,
+                "compressor",
+                ["f" => "f_pu", "r" => "ratio"],
+            ),
+            "delivery" => numeric_component_rows(solution, "delivery", ["fd" => "fd_pu"]),
+            "receipt" => numeric_component_rows(solution, "receipt", ["fg" => "fg_pu"]),
+            "transfer" => numeric_component_rows(solution, "transfer", ["ft" => "ft_pu"]),
         ),
         "provenance" => Dict(
             "gasmodels_repository" => "lanl-ansi/GasModels.jl",
             "gasmodels_case_ref" => "test/data/matgas/case-6-gf.m@$EXPECTED_GASMODELS_COMMIT",
             "petrole_runner_ref" => "tools/gasmodels_reference/run_case6_wp.jl",
-            "raw_values_are_per_unit" => true,
+            "network_state_values_are_per_unit" => true,
+            "compressor_ratio_is_dimensionless" => true,
             "si_conversion_performed_by_runner" => false,
         ),
     )

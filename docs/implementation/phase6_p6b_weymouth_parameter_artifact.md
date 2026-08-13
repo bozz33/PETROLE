@@ -19,7 +19,7 @@ Elle ne :
 
 Module : `packages/hydrogas/hydro_gas/weymouth_parameter_artifact.py`.
 
-### Schéma v1
+### Schema v1
 
 Version : `phase6/weymouth-si-parameters/1`.
 

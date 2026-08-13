@@ -49,6 +49,12 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. La branche 
 - signe du débit conservé, y compris pour flux inverse ;
 - aucun seuil `PASS/FAIL`, aucune résolution pression-débit et aucune convergence réseau dans l'évaluateur Weymouth ;
 - non-régression du résidu sur les quatre conduites du cas GasModels P6-H exécuté et hashé ;
+- artefact canonique P6-B par conduite contenant paramètres SI, équation et références géométrie/propriétés ;
+- sérialisation JSON déterministe sans arrondi ni `NaN/Infinity`, puis SHA-256 des octets exacts ;
+- quatre empreintes de paramètres du cas GasModels figées indépendamment du résultat solveur ;
+- descripteur `weymouth-si@gasmodels-0.13.4-reference-v1` déclaré `benchmark_ready`, jamais `benchmarked` sans critères et preuves supplémentaires ;
+- binding Weymouth construit directement depuis l'artefact hashé, sans recalcul des paramètres ;
+- manifeste constitutif du cas de référence démontré complet et `benchmark_ready` sur les quatre conduites ;
 - sélection énergétique discrète P6-F sur plans déjà évalués ;
 - preuve explicite de chaque contrainte obligatoire, sans faisabilité implicite ;
 - candidat violant une contrainte exclu même si son énergie est inférieure ;
@@ -65,13 +71,15 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. La branche 
 - critères optionnels mais obligatoirement pré-enregistrés et sourcés ;
 - observation sans critère conservée comme non évaluée, jamais transformée en succès ;
 - runner GasModels 0.13.4 réellement exécuté sur `case-6-gf.m` avec `WPGasModel`/Ipopt, artefact v2 archivé et hashé ;
-- pressions, débits et ratios compresseurs de la référence conservés sans conversion SI implicite dans le runner externe.
+- pressions, débits et ratios compresseurs de la référence conservés sans conversion SI implicite dans le runner externe ;
+- hash du JSON solveur traité comme preuve d'une exécution précise, pas comme garantie de byte-reproductibilité entre runs numériques ;
+- référence scientifique figée remplacée uniquement par décision explicite, jamais automatiquement par un rerun.
 
-La conservation/topologie P6-B est implémentée, le choix d'un modèle constitutif est traçable par manifeste et une première équation constitutive peut maintenant être **évaluée comme résidu SI** sur des valeurs fournies. Le solveur de conduite gaz stationnaire compressible reste toutefois incomplet : PETROLE ne déduit encore ni débit ni pression et ne résout aucun réseau non linéaire.
+La conservation/topologie P6-B est implémentée, le choix d'un modèle constitutif est traçable par manifeste, les paramètres Weymouth sont désormais canoniques/hashés et une première équation constitutive peut être **évaluée comme résidu SI** sur des valeurs fournies. Le solveur de conduite gaz stationnaire compressible reste toutefois incomplet : PETROLE ne déduit encore ni débit ni pression et ne résout aucun réseau non linéaire.
 
 P6-F dispose désormais d'une première fondation d'énumération filtrée conforme à D07 : la couche de décision consomme uniquement des plans et preuves calculés en amont. Elle ne constitue pas encore un NLP/MILP/MINLP couplé à la physique gaz et n'autorise aucune commande compresseur.
 
-P6-G dispose maintenant d’une fondation de restitution versionnée. P6-H dispose d'un contrat reproductible et d'une première exécution GasModels réelle pour comparer PETROLE à un solveur externe sans coupler le modèle persistant PETROLE à sa sérialisation. Cette référence ne valide pas encore P6-B : les critères PETROLE doivent être pré-enregistrés, les paramètres/formulations qualifiés et les cas indépendants multipliés avant toute conclusion scientifique.
+P6-G dispose maintenant d’une fondation de restitution versionnée. P6-H dispose d'un contrat de comparaison, d'une recette externe verrouillée et d'une première exécution GasModels réelle sans coupler le modèle persistant PETROLE à sa sérialisation. La recette est reproductible, tandis que les octets bruts du résultat numérique restent une preuve par exécution et peuvent varier aux derniers bits. Cette référence ne valide pas encore P6-B : les critères PETROLE doivent être pré-enregistrés, les paramètres/formulations qualifiés et les cas indépendants multipliés avant toute conclusion scientifique.
 
 ## 4. Règles scientifiques
 
@@ -83,7 +91,8 @@ P6-G dispose maintenant d’une fondation de restitution versionnée. P6-H dispo
 - line-pack et bilans de masse vérifiables ;
 - les modèles stationnaires et transitoires gaz restent explicitement distincts ;
 - le bilan nodal, le modèle constitutif de conduite et le modèle compresseur restent des couches distinctes ;
-- aucune équation de conduite ne devient solveur réseau sans modèle/version, domaine, hypothèses, paramètres et provenance explicites ;
+- aucune équation de conduite ne devient solveur réseau sans modèle/version, domaine, hypothèses, paramètres hashés et provenance explicites ;
+- un hash de paramètres garantit l'identité des entrées utilisées, pas leur justesse physique ;
 - un résidu algébrique proche de zéro n'est jamais transformé seul en validation d'un modèle ;
 - `benchmark_ready` et `benchmarked` sont des états techniques de validation interne, jamais une certification ;
 - la sélection énergétique ne recalcule jamais la physique : énergie et preuves de contraintes viennent de modèles amont versionnés ;
@@ -91,6 +100,7 @@ P6-G dispose maintenant d’une fondation de restitution versionnée. P6-H dispo
 - `optimality_gap=0` d'une sélection discrète signifie seulement que l'espace fourni a été entièrement parcouru ;
 - la couche d’export sérialise les résultats qualifiés en amont sans les recalculer ;
 - un solveur externe est identifié par sa version, sa formulation, son format et les empreintes des cas réellement exécutés ;
+- le SHA-256 d'un résultat solveur brut identifie une exécution et n'est pas utilisé comme critère numérique de validation ;
 - aucune différence cross-solver n'est présentée comme validation si les critères n'ont pas été définis avant la comparaison.
 
 ## 5. Normes et propriété intellectuelle
@@ -104,7 +114,7 @@ Les pages officielles ASME/ISO/API servent à vérifier l’existence, le statut
 - cas indépendants de validation ;
 - revue par un ingénieur gaz/thermofluides ;
 - documentation des limites et incertitudes ;
-- avant solveur P6-B : formulation, paramètres, domaine, source et critères de benchmark explicitement sélectionnés ;
+- avant solveur P6-B : critères de benchmark PETROLE pré-enregistrés et plusieurs cas indépendants exécutés ;
 - avant NLP/MILP/MINLP réseau : loi constitutive P6-B validée et fonction objectif/contraintes sourcées.
 
 ## 7. Hors portée

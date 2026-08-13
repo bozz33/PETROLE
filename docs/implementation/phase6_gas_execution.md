@@ -38,6 +38,12 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. La branche 
 - bilan massique nodal `Σm_entrant - Σm_sortant + m_externe` avec flux inverses ;
 - injections/soutirages externes explicites et références de provenance ;
 - résidus nodaux et globaux exposés sans tolérance industrielle codée en dur ;
+- registre P6-B de modèles constitutifs avec identifiant, version, formulation, équation, source, domaine et hypothèses obligatoires ;
+- états de qualification P6-B limités à `declared`, `benchmark_ready` et `benchmarked`, sans sémantique de certification ;
+- preuve obligatoire pour un modèle marqué `benchmarked` ;
+- binding constitutif unique par conduite vers un modèle/version et un jeu de paramètres identifié par SHA-256 ;
+- références séparées de géométrie, propriétés gaz et provenance du binding ;
+- diagnostic de manifeste distinguant conduite non liée, binding étranger au réseau, modèle inconnu et modèle non prêt benchmark ;
 - sélection énergétique discrète P6-F sur plans déjà évalués ;
 - preuve explicite de chaque contrainte obligatoire, sans faisabilité implicite ;
 - candidat violant une contrainte exclu même si son énergie est inférieure ;
@@ -54,7 +60,7 @@ Base de travail : `main = 6c0ed6aa1632eef0cb207f5ec3bcce9c382a140e`. La branche 
 - critères optionnels mais obligatoirement pré-enregistrés et sourcés ;
 - observation sans critère conservée comme non évaluée, jamais transformée en succès.
 
-La conservation/topologie P6-B est donc implémentée, mais le solveur de conduite gaz stationnaire compressible reste incomplet tant qu’un modèle constitutif de perte de charge n’a pas été sélectionné, documenté et validé.
+La conservation/topologie P6-B est implémentée et le choix d'un modèle constitutif est désormais traçable par manifeste. Le solveur de conduite gaz stationnaire compressible reste toutefois incomplet : aucune équation de perte de charge n'est encore exécutable tant qu'une formulation cible, ses paramètres, son domaine et ses benchmarks indépendants n'ont pas été sélectionnés et validés.
 
 P6-F dispose désormais d'une première fondation d'énumération filtrée conforme à D07 : la couche de décision consomme uniquement des plans et preuves calculés en amont. Elle ne constitue pas encore un NLP/MILP/MINLP couplé à la physique gaz et n'autorise aucune commande compresseur.
 
@@ -69,6 +75,9 @@ P6-G dispose maintenant d’une fondation de restitution versionnée. P6-H dispo
 - extrapolations hors domaine refusées ou signalées explicitement ;
 - line-pack et bilans de masse vérifiables ;
 - les modèles stationnaires et transitoires gaz restent explicitement distincts ;
+- le bilan nodal, le modèle constitutif de conduite et le modèle compresseur restent des couches distinctes ;
+- aucune équation de conduite ne devient active sans modèle/version, domaine, hypothèses, paramètres et provenance explicites ;
+- `benchmark_ready` et `benchmarked` sont des états techniques de validation interne, jamais une certification ;
 - la sélection énergétique ne recalcule jamais la physique : énergie et preuves de contraintes viennent de modèles amont versionnés ;
 - aucun plan sans preuve explicite de contraintes n'est déclaré faisable ;
 - `optimality_gap=0` d'une sélection discrète signifie seulement que l'espace fourni a été entièrement parcouru ;
@@ -87,6 +96,7 @@ Les pages officielles ASME/ISO/API servent à vérifier l’existence, le statut
 - cas indépendants de validation ;
 - revue par un ingénieur gaz/thermofluides ;
 - documentation des limites et incertitudes ;
+- avant l'évaluateur constitutif P6-B : formulation, paramètres, domaine et source explicitement sélectionnés ;
 - avant NLP/MILP/MINLP réseau : loi constitutive P6-B validée et fonction objectif/contraintes sourcées.
 
 ## 7. Hors portée

@@ -79,6 +79,9 @@ from hydro_gas.weymouth_si import (
 )
 
 __all__ = [
+    "WEYMOUTH_SI_MODEL_ID",
+    "WEYMOUTH_SI_MODEL_VERSION",
+    "WEYMOUTH_SI_PARAMETER_SCHEMA_VERSION",
     "CompressorEnvelopeAssessment",
     "CompressorFlowLimitPoint",
     "CompressorMap",
@@ -119,9 +122,6 @@ __all__ = [
     "SteadyGasNetwork",
     "SteadyGasNode",
     "SteadyGasPipe",
-    "WEYMOUTH_SI_MODEL_ID",
-    "WEYMOUTH_SI_MODEL_VERSION",
-    "WEYMOUTH_SI_PARAMETER_SCHEMA_VERSION",
     "WeymouthSiObservation",
     "WeymouthSiParameterArtifact",
     "WeymouthSiPipeParameters",

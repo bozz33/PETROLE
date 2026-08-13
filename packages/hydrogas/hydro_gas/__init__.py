@@ -24,6 +24,15 @@ from hydro_gas.coolprop_adapter import (
     CoolPropPureFluidDefinition,
     evaluate_coolprop_properties,
 )
+from hydro_gas.energy_optimization import (
+    GasDispatchConstraintEvidence,
+    GasEnergyDispatchCandidate,
+    GasEnergySelectionResult,
+    GasEnergySelectionStatus,
+    RankedGasEnergyCandidate,
+    RejectedGasEnergyCandidate,
+    select_minimum_energy_dispatch,
+)
 from hydro_gas.linepack import GasLinepackCell, GasLinepackResult, compute_segmented_linepack
 from hydro_gas.network_balance import (
     GasBoundaryMassFlow,
@@ -63,6 +72,10 @@ __all__ = [
     "GasBoundaryMassFlow",
     "GasComponentFraction",
     "GasComposition",
+    "GasDispatchConstraintEvidence",
+    "GasEnergyDispatchCandidate",
+    "GasEnergySelectionResult",
+    "GasEnergySelectionStatus",
     "GasLinepackCell",
     "GasLinepackResult",
     "GasNetworkMassBalanceResult",
@@ -70,6 +83,8 @@ __all__ = [
     "GasPipeMassFlow",
     "GasResultExportArtifact",
     "GasState",
+    "RankedGasEnergyCandidate",
+    "RejectedGasEnergyCandidate",
     "StationCoolerConfiguration",
     "StationValveConfiguration",
     "StationValveRole",
@@ -84,4 +99,5 @@ __all__ = [
     "gas_density_from_z",
     "interpolate_compressor_map",
     "linepack_mass",
+    "select_minimum_energy_dispatch",
 ]

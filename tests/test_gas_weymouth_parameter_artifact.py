@@ -25,10 +25,10 @@ _COMMIT = "21422f18e7e328732ec8edd7995446d33f58e789"
 _EQUATION_REF = f"GasModels.jl/docs/src/math-model.md@{_COMMIT}#steady-state-weymouth"
 _CASE_REF = f"GasModels.jl/test/data/matgas/case-6-gf.m@{_COMMIT}"
 _EXPECTED_CASE_HASHES = {
-    "1": "8750cdf95bbc1b2b73a4dab6881c736b29ef3ad6de19d69d03c2565fcf00f3ed",
-    "2": "f83d3607d95e6175daf037967214749899bedb21ea360407dee7d8fc588ab31b",
-    "3": "ed5a742fd5ef6e129f6ebbacdc99d3202487685cc784fca18e8bbe9698cdf998",
-    "4": "245cf1ab92e9030493e13be3464fd4418e8d42b59ffb2ff681271bfdfc8169a5",
+    "1": "d8d38334b5cd3477ffe658514373c12dcce48833a6876c7cd67e330760cfe52c",
+    "2": "81674ea1452942c6d2283df1344f5802967cfdc601142b42c57cd65e096a8425",
+    "3": "7b39768267f3284b954d55e583719afa0e9a776f9f9971bf4b594f35d1890b58",
+    "4": "a69bc30dbc1669f4f96ebccc95a6c353abb0cfff6d4a0dcf8426768fc5cf61fe",
 }
 _CASE_PIPE_DATA = {
     "1": ("5", "2", 0.6, 50_000.0, 0.01),
@@ -44,6 +44,7 @@ def _parameters(
     diameter_m: float,
     length_m: float,
     friction_factor: float,
+    equation_ref: str = _EQUATION_REF,
 ) -> WeymouthSiPipeParameters:
     return WeymouthSiPipeParameters(
         pipe_id=pipe_id,
@@ -51,7 +52,7 @@ def _parameters(
         diameter_m=diameter_m,
         friction_factor=friction_factor,
         sound_speed_m_s=371.6643,
-        equation_ref=_EQUATION_REF,
+        equation_ref=equation_ref,
         parameter_source_ref=_CASE_REF,
     )
 
@@ -96,6 +97,9 @@ def test_parameter_artifact_is_canonical_and_preserves_explicit_references() -> 
     assert artifact.sha256 == _EXPECTED_CASE_HASHES["1"]
     assert document["schema_version"] == WEYMOUTH_SI_PARAMETER_SCHEMA_VERSION
     assert document["unit_system"] == "SI"
+    assert document["model_id"] == WEYMOUTH_SI_MODEL_ID
+    assert document["model_version"] == WEYMOUTH_SI_MODEL_VERSION
+    assert document["parameter_set_ref"] == artifact.parameter_set_ref
     assert document["pipe_id"] == "1"
     assert document["length_m"] == 50_000.0
     assert document["diameter_m"] == 0.6
@@ -163,6 +167,26 @@ def test_case6_manifest_is_complete_and_benchmark_ready_without_certification_cl
     assert manifest.descriptors[0].qualification_evidence_refs == ()
 
 
+def test_parameter_artifact_normalizes_outer_reference_whitespace() -> None:
+    parameters = _parameters(
+        "1",
+        diameter_m=0.6,
+        length_m=50_000.0,
+        friction_factor=0.01,
+    )
+    artifact = export_weymouth_si_parameter_artifact(
+        parameters,
+        parameter_set_ref=" reference://gasmodels/case-6-gf/weymouth/pipe-1/v1 ",
+        geometry_ref=f" {_CASE_REF}#pipe/1 ",
+        gas_property_ref=f" {_CASE_REF}#gas-properties ",
+    )
+
+    assert artifact.sha256 == _EXPECTED_CASE_HASHES["1"]
+    assert artifact.parameter_set_ref == "reference://gasmodels/case-6-gf/weymouth/pipe-1/v1"
+    assert artifact.geometry_ref == f"{_CASE_REF}#pipe/1"
+    assert artifact.gas_property_ref == f"{_CASE_REF}#gas-properties"
+
+
 def test_parameter_artifact_rejects_missing_external_references() -> None:
     parameters = _parameters(
         "1",
@@ -177,6 +201,49 @@ def test_parameter_artifact_rejects_missing_external_references() -> None:
             parameter_set_ref="",
             geometry_ref=f"{_CASE_REF}#pipe/1",
             gas_property_ref=f"{_CASE_REF}#gas-properties",
+        )
+
+
+def test_parameter_artifact_rejects_unpinned_equation() -> None:
+    parameters = _parameters(
+        "1",
+        diameter_m=0.6,
+        length_m=50_000.0,
+        friction_factor=0.01,
+        equation_ref="reference://another-weymouth-formulation",
+    )
+
+    with pytest.raises(ValueError, match="formulation de référence épinglée"):
+        export_weymouth_si_parameter_artifact(
+            parameters,
+            parameter_set_ref="reference://gasmodels/case-6-gf/weymouth/pipe-1/v1",
+            geometry_ref=f"{_CASE_REF}#pipe/1",
+            gas_property_ref=f"{_CASE_REF}#gas-properties",
+        )
+
+
+def test_parameter_artifact_rejects_tampered_content_or_envelope() -> None:
+    artifact = _artifact("1")
+    tampered = artifact.content.replace(b'"diameter_m":0.6', b'"diameter_m":0.7')
+
+    with pytest.raises(ValueError, match="ne correspond pas à son SHA-256"):
+        WeymouthSiParameterArtifact(
+            parameter_set_ref=artifact.parameter_set_ref,
+            pipe_id=artifact.pipe_id,
+            geometry_ref=artifact.geometry_ref,
+            gas_property_ref=artifact.gas_property_ref,
+            content=tampered,
+            sha256=artifact.sha256,
+        )
+
+    with pytest.raises(ValueError, match="incohérents"):
+        WeymouthSiParameterArtifact(
+            parameter_set_ref=artifact.parameter_set_ref,
+            pipe_id="wrong-pipe",
+            geometry_ref=artifact.geometry_ref,
+            gas_property_ref=artifact.gas_property_ref,
+            content=artifact.content,
+            sha256=artifact.sha256,
         )
 
 

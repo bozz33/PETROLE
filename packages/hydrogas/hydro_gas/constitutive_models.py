@@ -55,9 +55,7 @@ class GasPipeConstitutiveModelDescriptor:
                 "sa source et son schéma de paramètres sont obligatoires."
             )
 
-        domains = tuple(
-            dict.fromkeys(value.strip() for value in self.domain_refs if value.strip())
-        )
+        domains = tuple(dict.fromkeys(value.strip() for value in self.domain_refs if value.strip()))
         assumptions = tuple(
             dict.fromkeys(value.strip() for value in self.assumptions if value.strip())
         )
@@ -173,9 +171,7 @@ def assess_constitutive_manifest(
     network_pipe_ids = {pipe.pipe_id for pipe in network.pipes}
     bindings_by_pipe = {binding.pipe_id: binding for binding in manifest.bindings}
     binding_pipe_ids = set(bindings_by_pipe)
-    descriptors_by_key = {
-        descriptor.key: descriptor for descriptor in manifest.descriptors
-    }
+    descriptors_by_key = {descriptor.key: descriptor for descriptor in manifest.descriptors}
 
     unbound = tuple(sorted(network_pipe_ids - binding_pipe_ids))
     unknown_pipes = tuple(sorted(binding_pipe_ids - network_pipe_ids))
@@ -205,12 +201,9 @@ def assess_constitutive_manifest(
     violations: list[str] = []
     violations.extend(f"unbound_pipe:{pipe_id}" for pipe_id in unbound)
     violations.extend(f"unknown_pipe:{pipe_id}" for pipe_id in unknown_pipes)
+    violations.extend(f"unknown_model:{model_id}@{version}" for model_id, version in unknown_models)
     violations.extend(
-        f"unknown_model:{model_id}@{version}" for model_id, version in unknown_models
-    )
-    violations.extend(
-        f"model_not_benchmark_ready:{model_id}@{version}"
-        for model_id, version in not_ready
+        f"model_not_benchmark_ready:{model_id}@{version}" for model_id, version in not_ready
     )
 
     complete = not unbound and not unknown_pipes and not unknown_models

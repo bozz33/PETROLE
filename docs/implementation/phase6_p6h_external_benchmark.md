@@ -1,6 +1,6 @@
 # Phase 6 — P6-H benchmark gaz externe
 
-Statut : contrat de comparaison reproductible implémenté et **runner de référence GasModels ajouté**, sans valider encore le solveur gaz PETROLE.
+Statut : contrat de comparaison et **recette de référence GasModels reproductible** implémentés, sans valider encore le solveur gaz PETROLE ni supposer un JSON solveur byte-identique entre exécutions.
 
 ## Références
 
@@ -20,7 +20,7 @@ La preuve du solveur externe conserve obligatoirement :
 - référence de formulation ;
 - référence du format de données ;
 - SHA-256 du cas d'entrée ;
-- SHA-256 du résultat externe ;
+- SHA-256 du résultat externe de **cette exécution** ;
 - provenance de l'exécution.
 
 ## Observations
@@ -59,7 +59,7 @@ Une observation sans critère reste explicitement non évaluée. Elle n'est jama
 
 D14 retient GasModels.jl comme outil de benchmark/service futur et non comme cœur universel. Le contrat PETROLE conserve donc la version du solveur et la référence de son format au lieu d'adopter son dictionnaire JSON comme modèle persistant du produit.
 
-Un premier runner reproductible est maintenant présent :
+Un premier runner à recette verrouillée est maintenant présent :
 
 - workflow : `.github/workflows/gasmodels-reference.yml` ;
 - environnement : `tools/gasmodels_reference/Project.toml` ;
@@ -101,6 +101,28 @@ Les pressions et débits de solution sont étiquetés `_pu`. Le ratio compresseu
 
 Le commit épinglé présente une divergence documentaire à connaître : la page de format de résultat montre un champ compresseur `ratio`, alors que `test/common.jl` vérifie le champ `r`. Le runner suit le comportement effectivement vérifié par les tests de la version 0.13.4 et enregistre cette référence dans l'artefact, afin que cette convention ne soit pas implicite.
 
+### Reproductibilité : recette, preuve brute et flottants
+
+La reproductibilité revendiquée ici porte sur la **recette** : même dépôt/commit, même cas, même formulation, même environnement résolu et mêmes étapes de génération. Elle ne signifie pas que le JSON brut d'un solveur numérique doit avoir le même SHA-256 à chaque exécution.
+
+La référence PETROLE actuellement figée pour les tests est :
+
+- run : `31657331294` ;
+- artifact id : `9164893821` ;
+- input SHA-256 : `9ebe79b0ac61892af4db71b5d78190a46cc1269a3942d0b18217dec1d28bf5ac` ;
+- Manifest SHA-256 : `831a5243dbd9b30278946313063ed46918d5d4f7652e09ea1d229b1adde1b16b` ;
+- JSON brut v2 SHA-256 : `1ad529221dc0f4e05e30f0e73c1e01b8b4c80925f65d135a4c9b908a902e386e`.
+
+Un rerun ultérieur sur le head `509a865f572902ab00fe49005a870da6fc48d158` a conservé les mêmes versions, le même input, le même Manifest, les mêmes pressions et les mêmes grandeurs à la précision utile observée, mais :
+
+- `solve_time_s` a changé ;
+- le débit de la conduite 4 a différé au dernier bit affiché (`-0.04774262816089823` contre `-0.04774262816089822` pu) ;
+- le JSON brut a donc reçu un autre SHA-256 (`0a621c06f846450d6c9c0200f65e116cc3f035412d9a05a1b1496c28c376abe3`).
+
+PETROLE ne masque pas cette variabilité par un arrondi arbitraire. Le hash du JSON brut identifie **une exécution précise**. Une comparaison sémantique de deux exécutions devra utiliser des critères numériques pré-enregistrés ; elle ne sera jamais remplacée par une simple égalité de hashes.
+
+Un rerun réussi ne remplace pas automatiquement l'artefact scientifique figé. Le changement de référence exige une décision explicite, une nouvelle provenance et la mise à jour contrôlée des tests/critères concernés.
+
 ### Contrôle upstream distinct du benchmark PETROLE
 
 GasModels teste officiellement ce cas en exigeant un statut de résolution admissible et un objectif proche de zéro avec une tolérance absolue de `1e-6`. Le runner reproduit ce contrôle **uniquement comme contrôle d'intégrité de la référence upstream** et l'étiquette séparément dans l'artefact.
@@ -129,7 +151,7 @@ Le runner ne :
 - certifie pas un résultat ;
 - commande aucun équipement.
 
-Il fabrique seulement une **référence externe versionnée et hashée** à partir d'un cas upstream officiel.
+Il fabrique seulement une **preuve externe versionnée et hashée par exécution** à partir d'un cas upstream officiel et d'une recette verrouillée.
 
 ## Gate scientifique suivant
 

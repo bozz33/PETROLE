@@ -18,6 +18,14 @@ from hydro_gas.compressor_map import (
     CompressorSpeedLine,
     interpolate_compressor_map,
 )
+from hydro_gas.constitutive_models import (
+    GasConstitutiveManifest,
+    GasConstitutiveManifestAssessment,
+    GasConstitutiveQualification,
+    GasPipeConstitutiveBinding,
+    GasPipeConstitutiveModelDescriptor,
+    assess_constitutive_manifest,
+)
 from hydro_gas.coolprop_adapter import (
     CoolPropEvaluationEnvelope,
     CoolPropPropertyResult,
@@ -72,6 +80,9 @@ __all__ = [
     "GasBoundaryMassFlow",
     "GasComponentFraction",
     "GasComposition",
+    "GasConstitutiveManifest",
+    "GasConstitutiveManifestAssessment",
+    "GasConstitutiveQualification",
     "GasDispatchConstraintEvidence",
     "GasEnergyDispatchCandidate",
     "GasEnergySelectionResult",
@@ -80,6 +91,8 @@ __all__ = [
     "GasLinepackResult",
     "GasNetworkMassBalanceResult",
     "GasNodeMassBalance",
+    "GasPipeConstitutiveBinding",
+    "GasPipeConstitutiveModelDescriptor",
     "GasPipeMassFlow",
     "GasResultExportArtifact",
     "GasState",
@@ -92,6 +105,7 @@ __all__ = [
     "SteadyGasNode",
     "SteadyGasPipe",
     "assess_compressor_envelope",
+    "assess_constitutive_manifest",
     "assess_stationary_mass_balance",
     "compute_segmented_linepack",
     "evaluate_coolprop_properties",

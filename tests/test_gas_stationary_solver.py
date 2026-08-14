@@ -7,7 +7,6 @@ import pytest
 
 import hydro_gas
 
-
 _SCALE_POLICY_REF = "scale-policy://synthetic-test-only/weymouth/v1"
 _INITIAL_GUESS_POLICY_REF = "initial-guess://synthetic-test-only/weymouth/v1"
 _PROTOCOL_REF = "protocol://gas/solver/synthetic-test-only/v1"

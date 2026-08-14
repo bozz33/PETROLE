@@ -69,6 +69,12 @@ from hydro_gas.station import (
     StationValveConfiguration,
     StationValveRole,
 )
+from hydro_gas.stationary_problem import (
+    GasPressureSlack,
+    StationaryWeymouthProblem,
+    StationaryWeymouthUnknownLayout,
+    build_stationary_weymouth_unknown_layout,
+)
 from hydro_gas.weymouth_network_residual import (
     GasNodePressure,
     WeymouthNetworkCandidateState,
@@ -129,6 +135,7 @@ __all__ = [
     "GasPipeConstitutiveBinding",
     "GasPipeConstitutiveModelDescriptor",
     "GasPipeMassFlow",
+    "GasPressureSlack",
     "GasResultExportArtifact",
     "GasState",
     "PreRegisteredGasBenchmarkCriterion",
@@ -137,6 +144,8 @@ __all__ = [
     "StationCoolerConfiguration",
     "StationValveConfiguration",
     "StationValveRole",
+    "StationaryWeymouthProblem",
+    "StationaryWeymouthUnknownLayout",
     "SteadyGasNetwork",
     "SteadyGasNode",
     "SteadyGasPipe",
@@ -150,6 +159,7 @@ __all__ = [
     "assess_compressor_envelope",
     "assess_constitutive_manifest",
     "assess_stationary_mass_balance",
+    "build_stationary_weymouth_unknown_layout",
     "build_weymouth_si_binding",
     "compute_segmented_linepack",
     "evaluate_coolprop_properties",

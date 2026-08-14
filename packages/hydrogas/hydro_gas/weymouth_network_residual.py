@@ -98,7 +98,9 @@ def assemble_weymouth_network_residuals(
     if len(parameter_ids) != len(set(parameter_ids)):
         raise ValueError("Un seul jeu de paramètres Weymouth est autorisé par conduite.")
     if set(parameter_ids) != expected_pipe_ids:
-        raise ValueError("Les paramètres Weymouth doivent couvrir exactement les conduites du réseau.")
+        raise ValueError(
+            "Les paramètres Weymouth doivent couvrir exactement les conduites du réseau."
+        )
 
     mass_balance = assess_stationary_mass_balance(
         network,

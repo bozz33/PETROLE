@@ -4,16 +4,11 @@ import math
 
 import pytest
 
-from hydro_gas.benchmark_protocol import (
-    GasBenchmarkCriterionState,
-    GasBenchmarkProtocolContext,
-    PreRegisteredGasBenchmarkCriterion,
-    materialize_approved_gas_benchmark_criteria,
-)
+from hydro_gas import benchmark_protocol
 from hydro_gas.external_benchmark import GasBenchmarkObservation
 
 
-_CONTEXT = GasBenchmarkProtocolContext(
+_CONTEXT = benchmark_protocol.GasBenchmarkProtocolContext(
     protocol_ref="protocol://gas/weymouth/case-6/v1",
     model_id="weymouth-si",
     model_version="gasmodels-0.13.4-reference-v1",
@@ -47,7 +42,9 @@ def _criterion(
     criterion_id: str = "criterion-pipe-1",
     *,
     observation_id: str = "pipe-1-residual",
-    state: GasBenchmarkCriterionState = GasBenchmarkCriterionState.APPROVED,
+    state: benchmark_protocol.GasBenchmarkCriterionState = (
+        benchmark_protocol.GasBenchmarkCriterionState.APPROVED
+    ),
     approval_ref: str | None = "approval://thermofluids/review-17",
     quantity_ref: str = "weymouth-residual",
     unit: str = "Pa2",
@@ -58,8 +55,8 @@ def _criterion(
     model_version: str = _CONTEXT.model_version,
     formulation_ref: str = _CONTEXT.formulation_ref,
     case_ref: str = _CONTEXT.case_ref,
-) -> PreRegisteredGasBenchmarkCriterion:
-    return PreRegisteredGasBenchmarkCriterion(
+) -> benchmark_protocol.PreRegisteredGasBenchmarkCriterion:
+    return benchmark_protocol.PreRegisteredGasBenchmarkCriterion(
         criterion_id=criterion_id,
         criterion_version="1",
         protocol_ref=protocol_ref,
@@ -82,7 +79,7 @@ def _criterion(
 def test_approved_criterion_materializes_without_creating_new_thresholds() -> None:
     approved = _criterion(maximum_absolute_error=2.0, maximum_relative_error_fraction=0.01)
 
-    result = materialize_approved_gas_benchmark_criteria(
+    result = benchmark_protocol.materialize_approved_gas_benchmark_criteria(
         context=_CONTEXT,
         criteria=(approved,),
         observations=(_observation(),),
@@ -104,12 +101,12 @@ def test_approved_criterion_materializes_without_creating_new_thresholds() -> No
 
 def test_draft_criterion_cannot_be_materialized() -> None:
     draft = _criterion(
-        state=GasBenchmarkCriterionState.DRAFT,
+        state=benchmark_protocol.GasBenchmarkCriterionState.DRAFT,
         approval_ref=None,
     )
 
     with pytest.raises(PermissionError, match="n'est pas APPROVED"):
-        materialize_approved_gas_benchmark_criteria(
+        benchmark_protocol.materialize_approved_gas_benchmark_criteria(
             context=_CONTEXT,
             criteria=(draft,),
             observations=(_observation(),),
@@ -117,11 +114,11 @@ def test_draft_criterion_cannot_be_materialized() -> None:
 
 
 def test_approved_state_requires_approval_and_draft_rejects_active_approval() -> None:
-    with pytest.raises(ValueError, match="APPROVED.*approbation"):
+    with pytest.raises(ValueError, match=r"APPROVED.*approbation"):
         _criterion(approval_ref=None)
 
-    with pytest.raises(ValueError, match="DRAFT.*approbation"):
-        _criterion(state=GasBenchmarkCriterionState.DRAFT)
+    with pytest.raises(ValueError, match=r"DRAFT.*approbation"):
+        _criterion(state=benchmark_protocol.GasBenchmarkCriterionState.DRAFT)
 
 
 def test_criterion_requires_explicit_nonnegative_finite_limit() -> None:
@@ -139,7 +136,7 @@ def test_materialization_rejects_context_mismatch() -> None:
     mismatched = _criterion(model_version="another-model-version")
 
     with pytest.raises(ValueError, match="contexte de benchmark"):
-        materialize_approved_gas_benchmark_criteria(
+        benchmark_protocol.materialize_approved_gas_benchmark_criteria(
             context=_CONTEXT,
             criteria=(mismatched,),
             observations=(_observation(),),
@@ -148,21 +145,21 @@ def test_materialization_rejects_context_mismatch() -> None:
 
 def test_materialization_rejects_missing_observation_quantity_or_unit_mismatch() -> None:
     with pytest.raises(ValueError, match="observation absente"):
-        materialize_approved_gas_benchmark_criteria(
+        benchmark_protocol.materialize_approved_gas_benchmark_criteria(
             context=_CONTEXT,
             criteria=(_criterion(observation_id="missing"),),
             observations=(_observation(),),
         )
 
     with pytest.raises(ValueError, match="autre grandeur"):
-        materialize_approved_gas_benchmark_criteria(
+        benchmark_protocol.materialize_approved_gas_benchmark_criteria(
             context=_CONTEXT,
             criteria=(_criterion(quantity_ref="pressure"),),
             observations=(_observation(),),
         )
 
     with pytest.raises(ValueError, match="autre unité"):
-        materialize_approved_gas_benchmark_criteria(
+        benchmark_protocol.materialize_approved_gas_benchmark_criteria(
             context=_CONTEXT,
             criteria=(_criterion(unit="bar"),),
             observations=(_observation(),),
@@ -172,8 +169,8 @@ def test_materialization_rejects_missing_observation_quantity_or_unit_mismatch()
 def test_materialization_rejects_duplicate_criteria_or_observation_assignment() -> None:
     first = _criterion(criterion_id="criterion-a")
     duplicate_id = _criterion(criterion_id="criterion-a", observation_id="pipe-2-residual")
-    with pytest.raises(ValueError, match="identifiants de critères.*uniques"):
-        materialize_approved_gas_benchmark_criteria(
+    with pytest.raises(ValueError, match=r"identifiants de critères.*uniques"):
+        benchmark_protocol.materialize_approved_gas_benchmark_criteria(
             context=_CONTEXT,
             criteria=(first, duplicate_id),
             observations=(
@@ -184,7 +181,7 @@ def test_materialization_rejects_duplicate_criteria_or_observation_assignment() 
 
     second_same_observation = _criterion(criterion_id="criterion-b")
     with pytest.raises(ValueError, match="observation ne peut recevoir qu'un critère"):
-        materialize_approved_gas_benchmark_criteria(
+        benchmark_protocol.materialize_approved_gas_benchmark_criteria(
             context=_CONTEXT,
             criteria=(first, second_same_observation),
             observations=(_observation(),),
@@ -193,7 +190,7 @@ def test_materialization_rejects_duplicate_criteria_or_observation_assignment() 
 
 def test_materialization_rejects_empty_protocol_slice() -> None:
     with pytest.raises(ValueError, match="Au moins un critère"):
-        materialize_approved_gas_benchmark_criteria(
+        benchmark_protocol.materialize_approved_gas_benchmark_criteria(
             context=_CONTEXT,
             criteria=(),
             observations=(_observation(),),

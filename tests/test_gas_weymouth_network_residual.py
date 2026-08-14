@@ -121,9 +121,7 @@ def test_network_residual_assembly_keeps_reverse_flow_sign() -> None:
     result = assemble_weymouth_network_residuals(network, candidate, (parameters,))
 
     assert tuple(item.residual_kg_s for item in result.mass_balance.node_balances) == (0.0, 0.0)
-    residual = result.pipe_residuals[0]
-    assert residual.friction_term_pa2 < 0.0
-    assert residual.mass_flow_kg_s if hasattr(residual, "mass_flow_kg_s") else True
+    assert result.pipe_residuals[0].friction_term_pa2 < 0.0
 
 
 def test_candidate_requires_unique_pressures_and_flows() -> None:
@@ -151,7 +149,7 @@ def test_network_residual_assembly_requires_exact_node_pressure_coverage() -> No
         pipe_flows=(GasPipeMassFlow("P1", 1.0, "candidate://flow/P1"),),
     )
 
-    with pytest.raises(ValueError, match="pressions candidates.*exactement"):
+    with pytest.raises(ValueError, match=r"pressions candidates.*exactement"):
         assemble_weymouth_network_residuals(_network(), candidate, (_parameters(),))
 
 
@@ -163,7 +161,7 @@ def test_network_residual_assembly_requires_exact_unique_parameter_coverage() ->
     with pytest.raises(ValueError, match="Un seul jeu de paramètres"):
         assemble_weymouth_network_residuals(network, candidate, (parameters, parameters))
 
-    with pytest.raises(ValueError, match="paramètres Weymouth.*exactement"):
+    with pytest.raises(ValueError, match=r"paramètres Weymouth.*exactement"):
         assemble_weymouth_network_residuals(network, candidate, (_parameters("OTHER"),))
 
 

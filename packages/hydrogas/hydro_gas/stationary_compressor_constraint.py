@@ -35,7 +35,9 @@ class StationaryCompressorState:
 
     def __post_init__(self) -> None:
         if not self.compressor_id.strip() or not self.source_ref.strip():
-            raise ValueError("L'identifiant compresseur et la provenance de l'état sont obligatoires.")
+            raise ValueError(
+                "L'identifiant compresseur et la provenance de l'état sont obligatoires."
+            )
         positive_values = (
             self.inlet_pressure_pa,
             self.outlet_pressure_pa,

@@ -15,9 +15,7 @@ def _problem() -> hydro_gas.StationaryWeymouthProblem:
             ),
             pipes=(hydro_gas.SteadyGasPipe("P1", "A", "B", "model://pipe/P1"),),
         ),
-        pressure_slacks=(
-            hydro_gas.GasPressureSlack("A", 5_000_000.0, "boundary://pressure/A"),
-        ),
+        pressure_slacks=(hydro_gas.GasPressureSlack("A", 5_000_000.0, "boundary://pressure/A"),),
         specified_boundary_flows=(
             hydro_gas.GasBoundaryMassFlow("DEMAND-B", "B", -3.0, "boundary://demand/B"),
         ),
@@ -27,9 +25,7 @@ def _problem() -> hydro_gas.StationaryWeymouthProblem:
 def _unknown_state() -> hydro_gas.StationaryWeymouthUnknownState:
     return hydro_gas.StationaryWeymouthUnknownState(
         state_ref="state://gas/evaluation/001",
-        unknown_node_pressures=(
-            hydro_gas.GasNodePressure("B", 4_900_000.0, "state://pressure/B"),
-        ),
+        unknown_node_pressures=(hydro_gas.GasNodePressure("B", 4_900_000.0, "state://pressure/B"),),
         pipe_flows=(hydro_gas.GasPipeMassFlow("P1", 3.0, "state://flow/P1"),),
         slack_external_flows=(
             hydro_gas.GasBoundaryMassFlow("SLACK-A", "A", 3.0, "state://slack/A"),

@@ -107,9 +107,11 @@ from hydro_gas.stationary_solver import (
     WEYMOUTH_P2_NUMERICAL_REPRESENTATION_REF,
     ScipyLeastSquaresTrfConfiguration,
     StationaryWeymouthConvergenceAssessment,
+    StationaryWeymouthGovernedSolveResult,
     StationaryWeymouthSolveResult,
     assess_stationary_weymouth_convergence,
     solve_stationary_weymouth_least_squares_trf,
+    solve_stationary_weymouth_with_approved_inputs,
 )
 from hydro_gas.stationary_solver_governance import (
     ApprovedStationaryConvergenceCriterion,
@@ -118,6 +120,15 @@ from hydro_gas.stationary_solver_governance import (
     StationarySolverQualificationContext,
     StationaryWeymouthSolverStatus,
     materialize_approved_stationary_convergence_criterion,
+)
+from hydro_gas.stationary_solver_inputs import (
+    ApprovedStationaryWeymouthInitialGuessArtifact,
+    ApprovedStationaryWeymouthScaleArtifact,
+    PreRegisteredStationaryWeymouthInitialGuessArtifact,
+    PreRegisteredStationaryWeymouthScaleArtifact,
+    materialize_approved_stationary_weymouth_initial_guess,
+    materialize_approved_stationary_weymouth_scale,
+    stationary_weymouth_layout_sha256,
 )
 from hydro_gas.weymouth_network_residual import (
     GasNodePressure,
@@ -149,6 +160,8 @@ __all__ = [
     "WEYMOUTH_SI_PARAMETER_SCHEMA_VERSION",
     "ApprovedGasBenchmarkCriteria",
     "ApprovedStationaryConvergenceCriterion",
+    "ApprovedStationaryWeymouthInitialGuessArtifact",
+    "ApprovedStationaryWeymouthScaleArtifact",
     "CompressorEnvelopeAssessment",
     "CompressorFlowLimitPoint",
     "CompressorMap",
@@ -192,6 +205,8 @@ __all__ = [
     "GasState",
     "PreRegisteredGasBenchmarkCriterion",
     "PreRegisteredStationaryConvergenceCriterion",
+    "PreRegisteredStationaryWeymouthInitialGuessArtifact",
+    "PreRegisteredStationaryWeymouthScaleArtifact",
     "RankedGasEnergyCandidate",
     "RejectedGasEnergyCandidate",
     "ScipyLeastSquaresTrfConfiguration",
@@ -202,6 +217,7 @@ __all__ = [
     "StationarySolverQualificationContext",
     "StationaryWeymouthConvergenceAssessment",
     "StationaryWeymouthEvaluation",
+    "StationaryWeymouthGovernedSolveResult",
     "StationaryWeymouthNumericalEvaluation",
     "StationaryWeymouthNumericalScale",
     "StationaryWeymouthNumericalVector",
@@ -242,8 +258,12 @@ __all__ = [
     "linepack_mass",
     "materialize_approved_gas_benchmark_criteria",
     "materialize_approved_stationary_convergence_criterion",
+    "materialize_approved_stationary_weymouth_initial_guess",
+    "materialize_approved_stationary_weymouth_scale",
     "materialize_stationary_weymouth_candidate",
     "select_minimum_energy_dispatch",
     "solve_stationary_weymouth_least_squares_trf",
+    "solve_stationary_weymouth_with_approved_inputs",
+    "stationary_weymouth_layout_sha256",
     "weymouth_si_reference_descriptor",
 ]

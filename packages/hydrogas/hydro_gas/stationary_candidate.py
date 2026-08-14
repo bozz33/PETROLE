@@ -100,7 +100,9 @@ def materialize_stationary_weymouth_candidate(
     }
 
     node_pressures = tuple(
-        fixed_pressure_by_node.get(node.node_id, pressure_by_node[node.node_id])
+        fixed_pressure_by_node[node.node_id]
+        if node.node_id in fixed_pressure_by_node
+        else pressure_by_node[node.node_id]
         for node in problem.network.nodes
     )
     pipe_flows = tuple(flow_by_pipe[pipe.pipe_id] for pipe in problem.network.pipes)

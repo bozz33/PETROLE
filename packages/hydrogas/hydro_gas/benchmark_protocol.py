@@ -59,12 +59,16 @@ class PreRegisteredGasBenchmarkCriterion:
             self.registration_ref,
         )
         if any(not value.strip() for value in required):
-            raise ValueError("Le critère pré-enregistré et toutes ses références sont obligatoires.")
+            raise ValueError(
+                "Le critère pré-enregistré et toutes ses références sont obligatoires."
+            )
         if self.maximum_absolute_error is None and self.maximum_relative_error_fraction is None:
             raise ValueError("Un critère doit définir au moins une limite explicite.")
         for value in (self.maximum_absolute_error, self.maximum_relative_error_fraction):
             if value is not None and (not math.isfinite(value) or value < 0.0):
-                raise ValueError("Les limites de benchmark doivent être finies et positives ou nulles.")
+                raise ValueError(
+                    "Les limites de benchmark doivent être finies et positives ou nulles."
+                )
 
         if self.state is GasBenchmarkCriterionState.APPROVED:
             if self.approval_ref is None or not self.approval_ref.strip():

@@ -4,8 +4,7 @@ import math
 
 import pytest
 
-from hydro_gas import benchmark_protocol
-from hydro_gas.external_benchmark import GasBenchmarkObservation
+from hydro_gas import benchmark_protocol, external_benchmark
 
 
 _CONTEXT = benchmark_protocol.GasBenchmarkProtocolContext(
@@ -25,8 +24,8 @@ def _observation(
     *,
     quantity_ref: str = "weymouth-residual",
     unit: str = "Pa2",
-) -> GasBenchmarkObservation:
-    return GasBenchmarkObservation(
+) -> external_benchmark.GasBenchmarkObservation:
+    return external_benchmark.GasBenchmarkObservation(
         observation_id=observation_id,
         quantity_ref=quantity_ref,
         location_ref="pipe://1",

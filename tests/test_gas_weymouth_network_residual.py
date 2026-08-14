@@ -99,12 +99,8 @@ def test_network_residual_assembly_keeps_reverse_flow_sign() -> None:
         ),
         pipe_flows=(hydro_gas.GasPipeMassFlow("P1", -5.0, "candidate://reverse/flow/P1"),),
         boundary_flows=(
-            hydro_gas.GasBoundaryMassFlow(
-                "OUT-A", "A", -5.0, "candidate://reverse/boundary/OUT-A"
-            ),
-            hydro_gas.GasBoundaryMassFlow(
-                "IN-B", "B", 5.0, "candidate://reverse/boundary/IN-B"
-            ),
+            hydro_gas.GasBoundaryMassFlow("OUT-A", "A", -5.0, "candidate://reverse/boundary/OUT-A"),
+            hydro_gas.GasBoundaryMassFlow("IN-B", "B", 5.0, "candidate://reverse/boundary/IN-B"),
         ),
     )
 
@@ -149,9 +145,7 @@ def test_network_residual_assembly_requires_exact_unique_parameter_coverage() ->
     parameters = _parameters()
 
     with pytest.raises(ValueError, match="Un seul jeu de paramètres"):
-        hydro_gas.assemble_weymouth_network_residuals(
-            network, candidate, (parameters, parameters)
-        )
+        hydro_gas.assemble_weymouth_network_residuals(network, candidate, (parameters, parameters))
 
     with pytest.raises(ValueError, match=r"paramètres Weymouth.*exactement"):
         hydro_gas.assemble_weymouth_network_residuals(network, candidate, (_parameters("OTHER"),))

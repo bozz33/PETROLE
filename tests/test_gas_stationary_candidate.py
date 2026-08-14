@@ -186,7 +186,7 @@ def test_unknown_state_rejects_duplicate_identifiers_and_missing_provenance() ->
             slack_external_flows=(slack,),
         )
 
-    with pytest.raises(ValueError, match="débits externes slack.*uniques"):
+    with pytest.raises(ValueError, match=r"débits externes slack.*uniques"):
         hydro_gas.StationaryWeymouthUnknownState(
             state_ref="state://duplicate-slack-boundary",
             unknown_node_pressures=(pressure,),

@@ -4,7 +4,8 @@ import math
 
 import pytest
 
-from hydro_gas import benchmark_protocol, external_benchmark
+import hydro_gas.benchmark_protocol as benchmark_protocol
+import hydro_gas.external_benchmark as external_benchmark
 
 
 _CONTEXT = benchmark_protocol.GasBenchmarkProtocolContext(

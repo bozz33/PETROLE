@@ -6,7 +6,6 @@ import pytest
 
 import hydro_gas
 
-
 _CONTEXT = hydro_gas.StationarySolverQualificationContext(
     protocol_ref="protocol://gas/solver/qualification/v1",
     problem_family_ref="problem-family://gas/weymouth/pressure-slack/v1",

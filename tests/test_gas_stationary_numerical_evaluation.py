@@ -147,7 +147,7 @@ def test_numerical_evaluation_requires_provenance_and_valid_input_domain() -> No
         values=(-0.1, 0.3, 0.3),
         source_ref="vector://gas/numerical/negative-pressure",
     )
-    with pytest.raises(ValueError, match="pression au carré.*négative"):
+    with pytest.raises(ValueError, match=r"pression au carré.*négative"):
         hydro_gas.evaluate_stationary_weymouth_numerical_vector(
             problem,
             layout,

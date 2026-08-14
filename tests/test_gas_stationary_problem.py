@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from hydro_gas import network_balance, stationary_problem
+import hydro_gas.network_balance as network_balance
+import hydro_gas.stationary_problem as stationary_problem
 
 
 def _connected_network() -> network_balance.SteadyGasNetwork:

@@ -180,7 +180,7 @@ def test_adapter_rejects_unknown_entities_and_duplicate_observation_ids() -> Non
         reference_value=1.0,
         reference_source_ref="reference://external/unknown-node",
     )
-    with pytest.raises(ValueError, match="nœud.*n'existe pas"):
+    with pytest.raises(ValueError, match=r"nœud.*n'existe pas"):
         hydro_gas.build_stationary_weymouth_benchmark_observations(
             result,
             (unknown_node,),

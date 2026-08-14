@@ -81,6 +81,10 @@ from hydro_gas.stationary_candidate import (
     StationaryWeymouthUnknownState,
     materialize_stationary_weymouth_candidate,
 )
+from hydro_gas.stationary_evaluation import (
+    StationaryWeymouthEvaluation,
+    evaluate_stationary_weymouth_unknown_state,
+)
 from hydro_gas.stationary_problem import (
     GasPressureSlack,
     StationaryWeymouthProblem,
@@ -161,6 +165,7 @@ __all__ = [
     "StationCoolerConfiguration",
     "StationValveConfiguration",
     "StationValveRole",
+    "StationaryWeymouthEvaluation",
     "StationaryWeymouthProblem",
     "StationaryWeymouthUnknownLayout",
     "StationaryWeymouthUnknownState",
@@ -182,6 +187,7 @@ __all__ = [
     "build_weymouth_si_binding",
     "compute_segmented_linepack",
     "evaluate_coolprop_properties",
+    "evaluate_stationary_weymouth_unknown_state",
     "evaluate_weymouth_si_residual",
     "export_gas_results_json",
     "export_weymouth_si_parameter_artifact",

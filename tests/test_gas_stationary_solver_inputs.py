@@ -188,9 +188,9 @@ def test_draft_scale_and_initial_guess_artifacts_are_refused() -> None:
         approval_ref=None,
     )
 
-    with pytest.raises(PermissionError, match="échelle.*APPROVED"):
+    with pytest.raises(PermissionError, match=r"échelle.*APPROVED"):
         hydro_gas.materialize_approved_stationary_weymouth_scale(draft_scale)
-    with pytest.raises(PermissionError, match="initialisation.*APPROVED"):
+    with pytest.raises(PermissionError, match=r"initialisation.*APPROVED"):
         hydro_gas.materialize_approved_stationary_weymouth_initial_guess(
             problem=problem,
             layout=layout,

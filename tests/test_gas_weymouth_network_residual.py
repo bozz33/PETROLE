@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from hydro_gas import network_balance, weymouth_network_residual, weymouth_si
+import hydro_gas.network_balance as network_balance
+import hydro_gas.weymouth_network_residual as weymouth_network_residual
+import hydro_gas.weymouth_si as weymouth_si
 
 
 _EQUATION_REF = "reference://weymouth/validated-formulation"

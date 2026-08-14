@@ -14,7 +14,9 @@ _PROTOCOL_REF = "protocol://gas/solver/synthetic-test-only/v1"
 _PROBLEM_FAMILY_REF = "problem-family://gas/weymouth/pressure-slack/v1"
 
 
-def _problem(*, slack_pressure_pa: float = 5_000_000.0, demand_kg_s: float = 3.0) -> hydro_gas.StationaryWeymouthProblem:
+def _problem(
+    *, slack_pressure_pa: float = 5_000_000.0, demand_kg_s: float = 3.0
+) -> hydro_gas.StationaryWeymouthProblem:
     return hydro_gas.StationaryWeymouthProblem(
         problem_ref="problem://gas/solver/simple-v1",
         network=hydro_gas.SteadyGasNetwork(
@@ -137,9 +139,7 @@ def _initial_state(
         unknown_node_pressures=(
             hydro_gas.GasNodePressure("B", pressure_pa, "initial://pressure/B"),
         ),
-        pipe_flows=(
-            hydro_gas.GasPipeMassFlow("P1", pipe_flow_kg_s, "initial://pipe-flow/P1"),
-        ),
+        pipe_flows=(hydro_gas.GasPipeMassFlow("P1", pipe_flow_kg_s, "initial://pipe-flow/P1"),),
         slack_external_flows=(
             hydro_gas.GasBoundaryMassFlow(
                 "SLACK-A",

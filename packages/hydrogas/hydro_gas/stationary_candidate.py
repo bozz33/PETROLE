@@ -69,22 +69,22 @@ def materialize_stationary_weymouth_candidate(
 
     pressure_by_node = {item.node_id: item for item in unknown_state.unknown_node_pressures}
     if set(pressure_by_node) != set(layout.unknown_pressure_node_ids):
-        raise ValueError("Les pressions inconnues doivent couvrir exactement le layout stationnaire.")
+        raise ValueError(
+            "Les pressions inconnues doivent couvrir exactement le layout stationnaire."
+        )
 
     flow_by_pipe = {item.pipe_id: item for item in unknown_state.pipe_flows}
     if set(flow_by_pipe) != set(layout.pipe_flow_ids):
-        raise ValueError("Les débits de conduite doivent couvrir exactement le layout stationnaire.")
+        raise ValueError(
+            "Les débits de conduite doivent couvrir exactement le layout stationnaire."
+        )
 
     slack_flow_by_node = {item.node_id: item for item in unknown_state.slack_external_flows}
     if set(slack_flow_by_node) != set(layout.slack_external_flow_node_ids):
         raise ValueError("Les débits externes slack doivent couvrir exactement les nœuds slack.")
 
-    specified_boundary_ids = {
-        item.boundary_id for item in problem.specified_boundary_flows
-    }
-    slack_boundary_ids = {
-        item.boundary_id for item in unknown_state.slack_external_flows
-    }
+    specified_boundary_ids = {item.boundary_id for item in problem.specified_boundary_flows}
+    slack_boundary_ids = {item.boundary_id for item in unknown_state.slack_external_flows}
     if specified_boundary_ids & slack_boundary_ids:
         raise ValueError(
             "Un débit externe slack ne peut pas réutiliser un identifiant de frontière imposée."

@@ -31,25 +31,19 @@ def _parameters(pipe_id: str = "P1") -> weymouth_si.WeymouthSiPipeParameters:
     )
 
 
-def _candidate(*, flow_kg_s: float = 5.0) -> weymouth_network_residual.WeymouthNetworkCandidateState:
+def _candidate(
+    *, flow_kg_s: float = 5.0
+) -> weymouth_network_residual.WeymouthNetworkCandidateState:
     return weymouth_network_residual.WeymouthNetworkCandidateState(
         candidate_ref="candidate://simple-network/state-001",
         node_pressures=(
-            weymouth_network_residual.GasNodePressure(
-                "A", 5_000_000.0, "candidate://pressure/A"
-            ),
-            weymouth_network_residual.GasNodePressure(
-                "B", 4_900_000.0, "candidate://pressure/B"
-            ),
+            weymouth_network_residual.GasNodePressure("A", 5_000_000.0, "candidate://pressure/A"),
+            weymouth_network_residual.GasNodePressure("B", 4_900_000.0, "candidate://pressure/B"),
         ),
         pipe_flows=(network_balance.GasPipeMassFlow("P1", flow_kg_s, "candidate://flow/P1"),),
         boundary_flows=(
-            network_balance.GasBoundaryMassFlow(
-                "IN", "A", flow_kg_s, "candidate://boundary/IN"
-            ),
-            network_balance.GasBoundaryMassFlow(
-                "OUT", "B", -flow_kg_s, "candidate://boundary/OUT"
-            ),
+            network_balance.GasBoundaryMassFlow("IN", "A", flow_kg_s, "candidate://boundary/IN"),
+            network_balance.GasBoundaryMassFlow("OUT", "B", -flow_kg_s, "candidate://boundary/OUT"),
         ),
     )
 
@@ -109,9 +103,7 @@ def test_network_residual_assembly_keeps_reverse_flow_sign() -> None:
                 "B", 5_000_000.0, "candidate://reverse/pressure/B"
             ),
         ),
-        pipe_flows=(
-            network_balance.GasPipeMassFlow("P1", -5.0, "candidate://reverse/flow/P1"),
-        ),
+        pipe_flows=(network_balance.GasPipeMassFlow("P1", -5.0, "candidate://reverse/flow/P1"),),
         boundary_flows=(
             network_balance.GasBoundaryMassFlow(
                 "OUT-A", "A", -5.0, "candidate://reverse/boundary/OUT-A"
@@ -131,16 +123,12 @@ def test_network_residual_assembly_keeps_reverse_flow_sign() -> None:
 
 
 def test_candidate_requires_unique_pressures_and_flows() -> None:
-    pressure = weymouth_network_residual.GasNodePressure(
-        "A", 5_000_000.0, "candidate://pressure/A"
-    )
+    pressure = weymouth_network_residual.GasNodePressure("A", 5_000_000.0, "candidate://pressure/A")
     with pytest.raises(ValueError, match="pression candidate"):
         weymouth_network_residual.WeymouthNetworkCandidateState(
             candidate_ref="candidate://duplicate-pressure",
             node_pressures=(pressure, pressure),
-            pipe_flows=(
-                network_balance.GasPipeMassFlow("P1", 1.0, "candidate://flow/P1"),
-            ),
+            pipe_flows=(network_balance.GasPipeMassFlow("P1", 1.0, "candidate://flow/P1"),),
         )
 
     flow = network_balance.GasPipeMassFlow("P1", 1.0, "candidate://flow/P1")
@@ -156,9 +144,7 @@ def test_network_residual_assembly_requires_exact_node_pressure_coverage() -> No
     candidate = weymouth_network_residual.WeymouthNetworkCandidateState(
         candidate_ref="candidate://missing-pressure",
         node_pressures=(
-            weymouth_network_residual.GasNodePressure(
-                "A", 5_000_000.0, "candidate://pressure/A"
-            ),
+            weymouth_network_residual.GasNodePressure("A", 5_000_000.0, "candidate://pressure/A"),
         ),
         pipe_flows=(network_balance.GasPipeMassFlow("P1", 1.0, "candidate://flow/P1"),),
     )
@@ -190,6 +176,4 @@ def test_node_pressure_rejects_invalid_values_or_missing_provenance() -> None:
         weymouth_network_residual.GasNodePressure("A", 1.0, "")
 
     with pytest.raises(ValueError, match="pression absolue"):
-        weymouth_network_residual.GasNodePressure(
-            "A", -1.0, "candidate://pressure/A"
-        )
+        weymouth_network_residual.GasNodePressure("A", -1.0, "candidate://pressure/A")

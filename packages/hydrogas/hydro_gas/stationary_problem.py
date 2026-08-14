@@ -133,9 +133,7 @@ def build_stationary_weymouth_unknown_layout(
             )
 
     node_order = tuple(node.node_id for node in problem.network.nodes)
-    fixed_pressure_node_ids = tuple(
-        node_id for node_id in node_order if node_id in slack_by_node
-    )
+    fixed_pressure_node_ids = tuple(node_id for node_id in node_order if node_id in slack_by_node)
     unknown_pressure_node_ids = tuple(
         node_id for node_id in node_order if node_id not in slack_by_node
     )
@@ -151,7 +149,9 @@ def build_stationary_weymouth_unknown_layout(
         pipe_equation_ids=pipe_flow_ids,
     )
     if not layout.structurally_square:
-        raise RuntimeError("Le contrat pressure-slack doit produire un système structurellement carré.")
+        raise RuntimeError(
+            "Le contrat pressure-slack doit produire un système structurellement carré."
+        )
     return layout
 
 

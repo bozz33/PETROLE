@@ -77,6 +77,10 @@ from hydro_gas.station import (
     StationValveConfiguration,
     StationValveRole,
 )
+from hydro_gas.stationary_candidate import (
+    StationaryWeymouthUnknownState,
+    materialize_stationary_weymouth_candidate,
+)
 from hydro_gas.stationary_problem import (
     GasPressureSlack,
     StationaryWeymouthProblem,
@@ -159,6 +163,7 @@ __all__ = [
     "StationValveRole",
     "StationaryWeymouthProblem",
     "StationaryWeymouthUnknownLayout",
+    "StationaryWeymouthUnknownState",
     "SteadyGasNetwork",
     "SteadyGasNode",
     "SteadyGasPipe",
@@ -184,6 +189,7 @@ __all__ = [
     "interpolate_compressor_map",
     "linepack_mass",
     "materialize_approved_gas_benchmark_criteria",
+    "materialize_stationary_weymouth_candidate",
     "select_minimum_energy_dispatch",
     "weymouth_si_reference_descriptor",
 ]

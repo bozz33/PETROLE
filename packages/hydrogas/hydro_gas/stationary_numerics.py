@@ -89,7 +89,7 @@ def encode_stationary_weymouth_unknown_state(
     slack_flow_by_node = {item.node_id: item for item in state.slack_external_flows}
 
     pressure_values = tuple(
-        pressure_by_node[node_id].pressure_pa**2 / scale.pressure_squared_scale_pa2
+        pressure_by_node[node_id].pressure_pa ** 2 / scale.pressure_squared_scale_pa2
         for node_id in layout.unknown_pressure_node_ids
     )
     flow_values = tuple(
@@ -207,8 +207,7 @@ def encode_stationary_weymouth_residuals(
         for node_id in layout.mass_equation_node_ids
     )
     pipe_values = tuple(
-        pipe_by_id[pipe_id] / scale.pipe_residual_scale_pa2
-        for pipe_id in layout.pipe_equation_ids
+        pipe_by_id[pipe_id] / scale.pipe_residual_scale_pa2 for pipe_id in layout.pipe_equation_ids
     )
     return StationaryWeymouthNumericalVector(
         values=mass_values + pipe_values,

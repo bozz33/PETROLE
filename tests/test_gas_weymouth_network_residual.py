@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import pytest
-
 import hydro_gas
+import pytest
 
 
 _EQUATION_REF = "reference://weymouth/validated-formulation"

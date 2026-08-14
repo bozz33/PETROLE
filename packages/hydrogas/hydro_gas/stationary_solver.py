@@ -80,7 +80,9 @@ class ScipyLeastSquaresTrfConfiguration:
         if self.solver_method_ref != SCIPY_LEAST_SQUARES_TRF_METHOD_REF:
             raise ValueError("La configuration doit viser exactement le solveur TRF implémenté.")
         if self.numerical_representation_ref != WEYMOUTH_P2_NUMERICAL_REPRESENTATION_REF:
-            raise ValueError("La configuration doit viser exactement la représentation p² implémentée.")
+            raise ValueError(
+                "La configuration doit viser exactement la représentation p² implémentée."
+            )
 
         machine_epsilon = float(np.finfo(float).eps)
         tolerances = (self.ftol, self.xtol, self.gtol)
@@ -169,15 +171,21 @@ def _validate_execution_context(
     configuration: ScipyLeastSquaresTrfConfiguration,
 ) -> None:
     if _approved_criterion_context_tuple(criterion) != _context_tuple(context):
-        raise ValueError("Le critère approuvé ne correspond pas au contexte d'exécution du solveur.")
+        raise ValueError(
+            "Le critère approuvé ne correspond pas au contexte d'exécution du solveur."
+        )
     if context.solver_method_ref != configuration.solver_method_ref:
-        raise ValueError("La méthode du contexte et celle de la configuration doivent être identiques.")
+        raise ValueError(
+            "La méthode du contexte et celle de la configuration doivent être identiques."
+        )
     if context.numerical_representation_ref != configuration.numerical_representation_ref:
         raise ValueError(
             "La représentation numérique du contexte et celle de la configuration doivent être identiques."
         )
     if context.scale_policy_ref != configuration.scale_policy_ref:
-        raise ValueError("La politique d'échelle du contexte et de la configuration doit être identique.")
+        raise ValueError(
+            "La politique d'échelle du contexte et de la configuration doit être identique."
+        )
     if context.initial_guess_policy_ref != configuration.initial_guess_policy_ref:
         raise ValueError(
             "La politique d'initialisation du contexte et de la configuration doit être identique."
@@ -197,8 +205,7 @@ def assess_stationary_weymouth_convergence(
         for item in evaluation.physical_evaluation.residuals.mass_balance.node_balances
     )
     pipe_values = tuple(
-        abs(item.residual_pa2)
-        for item in evaluation.physical_evaluation.residuals.pipe_residuals
+        abs(item.residual_pa2) for item in evaluation.physical_evaluation.residuals.pipe_residuals
     )
     maximum_mass = max(mass_values, default=0.0)
     maximum_pipe = max(pipe_values, default=0.0)
@@ -255,7 +262,9 @@ def solve_stationary_weymouth_least_squares_trf(
     if not layout.structurally_square:
         raise ValueError("Le solveur P6-B exige un layout structurellement carré.")
     if len(initial_vector.values) != layout.unknown_count:
-        raise ValueError("Le vecteur initial doit couvrir exactement toutes les inconnues du layout.")
+        raise ValueError(
+            "Le vecteur initial doit couvrir exactement toutes les inconnues du layout."
+        )
 
     _validate_execution_context(context, convergence_criterion, configuration)
 

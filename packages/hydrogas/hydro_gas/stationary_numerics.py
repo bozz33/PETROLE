@@ -71,7 +71,9 @@ def _validate_state_layout(
 
     slack_node_ids = {item.node_id for item in state.slack_external_flows}
     if slack_node_ids != set(layout.slack_external_flow_node_ids):
-        raise ValueError("Les débits slack de l'état doivent couvrir exactement le layout numérique.")
+        raise ValueError(
+            "Les débits slack de l'état doivent couvrir exactement le layout numérique."
+        )
 
 
 def encode_stationary_weymouth_unknown_state(
@@ -196,7 +198,9 @@ def encode_stationary_weymouth_residuals(
     if set(mass_by_node) != set(layout.mass_equation_node_ids):
         raise ValueError("Les résidus massiques doivent couvrir exactement les équations nodales.")
     if set(pipe_by_id) != set(layout.pipe_equation_ids):
-        raise ValueError("Les résidus de conduite doivent couvrir exactement les équations du layout.")
+        raise ValueError(
+            "Les résidus de conduite doivent couvrir exactement les équations du layout."
+        )
 
     mass_values = tuple(
         mass_by_node[node_id] / scale.mass_residual_scale_kg_s

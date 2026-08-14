@@ -28,7 +28,12 @@ class SteadyGasCompressorEdge:
     source_ref: str
 
     def __post_init__(self) -> None:
-        values = (self.compressor_id, self.from_node_id, self.to_node_id, self.source_ref)
+        values = (
+            self.compressor_id,
+            self.from_node_id,
+            self.to_node_id,
+            self.source_ref,
+        )
         if any(not value.strip() for value in values):
             raise ValueError(
                 "Le compresseur, ses extrémités et sa provenance sont obligatoires."
@@ -101,11 +106,15 @@ def assess_stationary_equipment_mass_balance(
     if len(supplied_pipe_ids) != len(set(supplied_pipe_ids)):
         raise ValueError("Un seul débit massique doit être fourni par conduite.")
     if set(supplied_pipe_ids) != expected_pipe_ids:
-        raise ValueError("Les débits fournis doivent couvrir exactement les conduites du réseau.")
+        raise ValueError(
+            "Les débits fournis doivent couvrir exactement les conduites du réseau."
+        )
 
     compressor_ids = tuple(edge.compressor_id for edge in compressor_edges)
     if len(compressor_ids) != len(set(compressor_ids)):
-        raise ValueError("Les identifiants de compresseurs stationnaires doivent être uniques.")
+        raise ValueError(
+            "Les identifiants de compresseurs stationnaires doivent être uniques."
+        )
     for edge in compressor_edges:
         if edge.from_node_id not in known_node_ids or edge.to_node_id not in known_node_ids:
             raise ValueError(
@@ -124,7 +133,9 @@ def assess_stationary_equipment_mass_balance(
     if len(boundary_ids) != len(set(boundary_ids)):
         raise ValueError("Les identifiants de frontières gaz doivent être uniques.")
     if any(flow.node_id not in known_node_ids for flow in boundary_flows):
-        raise ValueError("Chaque frontière gaz doit référencer un noeud présent dans le réseau.")
+        raise ValueError(
+            "Chaque frontière gaz doit référencer un noeud présent dans le réseau."
+        )
 
     pipe_flow_by_id = {flow.pipe_id: flow.mass_flow_kg_s for flow in pipe_flows}
     compressor_flow_by_id = {
@@ -176,7 +187,10 @@ def assess_stationary_equipment_mass_balance(
     return GasNetworkEquipmentMassBalanceResult(
         node_balances=balances,
         global_residual_kg_s=math.fsum(residuals),
-        max_abs_node_residual_kg_s=max((abs(value) for value in residuals), default=0.0),
+        max_abs_node_residual_kg_s=max(
+            (abs(value) for value in residuals),
+            default=0.0,
+        ),
         pipe_flow_source_refs=tuple(flow.source_ref for flow in pipe_flows),
         compressor_flow_source_refs=tuple(flow.source_ref for flow in compressor_flows),
         boundary_source_refs=tuple(flow.source_ref for flow in boundary_flows),

@@ -38,7 +38,9 @@ class StationaryWeymouthNumericalScale:
             self.pipe_residual_scale_pa2,
         )
         if any(not math.isfinite(value) or value <= 0.0 for value in values):
-            raise ValueError("Toutes les échelles numériques doivent être finies et strictement positives.")
+            raise ValueError(
+                "Toutes les échelles numériques doivent être finies et strictement positives."
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,10 +134,6 @@ def decode_stationary_weymouth_numerical_vector(
     if any(value < 0.0 for value in pressure_coordinates):
         raise ValueError("Une coordonnée de pression au carré ne peut pas être négative.")
 
-    template_pressure_by_node = {
-        item.node_id: item for item in template_state.unknown_node_pressures
-    }
-    template_flow_by_pipe = {item.pipe_id: item for item in template_state.pipe_flows}
     template_slack_by_node = {item.node_id: item for item in template_state.slack_external_flows}
 
     pressures = tuple(
@@ -171,12 +169,6 @@ def decode_stationary_weymouth_numerical_vector(
             strict=True,
         )
     )
-
-    # Access validates that every identity in the template was covered exactly.
-    for node_id in layout.unknown_pressure_node_ids:
-        template_pressure_by_node[node_id]
-    for pipe_id in layout.pipe_flow_ids:
-        template_flow_by_pipe[pipe_id]
 
     return StationaryWeymouthUnknownState(
         state_ref=state_ref,

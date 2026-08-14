@@ -189,9 +189,7 @@ def test_series_network_recovers_mass_flows_and_cumulative_pressure_drop() -> No
                 hydro_gas.SteadyGasPipe("P2", "B", "C", "model://pipe/P2"),
             ),
         ),
-        pressure_slacks=(
-            hydro_gas.GasPressureSlack("A", 5_000_000.0, "boundary://pressure/A"),
-        ),
+        pressure_slacks=(hydro_gas.GasPressureSlack("A", 5_000_000.0, "boundary://pressure/A"),),
         specified_boundary_flows=(
             hydro_gas.GasBoundaryMassFlow("DEMAND-C", "C", -3.0, "boundary://demand/C"),
         ),
@@ -233,9 +231,7 @@ def test_branched_network_recovers_flow_split_and_branch_pressures() -> None:
                 hydro_gas.SteadyGasPipe("P_BD", "B", "D", "model://pipe/P_BD"),
             ),
         ),
-        pressure_slacks=(
-            hydro_gas.GasPressureSlack("A", 5_000_000.0, "boundary://pressure/A"),
-        ),
+        pressure_slacks=(hydro_gas.GasPressureSlack("A", 5_000_000.0, "boundary://pressure/A"),),
         specified_boundary_flows=(
             hydro_gas.GasBoundaryMassFlow("DEMAND-C", "C", -2.0, "boundary://demand/C"),
             hydro_gas.GasBoundaryMassFlow("DEMAND-D", "D", -1.0, "boundary://demand/D"),
@@ -279,9 +275,7 @@ def test_reverse_flow_is_solved_with_negative_signed_pipe_flow() -> None:
             ),
             pipes=(hydro_gas.SteadyGasPipe("P1", "A", "B", "model://pipe/P1"),),
         ),
-        pressure_slacks=(
-            hydro_gas.GasPressureSlack("B", 5_000_000.0, "boundary://pressure/B"),
-        ),
+        pressure_slacks=(hydro_gas.GasPressureSlack("B", 5_000_000.0, "boundary://pressure/B"),),
         specified_boundary_flows=(
             hydro_gas.GasBoundaryMassFlow("DEMAND-A", "A", -3.0, "boundary://demand/A"),
         ),
@@ -321,9 +315,7 @@ def test_internal_injection_and_downstream_withdrawal_are_balanced_together() ->
                 hydro_gas.SteadyGasPipe("P2", "B", "C", "model://pipe/P2"),
             ),
         ),
-        pressure_slacks=(
-            hydro_gas.GasPressureSlack("A", 5_000_000.0, "boundary://pressure/A"),
-        ),
+        pressure_slacks=(hydro_gas.GasPressureSlack("A", 5_000_000.0, "boundary://pressure/A"),),
         specified_boundary_flows=(
             hydro_gas.GasBoundaryMassFlow("INJECTION-B", "B", 1.0, "boundary://injection/B"),
             hydro_gas.GasBoundaryMassFlow("DEMAND-C", "C", -4.0, "boundary://demand/C"),
@@ -350,4 +342,7 @@ def test_internal_injection_and_downstream_withdrawal_are_balanced_together() ->
     assert flows == pytest.approx({"P1": 3.0, "P2": 4.0}, abs=1e-7)
     assert pressures["B"] == pytest.approx(expected_b, rel=1e-10)
     assert pressures["C"] == pytest.approx(expected_c, rel=1e-10)
-    assert result.final_evaluation.physical_evaluation.residuals.mass_balance.max_abs_node_residual_kg_s <= 1e-7
+    assert (
+        result.final_evaluation.physical_evaluation.residuals.mass_balance.max_abs_node_residual_kg_s
+        <= 1e-7
+    )

@@ -77,6 +77,12 @@ from hydro_gas.station import (
     StationValveConfiguration,
     StationValveRole,
 )
+from hydro_gas.stationary_benchmark_adapter import (
+    StationaryGasBenchmarkBinding,
+    StationaryGasBenchmarkObservationBundle,
+    StationaryGasBenchmarkQuantity,
+    build_stationary_weymouth_benchmark_observations,
+)
 from hydro_gas.stationary_candidate import (
     StationaryWeymouthUnknownState,
     materialize_stationary_weymouth_candidate,
@@ -213,6 +219,9 @@ __all__ = [
     "StationCoolerConfiguration",
     "StationValveConfiguration",
     "StationValveRole",
+    "StationaryGasBenchmarkBinding",
+    "StationaryGasBenchmarkObservationBundle",
+    "StationaryGasBenchmarkQuantity",
     "StationarySolverPolicyState",
     "StationarySolverQualificationContext",
     "StationaryWeymouthConvergenceAssessment",
@@ -241,6 +250,7 @@ __all__ = [
     "assess_external_gas_benchmark",
     "assess_stationary_mass_balance",
     "assess_stationary_weymouth_convergence",
+    "build_stationary_weymouth_benchmark_observations",
     "build_stationary_weymouth_unknown_layout",
     "build_weymouth_si_binding",
     "compute_segmented_linepack",

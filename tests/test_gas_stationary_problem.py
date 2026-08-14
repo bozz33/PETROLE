@@ -126,7 +126,7 @@ def test_problem_rejects_duplicate_or_unknown_flow_boundaries() -> None:
     slack = stationary_problem.GasPressureSlack("A", 5_000_000.0, "boundary://pressure/A")
     boundary = network_balance.GasBoundaryMassFlow("D1", "C", -1.0, "boundary://demand/C")
 
-    with pytest.raises(ValueError, match="frontières de débit.*uniques"):
+    with pytest.raises(ValueError, match=r"frontières de débit.*uniques"):
         stationary_problem.StationaryWeymouthProblem(
             problem_ref="problem://gas/duplicate-boundary",
             network=network,

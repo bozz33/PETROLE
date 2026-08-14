@@ -48,6 +48,14 @@ from hydro_gas.energy_optimization import (
     RejectedGasEnergyCandidate,
     select_minimum_energy_dispatch,
 )
+from hydro_gas.external_benchmark import (
+    ExternalGasBenchmarkAssessment,
+    ExternalGasSolverEvidence,
+    GasBenchmarkCriterion,
+    GasBenchmarkObservation,
+    GasBenchmarkObservationAssessment,
+    assess_external_gas_benchmark,
+)
 from hydro_gas.linepack import GasLinepackCell, GasLinepackResult, compute_segmented_linepack
 from hydro_gas.network_balance import (
     GasBoundaryMassFlow,
@@ -115,7 +123,12 @@ __all__ = [
     "CoolPropEvaluationEnvelope",
     "CoolPropPropertyResult",
     "CoolPropPureFluidDefinition",
+    "ExternalGasBenchmarkAssessment",
+    "ExternalGasSolverEvidence",
+    "GasBenchmarkCriterion",
     "GasBenchmarkCriterionState",
+    "GasBenchmarkObservation",
+    "GasBenchmarkObservationAssessment",
     "GasBenchmarkProtocolContext",
     "GasBoundaryMassFlow",
     "GasComponentFraction",
@@ -158,6 +171,7 @@ __all__ = [
     "assemble_weymouth_network_residuals",
     "assess_compressor_envelope",
     "assess_constitutive_manifest",
+    "assess_external_gas_benchmark",
     "assess_stationary_mass_balance",
     "build_stationary_weymouth_unknown_layout",
     "build_weymouth_si_binding",

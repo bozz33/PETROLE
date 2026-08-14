@@ -4,6 +4,13 @@ Le paquet est volontairement séparé de ``hydroliquid`` : un réseau gaz ne doi
 pas être modélisé en remplaçant simplement la densité d'un liquide.
 """
 
+from hydro_gas.benchmark_protocol import (
+    ApprovedGasBenchmarkCriteria,
+    GasBenchmarkCriterionState,
+    GasBenchmarkProtocolContext,
+    PreRegisteredGasBenchmarkCriterion,
+    materialize_approved_gas_benchmark_criteria,
+)
 from hydro_gas.composition import GasComponentFraction, GasComposition
 from hydro_gas.compressor_limits import (
     CompressorEnvelopeAssessment,
@@ -62,6 +69,12 @@ from hydro_gas.station import (
     StationValveConfiguration,
     StationValveRole,
 )
+from hydro_gas.weymouth_network_residual import (
+    GasNodePressure,
+    WeymouthNetworkCandidateState,
+    WeymouthNetworkResidualAssembly,
+    assemble_weymouth_network_residuals,
+)
 from hydro_gas.weymouth_parameter_artifact import (
     WEYMOUTH_SI_MODEL_ID,
     WEYMOUTH_SI_MODEL_VERSION,
@@ -82,6 +95,7 @@ __all__ = [
     "WEYMOUTH_SI_MODEL_ID",
     "WEYMOUTH_SI_MODEL_VERSION",
     "WEYMOUTH_SI_PARAMETER_SCHEMA_VERSION",
+    "ApprovedGasBenchmarkCriteria",
     "CompressorEnvelopeAssessment",
     "CompressorFlowLimitPoint",
     "CompressorMap",
@@ -95,6 +109,8 @@ __all__ = [
     "CoolPropEvaluationEnvelope",
     "CoolPropPropertyResult",
     "CoolPropPureFluidDefinition",
+    "GasBenchmarkCriterionState",
+    "GasBenchmarkProtocolContext",
     "GasBoundaryMassFlow",
     "GasComponentFraction",
     "GasComposition",
@@ -109,11 +125,13 @@ __all__ = [
     "GasLinepackResult",
     "GasNetworkMassBalanceResult",
     "GasNodeMassBalance",
+    "GasNodePressure",
     "GasPipeConstitutiveBinding",
     "GasPipeConstitutiveModelDescriptor",
     "GasPipeMassFlow",
     "GasResultExportArtifact",
     "GasState",
+    "PreRegisteredGasBenchmarkCriterion",
     "RankedGasEnergyCandidate",
     "RejectedGasEnergyCandidate",
     "StationCoolerConfiguration",
@@ -122,10 +140,13 @@ __all__ = [
     "SteadyGasNetwork",
     "SteadyGasNode",
     "SteadyGasPipe",
+    "WeymouthNetworkCandidateState",
+    "WeymouthNetworkResidualAssembly",
     "WeymouthSiObservation",
     "WeymouthSiParameterArtifact",
     "WeymouthSiPipeParameters",
     "WeymouthSiResidual",
+    "assemble_weymouth_network_residuals",
     "assess_compressor_envelope",
     "assess_constitutive_manifest",
     "assess_stationary_mass_balance",
@@ -138,6 +159,7 @@ __all__ = [
     "gas_density_from_z",
     "interpolate_compressor_map",
     "linepack_mass",
+    "materialize_approved_gas_benchmark_criteria",
     "select_minimum_energy_dispatch",
     "weymouth_si_reference_descriptor",
 ]

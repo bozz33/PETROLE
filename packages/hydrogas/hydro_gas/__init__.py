@@ -87,6 +87,11 @@ from hydro_gas.stationary_candidate import (
     StationaryWeymouthUnknownState,
     materialize_stationary_weymouth_candidate,
 )
+from hydro_gas.stationary_compressor_constraint import (
+    StationaryCompressorMapConstraint,
+    StationaryCompressorState,
+    evaluate_stationary_compressor_map_constraint,
+)
 from hydro_gas.stationary_evaluation import (
     StationaryWeymouthEvaluation,
     evaluate_stationary_weymouth_unknown_state,
@@ -219,6 +224,8 @@ __all__ = [
     "StationCoolerConfiguration",
     "StationValveConfiguration",
     "StationValveRole",
+    "StationaryCompressorMapConstraint",
+    "StationaryCompressorState",
     "StationaryGasBenchmarkBinding",
     "StationaryGasBenchmarkObservationBundle",
     "StationaryGasBenchmarkQuantity",
@@ -258,6 +265,7 @@ __all__ = [
     "encode_stationary_weymouth_residuals",
     "encode_stationary_weymouth_unknown_state",
     "evaluate_coolprop_properties",
+    "evaluate_stationary_compressor_map_constraint",
     "evaluate_stationary_weymouth_numerical_vector",
     "evaluate_stationary_weymouth_unknown_state",
     "evaluate_weymouth_si_residual",

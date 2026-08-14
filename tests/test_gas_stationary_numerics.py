@@ -134,7 +134,7 @@ def test_decode_rejects_negative_squared_pressure_and_wrong_vector_size() -> Non
         values=(-0.1, 0.3, 0.3),
         source_ref="vector://gas/numerics/negative-pressure",
     )
-    with pytest.raises(ValueError, match="pression au carré.*négative"):
+    with pytest.raises(ValueError, match=r"pression au carré.*négative"):
         hydro_gas.decode_stationary_weymouth_numerical_vector(
             layout,
             _state(),

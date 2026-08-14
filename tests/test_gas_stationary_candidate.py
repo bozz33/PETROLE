@@ -22,9 +22,7 @@ def _problem() -> hydro_gas.StationaryWeymouthProblem:
     return hydro_gas.StationaryWeymouthProblem(
         problem_ref="problem://gas/materialization/simple-v1",
         network=network,
-        pressure_slacks=(
-            hydro_gas.GasPressureSlack("A", 5_000_000.0, "boundary://pressure/A"),
-        ),
+        pressure_slacks=(hydro_gas.GasPressureSlack("A", 5_000_000.0, "boundary://pressure/A"),),
         specified_boundary_flows=(
             hydro_gas.GasBoundaryMassFlow("DEMAND-C", "C", -4.0, "boundary://demand/C"),
         ),

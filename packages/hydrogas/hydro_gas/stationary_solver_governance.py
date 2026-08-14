@@ -132,6 +132,11 @@ class ApprovedStationaryConvergenceCriterion:
     registration_ref: str
     approval_ref: str
     protocol_ref: str
+    problem_family_ref: str
+    numerical_representation_ref: str
+    solver_method_ref: str
+    scale_policy_ref: str
+    initial_guess_policy_ref: str
 
 
 def materialize_approved_stationary_convergence_criterion(
@@ -184,6 +189,11 @@ def materialize_approved_stationary_convergence_criterion(
         registration_ref=criterion.registration_ref,
         approval_ref=approval_ref,
         protocol_ref=criterion.protocol_ref,
+        problem_family_ref=criterion.problem_family_ref,
+        numerical_representation_ref=criterion.numerical_representation_ref,
+        solver_method_ref=criterion.solver_method_ref,
+        scale_policy_ref=criterion.scale_policy_ref,
+        initial_guess_policy_ref=criterion.initial_guess_policy_ref,
     )
 
 

@@ -50,9 +50,7 @@ def _candidate(*, flow_kg_s: float = 5.0) -> WeymouthNetworkCandidateState:
             GasNodePressure("A", 5_000_000.0, "candidate://pressure/A"),
             GasNodePressure("B", 4_900_000.0, "candidate://pressure/B"),
         ),
-        pipe_flows=(
-            GasPipeMassFlow("P1", flow_kg_s, "candidate://flow/P1"),
-        ),
+        pipe_flows=(GasPipeMassFlow("P1", flow_kg_s, "candidate://flow/P1"),),
         boundary_flows=(
             GasBoundaryMassFlow("IN", "A", flow_kg_s, "candidate://boundary/IN"),
             GasBoundaryMassFlow("OUT", "B", -flow_kg_s, "candidate://boundary/OUT"),

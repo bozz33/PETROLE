@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pytest
 
 import hydro_gas
@@ -266,7 +267,7 @@ def test_bound_prevents_negative_p2_when_requested_flow_has_no_physical_pressure
 
 
 def test_solver_configuration_has_no_hidden_tolerance_or_evaluation_budget() -> None:
-    epsilon = float(__import__("numpy").finfo(float).eps)
+    epsilon = float(np.finfo(float).eps)
 
     with pytest.raises(ValueError, match="epsilon machine"):
         hydro_gas.ScipyLeastSquaresTrfConfiguration(

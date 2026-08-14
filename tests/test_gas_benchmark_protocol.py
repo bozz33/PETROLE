@@ -6,7 +6,6 @@ import pytest
 
 import hydro_gas
 
-
 _CONTEXT = hydro_gas.GasBenchmarkProtocolContext(
     protocol_ref="protocol://gas/weymouth/case-6/v1",
     model_id="weymouth-si",

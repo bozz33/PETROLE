@@ -4,7 +4,6 @@ import pytest
 
 import hydro_gas
 
-
 _EQUATION_REF = "reference://weymouth/validated-formulation"
 _PARAMETER_SOURCE = "reference://parameters/case-simple"
 

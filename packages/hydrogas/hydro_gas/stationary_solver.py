@@ -39,7 +39,6 @@ from hydro_gas.stationary_solver_governance import (
 )
 from hydro_gas.weymouth_si import WeymouthSiPipeParameters
 
-
 SCIPY_LEAST_SQUARES_TRF_METHOD_REF = "solver-method://scipy/least-squares/trf/v1"
 WEYMOUTH_P2_NUMERICAL_REPRESENTATION_REF = "numerics://gas/weymouth/psqr-scaled/v1"
 

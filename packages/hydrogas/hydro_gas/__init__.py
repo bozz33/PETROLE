@@ -92,6 +92,13 @@ from hydro_gas.stationary_compressor_constraint import (
     StationaryCompressorState,
     evaluate_stationary_compressor_map_constraint,
 )
+from hydro_gas.stationary_equipment_balance import (
+    GasCompressorMassFlow,
+    GasNetworkEquipmentMassBalanceResult,
+    GasNodeEquipmentMassBalance,
+    SteadyGasCompressorEdge,
+    assess_stationary_equipment_mass_balance,
+)
 from hydro_gas.stationary_evaluation import (
     StationaryWeymouthEvaluation,
     evaluate_stationary_weymouth_unknown_state,
@@ -196,6 +203,7 @@ __all__ = [
     "GasBoundaryMassFlow",
     "GasComponentFraction",
     "GasComposition",
+    "GasCompressorMassFlow",
     "GasConstitutiveManifest",
     "GasConstitutiveManifestAssessment",
     "GasConstitutiveQualification",
@@ -205,7 +213,9 @@ __all__ = [
     "GasEnergySelectionStatus",
     "GasLinepackCell",
     "GasLinepackResult",
+    "GasNetworkEquipmentMassBalanceResult",
     "GasNetworkMassBalanceResult",
+    "GasNodeEquipmentMassBalance",
     "GasNodeMassBalance",
     "GasNodePressure",
     "GasPipeConstitutiveBinding",
@@ -242,6 +252,7 @@ __all__ = [
     "StationaryWeymouthSolverStatus",
     "StationaryWeymouthUnknownLayout",
     "StationaryWeymouthUnknownState",
+    "SteadyGasCompressorEdge",
     "SteadyGasNetwork",
     "SteadyGasNode",
     "SteadyGasPipe",
@@ -255,6 +266,7 @@ __all__ = [
     "assess_compressor_envelope",
     "assess_constitutive_manifest",
     "assess_external_gas_benchmark",
+    "assess_stationary_equipment_mass_balance",
     "assess_stationary_mass_balance",
     "assess_stationary_weymouth_convergence",
     "build_stationary_weymouth_benchmark_observations",

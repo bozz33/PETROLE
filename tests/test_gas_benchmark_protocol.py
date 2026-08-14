@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import math
 
-import pytest
-
 import hydro_gas
+import pytest
 
 
 _CONTEXT = hydro_gas.GasBenchmarkProtocolContext(

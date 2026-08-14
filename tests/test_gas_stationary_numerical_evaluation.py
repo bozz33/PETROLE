@@ -15,9 +15,7 @@ def _problem() -> hydro_gas.StationaryWeymouthProblem:
             ),
             pipes=(hydro_gas.SteadyGasPipe("P1", "A", "B", "model://pipe/P1"),),
         ),
-        pressure_slacks=(
-            hydro_gas.GasPressureSlack("A", 5_000_000.0, "boundary://pressure/A"),
-        ),
+        pressure_slacks=(hydro_gas.GasPressureSlack("A", 5_000_000.0, "boundary://pressure/A"),),
         specified_boundary_flows=(
             hydro_gas.GasBoundaryMassFlow("DEMAND-B", "B", -3.0, "boundary://demand/B"),
         ),

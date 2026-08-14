@@ -37,7 +37,11 @@ def test_mixed_balance_keeps_pipe_and_compressor_contributions_separate() -> Non
     assert by_node["B"].incoming_pipe_mass_flow_kg_s == 3.0
     assert by_node["B"].outgoing_compressor_mass_flow_kg_s == 3.0
     assert by_node["C"].incoming_compressor_mass_flow_kg_s == 3.0
-    assert tuple(item.residual_kg_s for item in result.node_balances) == (0.0, 0.0, 0.0)
+    assert tuple(item.residual_kg_s for item in result.node_balances) == (
+        0.0,
+        0.0,
+        0.0,
+    )
     assert result.global_residual_kg_s == 0.0
     assert result.max_abs_node_residual_kg_s == 0.0
     assert result.pipe_flow_source_refs == ("state://pipe/P1",)
@@ -61,7 +65,9 @@ def test_internal_pipe_and_compressor_transport_cancel_from_global_residual() ->
     )
 
     assert result.global_residual_kg_s == pytest.approx(0.5)
-    assert sum(item.external_mass_flow_kg_s for item in result.node_balances) == pytest.approx(0.5)
+    assert sum(item.external_mass_flow_kg_s for item in result.node_balances) == pytest.approx(
+        0.5
+    )
 
 
 def test_reverse_pipe_flow_remains_signed_while_compressor_flow_stays_directional() -> None:
@@ -101,7 +107,7 @@ def test_compressor_flow_coverage_must_match_edges_exactly() -> None:
             compressor_flows=(),
         )
 
-    with pytest.raises(ValueError, match="Un seul débit massique.*compresseur"):
+    with pytest.raises(ValueError, match=r"Un seul débit massique.*compresseur"):
         hydro_gas.assess_stationary_equipment_mass_balance(
             _network(),
             pipe_flows=(hydro_gas.GasPipeMassFlow("P1", 3.0, "state://pipe/P1"),),
@@ -128,13 +134,17 @@ def test_compressor_edges_must_reference_network_nodes_and_unique_ids() -> None:
             ),
         )
 
-    with pytest.raises(ValueError, match="identifiants de compresseurs.*uniques"):
+    with pytest.raises(ValueError, match=r"identifiants de compresseurs.*uniques"):
         hydro_gas.assess_stationary_equipment_mass_balance(
             _network(),
             pipe_flows=(hydro_gas.GasPipeMassFlow("P1", 0.0, "state://pipe/P1"),),
             compressor_edges=(
-                hydro_gas.SteadyGasCompressorEdge("C1", "A", "C", "model://compressor/C1/a"),
-                hydro_gas.SteadyGasCompressorEdge("C1", "B", "C", "model://compressor/C1/b"),
+                hydro_gas.SteadyGasCompressorEdge(
+                    "C1", "A", "C", "model://compressor/C1/a"
+                ),
+                hydro_gas.SteadyGasCompressorEdge(
+                    "C1", "B", "C", "model://compressor/C1/b"
+                ),
             ),
             compressor_flows=(
                 hydro_gas.GasCompressorMassFlow("C1", 0.0, "state://compressor/C1"),

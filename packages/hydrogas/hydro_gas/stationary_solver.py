@@ -27,6 +27,7 @@ from hydro_gas.stationary_numerical_evaluation import (
 from hydro_gas.stationary_numerics import (
     StationaryWeymouthNumericalScale,
     StationaryWeymouthNumericalVector,
+    encode_stationary_weymouth_unknown_state,
 )
 from hydro_gas.stationary_problem import (
     StationaryWeymouthProblem,
@@ -36,6 +37,11 @@ from hydro_gas.stationary_solver_governance import (
     ApprovedStationaryConvergenceCriterion,
     StationarySolverQualificationContext,
     StationaryWeymouthSolverStatus,
+)
+from hydro_gas.stationary_solver_inputs import (
+    ApprovedStationaryWeymouthInitialGuessArtifact,
+    ApprovedStationaryWeymouthScaleArtifact,
+    stationary_weymouth_layout_sha256,
 )
 from hydro_gas.weymouth_si import WeymouthSiPipeParameters
 
@@ -138,6 +144,19 @@ class StationaryWeymouthSolveResult:
     active_mask: tuple[int, ...]
     configuration_ref: str
     configuration_source_ref: str
+
+
+@dataclass(frozen=True, slots=True)
+class StationaryWeymouthGovernedSolveResult:
+    """Résultat du chemin gouverné avec preuves d'échelle et d'initialisation."""
+
+    solve: StationaryWeymouthSolveResult
+    scale_artifact_ref: str
+    scale_policy_ref: str
+    scale_approval_ref: str
+    initial_guess_artifact_ref: str
+    initial_guess_policy_ref: str
+    initial_guess_approval_ref: str
 
 
 def _context_tuple(context: StationarySolverQualificationContext) -> tuple[str, ...]:
@@ -374,12 +393,65 @@ def solve_stationary_weymouth_least_squares_trf(
     )
 
 
+def solve_stationary_weymouth_with_approved_inputs(
+    problem: StationaryWeymouthProblem,
+    layout: StationaryWeymouthUnknownLayout,
+    pipe_parameters: tuple[WeymouthSiPipeParameters, ...],
+    *,
+    context: StationarySolverQualificationContext,
+    convergence_criterion: ApprovedStationaryConvergenceCriterion,
+    configuration: ScipyLeastSquaresTrfConfiguration,
+    scale_artifact: ApprovedStationaryWeymouthScaleArtifact,
+    initial_guess_artifact: ApprovedStationaryWeymouthInitialGuessArtifact,
+    solve_ref: str,
+) -> StationaryWeymouthGovernedSolveResult:
+    """Exécute le solveur seulement avec échelle et initialisation approuvées."""
+
+    if scale_artifact.policy_ref != context.scale_policy_ref:
+        raise ValueError("L'artefact d'échelle ne correspond pas à la politique du contexte.")
+    if initial_guess_artifact.policy_ref != context.initial_guess_policy_ref:
+        raise ValueError(
+            "L'artefact d'initialisation ne correspond pas à la politique du contexte."
+        )
+    if initial_guess_artifact.problem_ref != problem.problem_ref:
+        raise ValueError("L'artefact d'initialisation ne correspond pas au problème exécuté.")
+    if initial_guess_artifact.layout_sha256 != stationary_weymouth_layout_sha256(layout):
+        raise ValueError("L'artefact d'initialisation ne correspond pas au layout exécuté.")
+
+    scale = scale_artifact.to_numerical_scale()
+    initial_state = initial_guess_artifact.unknown_state
+    initial_vector = encode_stationary_weymouth_unknown_state(layout, initial_state, scale)
+    solve = solve_stationary_weymouth_least_squares_trf(
+        problem,
+        layout,
+        initial_state,
+        initial_vector,
+        scale,
+        pipe_parameters,
+        context=context,
+        convergence_criterion=convergence_criterion,
+        configuration=configuration,
+        solve_ref=solve_ref,
+    )
+    return StationaryWeymouthGovernedSolveResult(
+        solve=solve,
+        scale_artifact_ref=scale_artifact.artifact_ref,
+        scale_policy_ref=scale_artifact.policy_ref,
+        scale_approval_ref=scale_artifact.approval_ref,
+        initial_guess_artifact_ref=initial_guess_artifact.artifact_ref,
+        initial_guess_policy_ref=initial_guess_artifact.policy_ref,
+        initial_guess_approval_ref=initial_guess_artifact.approval_ref,
+    )
+
+
 __all__ = [
     "SCIPY_LEAST_SQUARES_TRF_METHOD_REF",
     "WEYMOUTH_P2_NUMERICAL_REPRESENTATION_REF",
     "ScipyLeastSquaresTrfConfiguration",
     "StationaryWeymouthConvergenceAssessment",
+    "StationaryWeymouthGovernedSolveResult",
     "StationaryWeymouthSolveResult",
     "assess_stationary_weymouth_convergence",
     "solve_stationary_weymouth_least_squares_trf",
+    "solve_stationary_weymouth_with_approved_inputs",
 ]

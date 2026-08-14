@@ -85,6 +85,10 @@ from hydro_gas.stationary_evaluation import (
     StationaryWeymouthEvaluation,
     evaluate_stationary_weymouth_unknown_state,
 )
+from hydro_gas.stationary_numerical_evaluation import (
+    StationaryWeymouthNumericalEvaluation,
+    evaluate_stationary_weymouth_numerical_vector,
+)
 from hydro_gas.stationary_numerics import (
     StationaryWeymouthNumericalScale,
     StationaryWeymouthNumericalVector,
@@ -173,6 +177,7 @@ __all__ = [
     "StationValveConfiguration",
     "StationValveRole",
     "StationaryWeymouthEvaluation",
+    "StationaryWeymouthNumericalEvaluation",
     "StationaryWeymouthNumericalScale",
     "StationaryWeymouthNumericalVector",
     "StationaryWeymouthProblem",
@@ -199,6 +204,7 @@ __all__ = [
     "encode_stationary_weymouth_residuals",
     "encode_stationary_weymouth_unknown_state",
     "evaluate_coolprop_properties",
+    "evaluate_stationary_weymouth_numerical_vector",
     "evaluate_stationary_weymouth_unknown_state",
     "evaluate_weymouth_si_residual",
     "export_gas_results_json",

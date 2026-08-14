@@ -21,10 +21,7 @@ _CONTEXT = GasBenchmarkProtocolContext(
         "GasModels.jl/docs/src/math-model.md@"
         "21422f18e7e328732ec8edd7995446d33f58e789#steady-state-weymouth"
     ),
-    case_ref=(
-        "GasModels.jl/test/data/matgas/case-6-gf.m@"
-        "21422f18e7e328732ec8edd7995446d33f58e789"
-    ),
+    case_ref=("GasModels.jl/test/data/matgas/case-6-gf.m@21422f18e7e328732ec8edd7995446d33f58e789"),
 )
 
 

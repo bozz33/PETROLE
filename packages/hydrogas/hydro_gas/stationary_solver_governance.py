@@ -50,7 +50,9 @@ class StationarySolverQualificationContext:
             self.initial_guess_policy_ref,
         )
         if any(not value.strip() for value in values):
-            raise ValueError("Le contexte de qualification solveur doit être entièrement référencé.")
+            raise ValueError(
+                "Le contexte de qualification solveur doit être entièrement référencé."
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,7 +89,9 @@ class PreRegisteredStationaryConvergenceCriterion:
             self.registration_ref,
         )
         if any(not value.strip() for value in required):
-            raise ValueError("Le critère de convergence et toutes ses références sont obligatoires.")
+            raise ValueError(
+                "Le critère de convergence et toutes ses références sont obligatoires."
+            )
 
         if (
             not math.isfinite(self.maximum_scaled_residual_inf_norm)
@@ -104,7 +108,9 @@ class PreRegisteredStationaryConvergenceCriterion:
             value is not None and (not math.isfinite(value) or value < 0.0)
             for value in optional_limits
         ):
-            raise ValueError("Les limites physiques optionnelles doivent être finies et positives ou nulles.")
+            raise ValueError(
+                "Les limites physiques optionnelles doivent être finies et positives ou nulles."
+            )
 
         if self.state is StationarySolverPolicyState.APPROVED:
             if self.approval_ref is None or not self.approval_ref.strip():

@@ -8,6 +8,7 @@ preuves d'approbation utilisées pendant l'exécution.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from hydro_gas.result_export import GasResultExportArtifact, export_gas_results_json
@@ -83,7 +84,9 @@ def _residual_payload(result: StationaryActiveCompressorGovernedSolveResult) -> 
                 "residual_pa2": item.residual_pa2,
                 "pressure_squared_difference_pa2": item.pressure_squared_difference_pa2,
                 "friction_term_pa2": item.friction_term_pa2,
-                "coefficient_si": item.coefficient_si,
+                "resistance_coefficient_pa2_per_kg_s2": (
+                    item.resistance_coefficient_pa2_per_kg_s2
+                ),
                 "observation_source_ref": item.observation_source_ref,
                 "parameter_source_ref": item.parameter_source_ref,
                 "equation_ref": item.equation_ref,
@@ -123,12 +126,19 @@ def _residual_payload(result: StationaryActiveCompressorGovernedSolveResult) -> 
     }
 
 
+def _json_bound(value: float) -> float | None:
+    """Encode ``None`` pour une borne numérique structurellement non bornée."""
+
+    return value if math.isfinite(value) else None
+
+
 def _bounds_payload(result: StationaryActiveCompressorGovernedSolveResult) -> dict[str, Any]:
     bounds = result.solve.numerical_bounds
     return {
         "source_ref": bounds.source_ref,
-        "lower_values": list(bounds.lower_values),
-        "upper_values": list(bounds.upper_values),
+        "lower_values": [_json_bound(value) for value in bounds.lower_values],
+        "upper_values": [_json_bound(value) for value in bounds.upper_values],
+        "null_bound_semantics": "unbounded",
         "compressor_flow_bounds": [
             {
                 "compressor_id": item.compressor_id,

@@ -26,7 +26,7 @@ def _approved_criteria(*, observation_ids: tuple[str, ...]) -> ApprovedGasBenchm
     )
     value = SimpleNamespace(
         protocol_ref="protocol://mixed/benchmark/v1",
-        runtime_criteria=runtime_criteria,
+        criteria=runtime_criteria,
         criterion_ids=tuple(
             f"criterion-{index}" for index, _ in enumerate(observation_ids, start=1)
         ),

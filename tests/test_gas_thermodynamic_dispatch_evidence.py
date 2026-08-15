@@ -76,7 +76,7 @@ def _artifact(
     assessment: StationaryActiveCompressorThermodynamicLimitAssessment,
     *,
     calculation_ref: str | None = None,
-    exported_passed: bool | None | object = Ellipsis,
+    exported_passed: bool | object | None = Ellipsis,
     approval_ref: str = "approval://limits/C1/v1",
     export_version: str = STATIONARY_COMPRESSOR_THERMODYNAMIC_EXPORT_VERSION,
     model_version: str = STATIONARY_COMPRESSOR_THERMODYNAMIC_RESULT_MODEL_VERSION,

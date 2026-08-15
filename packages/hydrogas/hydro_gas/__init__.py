@@ -56,6 +56,12 @@ from hydro_gas.coolprop_gas_property_artifact import (
     CoolPropGasMixturePropertyArtifact,
     export_coolprop_gas_mixture_property_artifact,
 )
+from hydro_gas.coolprop_gas_property_benchmark_adapter import (
+    GasMixturePropertyBenchmarkBinding,
+    GasMixturePropertyBenchmarkObservationBundle,
+    GasMixturePropertyBenchmarkQuantity,
+    build_coolprop_gas_property_benchmark_observations,
+)
 from hydro_gas.energy_optimization import (
     GasDispatchConstraintEvidence,
     GasEnergyDispatchCandidate,
@@ -239,6 +245,9 @@ __all__ = [
     "GasEnergySelectionStatus",
     "GasLinepackCell",
     "GasLinepackResult",
+    "GasMixturePropertyBenchmarkBinding",
+    "GasMixturePropertyBenchmarkObservationBundle",
+    "GasMixturePropertyBenchmarkQuantity",
     "GasNetworkEquipmentMassBalanceResult",
     "GasNetworkMassBalanceResult",
     "GasNodeEquipmentMassBalance",
@@ -295,6 +304,7 @@ __all__ = [
     "assess_stationary_equipment_mass_balance",
     "assess_stationary_mass_balance",
     "assess_stationary_weymouth_convergence",
+    "build_coolprop_gas_property_benchmark_observations",
     "build_stationary_weymouth_benchmark_observations",
     "build_stationary_weymouth_unknown_layout",
     "build_weymouth_si_binding",

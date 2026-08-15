@@ -45,9 +45,9 @@ class CoolPropCompressorMixtureComponentBinding:
         if not self.composition_component.strip() or not self.coolprop_fluid.strip():
             raise ValueError("Le composant PETROLE et son identifiant CoolProp sont obligatoires.")
         forbidden = ("::", "&", "[", "]")
-        if any(token in self.coolprop_fluid for token in forbidden) or self.coolprop_fluid.lower().endswith(
-            ".mix"
-        ):
+        if any(
+            token in self.coolprop_fluid for token in forbidden
+        ) or self.coolprop_fluid.lower().endswith(".mix"):
             raise ValueError(
                 "Un binding de composant doit viser un fluide CoolProp simple, sans syntaxe de mélange."
             )
@@ -107,7 +107,7 @@ class CoolPropCompressorMixtureDefinition:
     def fluid_name(self) -> str:
         """Identité déterministe du backend et des composants, fractions publiées séparément."""
 
-        return f"{self.backend}::{ '&'.join(self.coolprop_component_names)}"
+        return f"{self.backend}::{'&'.join(self.coolprop_component_names)}"
 
 
 CoolPropCompressorFluid = CoolPropCompressorFluidDefinition | CoolPropCompressorMixtureDefinition

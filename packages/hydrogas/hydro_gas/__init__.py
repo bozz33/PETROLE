@@ -39,6 +39,23 @@ from hydro_gas.coolprop_adapter import (
     CoolPropPureFluidDefinition,
     evaluate_coolprop_properties,
 )
+from hydro_gas.coolprop_gas_mixture import (
+    CoolPropGasMixtureComponentBinding,
+    CoolPropGasMixtureDefinition,
+)
+from hydro_gas.coolprop_gas_properties import (
+    CoolPropGasMixturePropertyResult,
+    CoolPropGasMixtureStateRequest,
+    evaluate_coolprop_gas_mixture_properties,
+)
+from hydro_gas.coolprop_gas_property_artifact import (
+    COOLPROP_GAS_MIXTURE_PROPERTY_EVIDENCE_REF_PREFIX,
+    COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_ID,
+    COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_VERSION,
+    COOLPROP_GAS_MIXTURE_PROPERTY_SCHEMA_VERSION,
+    CoolPropGasMixturePropertyArtifact,
+    export_coolprop_gas_mixture_property_artifact,
+)
 from hydro_gas.energy_optimization import (
     GasDispatchConstraintEvidence,
     GasEnergyDispatchCandidate,
@@ -171,6 +188,10 @@ from hydro_gas.weymouth_si import (
 )
 
 __all__ = [
+    "COOLPROP_GAS_MIXTURE_PROPERTY_EVIDENCE_REF_PREFIX",
+    "COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_ID",
+    "COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_VERSION",
+    "COOLPROP_GAS_MIXTURE_PROPERTY_SCHEMA_VERSION",
     "SCIPY_LEAST_SQUARES_TRF_METHOD_REF",
     "WEYMOUTH_P2_NUMERICAL_REPRESENTATION_REF",
     "WEYMOUTH_SI_MODEL_ID",
@@ -191,6 +212,11 @@ __all__ = [
     "CompressorUnitConfiguration",
     "CompressorUnitRole",
     "CoolPropEvaluationEnvelope",
+    "CoolPropGasMixtureComponentBinding",
+    "CoolPropGasMixtureDefinition",
+    "CoolPropGasMixturePropertyArtifact",
+    "CoolPropGasMixturePropertyResult",
+    "CoolPropGasMixtureStateRequest",
     "CoolPropPropertyResult",
     "CoolPropPureFluidDefinition",
     "ExternalGasBenchmarkAssessment",
@@ -276,11 +302,13 @@ __all__ = [
     "decode_stationary_weymouth_numerical_vector",
     "encode_stationary_weymouth_residuals",
     "encode_stationary_weymouth_unknown_state",
+    "evaluate_coolprop_gas_mixture_properties",
     "evaluate_coolprop_properties",
     "evaluate_stationary_compressor_map_constraint",
     "evaluate_stationary_weymouth_numerical_vector",
     "evaluate_stationary_weymouth_unknown_state",
     "evaluate_weymouth_si_residual",
+    "export_coolprop_gas_mixture_property_artifact",
     "export_gas_results_json",
     "export_weymouth_si_parameter_artifact",
     "gas_density_from_z",

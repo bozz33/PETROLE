@@ -43,8 +43,12 @@ class CoolPropGasMixturePropertyResult:
     density_kg_m3: float
     compressibility_factor: float
     molar_mass_kg_mol: float
+    declared_composition_molar_mass_kg_mol: float
+    molar_mass_residual_kg_mol: float
     speed_of_sound_m_s: float
     gas_constant_j_mol_k: float
+    eos_pressure_density_coefficient_m2_s2: float
+    eos_pressure_density_scale_m_s: float
     density_from_eos_kg_m3: float
     density_eos_residual_kg_m3: float
     fluid_name: str
@@ -107,14 +111,31 @@ def evaluate_coolprop_gas_mixture_properties(
     except Exception as exc:
         raise ValueError("Échec de l'évaluation CoolProp du mélange au point P/T demandé.") from exc
 
-    density_from_eos = (
-        request.pressure_pa * molar_mass / (compressibility * gas_constant * request.temperature_k)
+    declared_molar_mass = definition.composition.molar_mass_kg_mol
+    molar_mass_residual = declared_molar_mass - molar_mass
+    eos_pressure_density_coefficient = (
+        compressibility * gas_constant * request.temperature_k / molar_mass
     )
+    eos_pressure_density_scale = math.sqrt(eos_pressure_density_coefficient)
+    density_from_eos = request.pressure_pa / eos_pressure_density_coefficient
     density_residual = density - density_from_eos
-    if not math.isfinite(density_from_eos) or density_from_eos <= 0.0:
-        raise ValueError("La reconstruction de densité depuis Z/M/R/T doit être finie et positive.")
-    if not math.isfinite(density_residual):
-        raise ValueError("Le résidu brut de cohérence EOS doit être fini.")
+
+    diagnostic_values = (
+        declared_molar_mass,
+        molar_mass_residual,
+        eos_pressure_density_coefficient,
+        eos_pressure_density_scale,
+        density_from_eos,
+        density_residual,
+    )
+    if any(not math.isfinite(value) for value in diagnostic_values):
+        raise ValueError("Les diagnostics de cohérence des propriétés gaz doivent être finis.")
+    if declared_molar_mass <= 0.0:
+        raise ValueError("La masse molaire déclarée de la composition doit être positive.")
+    if eos_pressure_density_coefficient <= 0.0 or eos_pressure_density_scale <= 0.0:
+        raise ValueError("Le coefficient et l'échelle EOS p/rho doivent être strictement positifs.")
+    if density_from_eos <= 0.0:
+        raise ValueError("La reconstruction de densité depuis Z/M/R/T doit être positive.")
 
     return CoolPropGasMixturePropertyResult(
         temperature_k=request.temperature_k,
@@ -122,8 +143,12 @@ def evaluate_coolprop_gas_mixture_properties(
         density_kg_m3=density,
         compressibility_factor=compressibility,
         molar_mass_kg_mol=molar_mass,
+        declared_composition_molar_mass_kg_mol=declared_molar_mass,
+        molar_mass_residual_kg_mol=molar_mass_residual,
         speed_of_sound_m_s=speed_of_sound,
         gas_constant_j_mol_k=gas_constant,
+        eos_pressure_density_coefficient_m2_s2=eos_pressure_density_coefficient,
+        eos_pressure_density_scale_m_s=eos_pressure_density_scale,
         density_from_eos_kg_m3=density_from_eos,
         density_eos_residual_kg_m3=density_residual,
         fluid_name=definition.fluid_name,

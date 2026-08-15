@@ -33,7 +33,9 @@ COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_REF_PREFIX = (
 
 def _mapping(value: Any, *, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
-        raise ValueError(f"Le bloc {label} de la preuve benchmark propriétés doit être un objet JSON.")
+        raise ValueError(
+            f"Le bloc {label} de la preuve benchmark propriétés doit être un objet JSON."
+        )
     return cast(dict[str, Any], value)
 
 
@@ -84,7 +86,9 @@ def _property_artifact_sha256(bundle: GasMixturePropertyBenchmarkObservationBund
         raise ValueError(
             "La source PETROLE du benchmark propriétés doit référencer l'artefact P6-A canonique."
         )
-    value = bundle.petrole_source_ref.removeprefix(COOLPROP_GAS_MIXTURE_PROPERTY_EVIDENCE_REF_PREFIX)
+    value = bundle.petrole_source_ref.removeprefix(
+        COOLPROP_GAS_MIXTURE_PROPERTY_EVIDENCE_REF_PREFIX
+    )
     return _validate_sha256(value, label="Le hash de l'artefact propriétés PETROLE")
 
 
@@ -116,7 +120,9 @@ def export_coolprop_gas_property_benchmark_evidence(
         evidence_source_ref,
     )
     if any(not value.strip() for value in required_refs):
-        raise ValueError("Toutes les références de la preuve benchmark propriétés sont obligatoires.")
+        raise ValueError(
+            "Toutes les références de la preuve benchmark propriétés sont obligatoires."
+        )
     if review_ref is not None and not review_ref.strip():
         raise ValueError("Une référence de revue fournie ne peut pas être vide.")
     if context.protocol_ref != approved_criteria.protocol_ref:

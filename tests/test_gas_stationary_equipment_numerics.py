@@ -55,9 +55,7 @@ def _problem() -> StationaryActiveCompressorProblem:
             ),
             pipes=(SteadyGasPipe("P1", "A", "B", "model://pipe/P1"),),
         ),
-        compressor_edges=(
-            SteadyGasCompressorEdge("C1", "B", "C", "model://compressor/C1"),
-        ),
+        compressor_edges=(SteadyGasCompressorEdge("C1", "B", "C", "model://compressor/C1"),),
         pressure_slacks=(GasPressureSlack("A", 2_000_000.0, "boundary://pressure/A"),),
         compressor_speed_controls=(
             StationaryCompressorSpeedControl("C1", 1000.0, "control://speed/C1"),
@@ -79,12 +77,8 @@ def _state() -> StationaryActiveCompressorUnknownState:
             GasNodePressure("C", 3_000_000.0, "state://pressure/C"),
         ),
         pipe_flows=(GasPipeMassFlow("P1", 1.0, "state://pipe/P1"),),
-        compressor_flows=(
-            GasCompressorMassFlow("C1", 1.0, "state://compressor/C1"),
-        ),
-        slack_external_flows=(
-            GasBoundaryMassFlow("SLACK-A", "A", 1.0, "state://slack/A"),
-        ),
+        compressor_flows=(GasCompressorMassFlow("C1", 1.0, "state://compressor/C1"),),
+        slack_external_flows=(GasBoundaryMassFlow("SLACK-A", "A", 1.0, "state://slack/A"),),
     )
 
 
@@ -168,7 +162,7 @@ def test_mixed_decoder_refuses_nonpositive_active_compressor_flow_coordinate() -
         source_ref="vector://mixed/invalid-compressor-flow",
     )
 
-    with pytest.raises(ValueError, match="compresseur actif.*strictement positif"):
+    with pytest.raises(ValueError, match=r"compresseur actif.*strictement positif"):
         decode_stationary_active_compressor_numerical_vector(
             layout,
             _state(),

@@ -19,6 +19,11 @@ from hydro_gas.stationary_equipment_benchmark_evidence import (
 )
 from hydro_gas.stationary_solver_governance import StationaryWeymouthSolverStatus
 
+_MODEL_ID = "stationary-active-compressor-network"
+_MODEL_VERSION = "mixed-weymouth-compressor-v1"
+_CASE_REF = "case://mixed/reference/v1"
+_FORMULATION_REF = "formulation://gas/mixed/weymouth-map/v1"
+
 
 def _approved_criteria(*, observation_ids: tuple[str, ...]) -> ApprovedGasBenchmarkCriteria:
     runtime_criteria = tuple(
@@ -26,6 +31,10 @@ def _approved_criteria(*, observation_ids: tuple[str, ...]) -> ApprovedGasBenchm
     )
     value = SimpleNamespace(
         protocol_ref="protocol://mixed/benchmark/v1",
+        model_id=_MODEL_ID,
+        model_version=_MODEL_VERSION,
+        case_ref=_CASE_REF,
+        formulation_ref=_FORMULATION_REF,
         criteria=runtime_criteria,
         criterion_ids=tuple(
             f"criterion-{index}" for index, _ in enumerate(observation_ids, start=1)
@@ -84,8 +93,8 @@ def _export(
         _approved_criteria(
             observation_ids=tuple(item.observation_id for item in bundle.observations)
         ),
-        case_ref="case://mixed/reference/v1",
-        formulation_ref="formulation://gas/mixed/weymouth-map/v1",
+        case_ref=_CASE_REF,
+        formulation_ref=_FORMULATION_REF,
         petrole_result_sha256="1" * 64,
         external_solver_ref="external-solver://reference/v1",
         external_input_sha256="2" * 64,
@@ -105,6 +114,10 @@ def test_mixed_benchmark_evidence_is_canonical_deterministic_and_non_certifying(
     assert first.sha256 == hashlib.sha256(first.content).hexdigest()
 
     document = json.loads(first.content)
+    assert document["model_id"] == _MODEL_ID
+    assert document["model_version"] == _MODEL_VERSION
+    assert document["case_ref"] == _CASE_REF
+    assert document["formulation_ref"] == _FORMULATION_REF
     assert document["petrole"]["solver_status"] == "converged"
     assert document["petrole"]["result_sha256"] == "1" * 64
     assert document["external"]["input_sha256"] == "2" * 64
@@ -126,6 +139,39 @@ def test_mixed_benchmark_evidence_preserves_non_converged_status_without_accepta
     assert document["qualification_claim"] is False
 
 
+def test_mixed_benchmark_evidence_rejects_case_or_formulation_context_drift() -> None:
+    bundle = _bundle()
+    criteria = _approved_criteria(
+        observation_ids=tuple(item.observation_id for item in bundle.observations)
+    )
+
+    with pytest.raises(ValueError, match="cas.*contexte APPROVED"):
+        export_stationary_equipment_benchmark_evidence(
+            bundle,
+            criteria,
+            case_ref="case://mixed/other",
+            formulation_ref=_FORMULATION_REF,
+            petrole_result_sha256="1" * 64,
+            external_solver_ref="external-solver://reference/v1",
+            external_input_sha256="2" * 64,
+            external_output_sha256="3" * 64,
+            evidence_source_ref="evidence://mixed/benchmark/v1",
+        )
+
+    with pytest.raises(ValueError, match="formulation.*contexte APPROVED"):
+        export_stationary_equipment_benchmark_evidence(
+            bundle,
+            criteria,
+            case_ref=_CASE_REF,
+            formulation_ref="formulation://gas/mixed/other",
+            petrole_result_sha256="1" * 64,
+            external_solver_ref="external-solver://reference/v1",
+            external_input_sha256="2" * 64,
+            external_output_sha256="3" * 64,
+            evidence_source_ref="evidence://mixed/benchmark/v1",
+        )
+
+
 def test_mixed_benchmark_evidence_requires_exact_criterion_coverage() -> None:
     bundle = _bundle()
     criteria = _approved_criteria(observation_ids=("pressure-A",))
@@ -134,8 +180,8 @@ def test_mixed_benchmark_evidence_requires_exact_criterion_coverage() -> None:
         export_stationary_equipment_benchmark_evidence(
             bundle,
             criteria,
-            case_ref="case://mixed/reference/v1",
-            formulation_ref="formulation://gas/mixed/weymouth-map/v1",
+            case_ref=_CASE_REF,
+            formulation_ref=_FORMULATION_REF,
             petrole_result_sha256="1" * 64,
             external_solver_ref="external-solver://reference/v1",
             external_input_sha256="2" * 64,
@@ -154,8 +200,8 @@ def test_mixed_benchmark_evidence_rejects_invalid_hashes_and_tampering() -> None
         export_stationary_equipment_benchmark_evidence(
             bundle,
             criteria,
-            case_ref="case://mixed/reference/v1",
-            formulation_ref="formulation://gas/mixed/weymouth-map/v1",
+            case_ref=_CASE_REF,
+            formulation_ref=_FORMULATION_REF,
             petrole_result_sha256="not-a-hash",
             external_solver_ref="external-solver://reference/v1",
             external_input_sha256="2" * 64,

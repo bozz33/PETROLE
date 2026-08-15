@@ -5,12 +5,18 @@ façade fournit un point d'import explicite aux couches API/UI et aux intégrati
 sans transformer le paquet racine en registre de détails d'implémentation.
 """
 
+from hydro_gas.composition import GasComponentFraction, GasComposition
 from hydro_gas.compressor_limits import (
     CompressorEnvelopeFlowLimits,
     compressor_envelope_flow_limits_at_speed,
 )
 from hydro_gas.compressor_map import CompressorMapFlowDomain, compressor_map_flow_domain_at_speed
-from hydro_gas.coolprop_compressor_adapter import CoolPropCompressorFluidDefinition
+from hydro_gas.coolprop_compressor_adapter import (
+    CoolPropCompressorFluid,
+    CoolPropCompressorFluidDefinition,
+    CoolPropCompressorMixtureComponentBinding,
+    CoolPropCompressorMixtureDefinition,
+)
 from hydro_gas.stationary_compressor_thermodynamic_limits import (
     ApprovedCompressorThermodynamicLimits,
     CompressorThermodynamicLimitAssessment,
@@ -145,7 +151,12 @@ __all__ = [
     "CompressorMapFlowDomain",
     "CompressorThermodynamicLimitAssessment",
     "CompressorThermodynamicLimitState",
+    "CoolPropCompressorFluid",
     "CoolPropCompressorFluidDefinition",
+    "CoolPropCompressorMixtureComponentBinding",
+    "CoolPropCompressorMixtureDefinition",
+    "GasComponentFraction",
+    "GasComposition",
     "PreRegisteredCompressorThermodynamicLimits",
     "PreRegisteredStationaryEquipmentConvergenceCriterion",
     "PreRegisteredStationaryEquipmentInitialGuessArtifact",

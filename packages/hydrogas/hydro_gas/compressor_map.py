@@ -82,6 +82,17 @@ class CompressorOperatingPoint:
     map_version: str
 
 
+@dataclass(frozen=True, slots=True)
+class CompressorMapFlowDomain:
+    """Domaine de débit autorisé par la carte à une vitesse donnée."""
+
+    speed_rpm: float
+    minimum_mass_flow_kg_s: float
+    maximum_mass_flow_kg_s: float
+    source_ref: str
+    map_version: str
+
+
 def _interpolate_line(
     line: CompressorSpeedLine,
     mass_flow_kg_s: float,
@@ -104,6 +115,53 @@ def _interpolate_line(
     raise RuntimeError("Le point de carte n'a pas pu être encadré.")
 
 
+def compressor_map_flow_domain_at_speed(
+    compressor_map: CompressorMap,
+    *,
+    speed_rpm: float,
+) -> CompressorMapFlowDomain:
+    """Retourne le domaine de débit exact utilisable sans extrapolation."""
+
+    if not math.isfinite(speed_rpm) or speed_rpm <= 0:
+        raise ValueError("La vitesse demandée doit être finie et positive.")
+    lines = compressor_map.speed_lines
+    if speed_rpm < lines[0].speed_rpm or speed_rpm > lines[-1].speed_rpm:
+        raise ValueError("La vitesse demandée est hors du domaine de la carte compresseur.")
+
+    for line in lines:
+        if math.isclose(speed_rpm, line.speed_rpm, rel_tol=0.0, abs_tol=1e-12):
+            return CompressorMapFlowDomain(
+                speed_rpm=speed_rpm,
+                minimum_mass_flow_kg_s=line.points[0].mass_flow_kg_s,
+                maximum_mass_flow_kg_s=line.points[-1].mass_flow_kg_s,
+                source_ref=compressor_map.source_ref,
+                map_version=compressor_map.version,
+            )
+
+    for lower, upper in pairwise(lines):
+        if lower.speed_rpm < speed_rpm < upper.speed_rpm:
+            minimum_flow = max(
+                lower.points[0].mass_flow_kg_s,
+                upper.points[0].mass_flow_kg_s,
+            )
+            maximum_flow = min(
+                lower.points[-1].mass_flow_kg_s,
+                upper.points[-1].mass_flow_kg_s,
+            )
+            if minimum_flow > maximum_flow:
+                raise ValueError(
+                    "Les lignes encadrantes n'ont aucun domaine de débit commun à interpoler."
+                )
+            return CompressorMapFlowDomain(
+                speed_rpm=speed_rpm,
+                minimum_mass_flow_kg_s=minimum_flow,
+                maximum_mass_flow_kg_s=maximum_flow,
+                source_ref=compressor_map.source_ref,
+                map_version=compressor_map.version,
+            )
+    raise RuntimeError("La vitesse n'a pas pu être encadrée par la carte.")
+
+
 def interpolate_compressor_map(
     compressor_map: CompressorMap,
     *,
@@ -117,20 +175,31 @@ def interpolate_compressor_map(
     if not math.isfinite(mass_flow_kg_s) or mass_flow_kg_s <= 0:
         raise ValueError("Le débit demandé doit être fini et positif.")
 
-    lines = compressor_map.speed_lines
-    if speed_rpm < lines[0].speed_rpm or speed_rpm > lines[-1].speed_rpm:
-        raise ValueError("La vitesse demandée est hors du domaine de la carte compresseur.")
+    domain = compressor_map_flow_domain_at_speed(
+        compressor_map,
+        speed_rpm=speed_rpm,
+    )
+    if (
+        mass_flow_kg_s < domain.minimum_mass_flow_kg_s
+        or mass_flow_kg_s > domain.maximum_mass_flow_kg_s
+    ):
+        raise ValueError("Le débit demandé est hors du domaine de la carte compresseur.")
 
-    if len(lines) == 1:
-        if not math.isclose(speed_rpm, lines[0].speed_rpm, rel_tol=0.0, abs_tol=1e-12):
-            raise ValueError(
-                "Une carte à une seule ligne n'autorise aucune interpolation en vitesse."
-            )
-        pressure_ratio, efficiency = _interpolate_line(lines[0], mass_flow_kg_s)
+    lines = compressor_map.speed_lines
+    exact_line = next(
+        (
+            line
+            for line in lines
+            if math.isclose(speed_rpm, line.speed_rpm, rel_tol=0.0, abs_tol=1e-12)
+        ),
+        None,
+    )
+    if exact_line is not None:
+        pressure_ratio, efficiency = _interpolate_line(exact_line, mass_flow_kg_s)
     else:
         bracket: tuple[CompressorSpeedLine, CompressorSpeedLine] | None = None
         for lower, upper in pairwise(lines):
-            if lower.speed_rpm <= speed_rpm <= upper.speed_rpm:
+            if lower.speed_rpm < speed_rpm < upper.speed_rpm:
                 bracket = lower, upper
                 break
         if bracket is None:
@@ -154,8 +223,10 @@ def interpolate_compressor_map(
 
 __all__ = [
     "CompressorMap",
+    "CompressorMapFlowDomain",
     "CompressorMapPoint",
     "CompressorOperatingPoint",
     "CompressorSpeedLine",
+    "compressor_map_flow_domain_at_speed",
     "interpolate_compressor_map",
 ]

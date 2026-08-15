@@ -107,9 +107,7 @@ def materialize_approved_stationary_equipment_convergence_criterion(
     """Libère uniquement un critère APPROVED correspondant au contexte exact."""
 
     if criterion.state is not StationarySolverPolicyState.APPROVED:
-        raise PermissionError(
-            f"Le critère mixte {criterion.criterion_id} n'est pas APPROVED."
-        )
+        raise PermissionError(f"Le critère mixte {criterion.criterion_id} n'est pas APPROVED.")
     expected_context = (
         context.protocol_ref,
         context.problem_family_ref,

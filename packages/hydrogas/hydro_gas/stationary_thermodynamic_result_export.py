@@ -115,12 +115,8 @@ def _limits_payload(
                 "maximum_shaft_power_input_w": item.maximum_shaft_power_input_w,
                 "shaft_power_margin_w": item.shaft_power_margin_w,
                 "shaft_power_within_limit": item.shaft_power_within_limit,
-                "observed_actual_outlet_temperature_k": (
-                    item.observed_actual_outlet_temperature_k
-                ),
-                "maximum_actual_outlet_temperature_k": (
-                    item.maximum_actual_outlet_temperature_k
-                ),
+                "observed_actual_outlet_temperature_k": (item.observed_actual_outlet_temperature_k),
+                "maximum_actual_outlet_temperature_k": (item.maximum_actual_outlet_temperature_k),
                 "outlet_temperature_margin_k": item.outlet_temperature_margin_k,
                 "outlet_temperature_within_limit": item.outlet_temperature_within_limit,
                 "all_approved_limits_passed": item.all_approved_limits_passed,
@@ -178,18 +174,27 @@ def export_stationary_compressor_thermodynamic_result_json(
         raise ValueError("La composition et la méthode de propriétés doivent être référencées.")
     if not assessment.solve_ref.strip():
         raise ValueError("Le résultat thermodynamique doit référencer son calcul source.")
-    if station_summary.solve_ref != assessment.solve_ref or limit_assessment.solve_ref != assessment.solve_ref:
-        raise ValueError("La thermo, la synthèse station et les limites doivent viser le même calcul.")
+    if (
+        station_summary.solve_ref != assessment.solve_ref
+        or limit_assessment.solve_ref != assessment.solve_ref
+    ):
+        raise ValueError(
+            "La thermo, la synthèse station et les limites doivent viser le même calcul."
+        )
     if (
         station_summary.solver_status is not assessment.solver_status
         or limit_assessment.solver_status is not assessment.solver_status
     ):
-        raise ValueError("La thermo, la station et les limites doivent conserver le même statut solveur.")
+        raise ValueError(
+            "La thermo, la station et les limites doivent conserver le même statut solveur."
+        )
 
     compressor_ids = tuple(item.compressor_id for item in assessment.compressors)
     limit_ids = tuple(item.compressor_id for item in limit_assessment.compressors)
     if station_summary.compressor_ids != compressor_ids or limit_ids != compressor_ids:
-        raise ValueError("La station et les limites doivent couvrir exactement les mêmes compresseurs.")
+        raise ValueError(
+            "La station et les limites doivent couvrir exactement les mêmes compresseurs."
+        )
     if (
         station_summary.qualification_claim
         or station_summary.certification_claim
@@ -200,7 +205,9 @@ def export_stationary_compressor_thermodynamic_result_json(
             for item in limit_assessment.compressors
         )
     ):
-        raise ValueError("L'export P6-G ne peut pas propager une prétention de qualification/certification.")
+        raise ValueError(
+            "L'export P6-G ne peut pas propager une prétention de qualification/certification."
+        )
 
     payload: dict[str, Any] = {
         "calculation_ref": assessment.solve_ref,

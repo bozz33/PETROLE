@@ -85,8 +85,27 @@ def test_explicit_mixture_properties_execute_real_coolprop_and_keep_provenance()
     assert result.density_kg_m3 > 0.0
     assert result.compressibility_factor > 0.0
     assert result.molar_mass_kg_mol > 0.0
+    assert result.declared_composition_molar_mass_kg_mol == definition.composition.molar_mass_kg_mol
+    assert result.molar_mass_residual_kg_mol == (
+        definition.composition.molar_mass_kg_mol - result.molar_mass_kg_mol
+    )
+    assert math.isfinite(result.molar_mass_residual_kg_mol)
     assert result.speed_of_sound_m_s > 0.0
     assert result.gas_constant_j_mol_k > 0.0
+    assert result.eos_pressure_density_coefficient_m2_s2 == (
+        result.compressibility_factor
+        * result.gas_constant_j_mol_k
+        * result.temperature_k
+        / result.molar_mass_kg_mol
+    )
+    assert result.eos_pressure_density_coefficient_m2_s2 > 0.0
+    assert result.eos_pressure_density_scale_m_s == math.sqrt(
+        result.eos_pressure_density_coefficient_m2_s2
+    )
+    assert result.eos_pressure_density_scale_m_s > 0.0
+    assert result.density_from_eos_kg_m3 == (
+        result.pressure_pa / result.eos_pressure_density_coefficient_m2_s2
+    )
     assert result.density_from_eos_kg_m3 > 0.0
     assert math.isfinite(result.density_eos_residual_kg_m3)
     assert result.density_eos_residual_kg_m3 == (

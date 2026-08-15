@@ -145,7 +145,7 @@ def test_station_thermodynamics_rejects_duplicate_ids_status_mismatch_and_empty_
             compressors=(duplicate_item, duplicate_item),
         ),
     )
-    with pytest.raises(ValueError, match="identifiants compresseurs.*uniques"):
+    with pytest.raises(ValueError, match=r"identifiants compresseurs.*uniques"):
         aggregate_stationary_compressor_thermodynamics(
             duplicate,
             station_ref="station://gas/CS-01",

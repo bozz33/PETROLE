@@ -97,7 +97,9 @@ def test_station_thermodynamics_aggregates_only_additive_energy_and_temperature_
     assert not hasattr(summary, "total_mass_flow_kg_s")
 
 
-def test_station_thermodynamics_preserves_non_converged_status_and_flags_non_positive_power() -> None:
+def test_station_thermodynamics_preserves_non_converged_status_and_flags_non_positive_power() -> (
+    None
+):
     status = StationaryWeymouthSolverStatus.NON_CONVERGED
     value = SimpleNamespace(
         solve_ref="solve://mixed/station-thermal/non-converged",
@@ -127,7 +129,9 @@ def test_station_thermodynamics_preserves_non_converged_status_and_flags_non_pos
     assert summary.qualification_claim is False
 
 
-def test_station_thermodynamics_rejects_duplicate_ids_status_mismatch_and_empty_assessment() -> None:
+def test_station_thermodynamics_rejects_duplicate_ids_status_mismatch_and_empty_assessment() -> (
+    None
+):
     status = StationaryWeymouthSolverStatus.CONVERGED
     duplicate_item = _item(
         "C1",

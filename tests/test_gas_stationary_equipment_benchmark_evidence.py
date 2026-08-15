@@ -145,7 +145,7 @@ def test_mixed_benchmark_evidence_rejects_case_or_formulation_context_drift() ->
         observation_ids=tuple(item.observation_id for item in bundle.observations)
     )
 
-    with pytest.raises(ValueError, match="cas.*contexte APPROVED"):
+    with pytest.raises(ValueError, match=r"cas.*contexte APPROVED"):
         export_stationary_equipment_benchmark_evidence(
             bundle,
             criteria,
@@ -158,7 +158,7 @@ def test_mixed_benchmark_evidence_rejects_case_or_formulation_context_drift() ->
             evidence_source_ref="evidence://mixed/benchmark/v1",
         )
 
-    with pytest.raises(ValueError, match="formulation.*contexte APPROVED"):
+    with pytest.raises(ValueError, match=r"formulation.*contexte APPROVED"):
         export_stationary_equipment_benchmark_evidence(
             bundle,
             criteria,

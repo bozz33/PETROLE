@@ -62,6 +62,10 @@ from hydro_gas.coolprop_gas_property_benchmark_adapter import (
     GasMixturePropertyBenchmarkQuantity,
     build_coolprop_gas_property_benchmark_observations,
 )
+from hydro_gas.coolprop_gas_property_benchmark_assessment import (
+    CoolPropGasPropertyBenchmarkAssessmentResult,
+    assess_coolprop_gas_property_benchmark_evidence,
+)
 from hydro_gas.coolprop_gas_property_benchmark_evidence import (
     COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_REF_PREFIX,
     COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_SCHEMA_VERSION,
@@ -231,6 +235,7 @@ __all__ = [
     "CoolPropGasMixturePropertyArtifact",
     "CoolPropGasMixturePropertyResult",
     "CoolPropGasMixtureStateRequest",
+    "CoolPropGasPropertyBenchmarkAssessmentResult",
     "CoolPropGasPropertyBenchmarkEvidenceArtifact",
     "CoolPropPropertyResult",
     "CoolPropPureFluidDefinition",
@@ -309,6 +314,7 @@ __all__ = [
     "assemble_weymouth_network_residuals",
     "assess_compressor_envelope",
     "assess_constitutive_manifest",
+    "assess_coolprop_gas_property_benchmark_evidence",
     "assess_external_gas_benchmark",
     "assess_stationary_equipment_mass_balance",
     "assess_stationary_mass_balance",

@@ -3,7 +3,9 @@ import importlib
 REQUIRED_PROPERTY_BENCHMARK_EVIDENCE_SYMBOLS = (
     "COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_REF_PREFIX",
     "COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_SCHEMA_VERSION",
+    "CoolPropGasPropertyBenchmarkAssessmentResult",
     "CoolPropGasPropertyBenchmarkEvidenceArtifact",
+    "assess_coolprop_gas_property_benchmark_evidence",
     "export_coolprop_gas_property_benchmark_evidence",
 )
 

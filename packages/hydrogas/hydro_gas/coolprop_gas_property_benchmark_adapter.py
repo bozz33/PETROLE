@@ -92,7 +92,9 @@ def _load_document(artifact: CoolPropGasMixturePropertyArtifact) -> dict[str, An
     }
     for field, expected_value in expected.items():
         if document.get(field) != expected_value:
-            raise ValueError(f"L'artefact propriétés ne correspond pas au contrat attendu : {field}.")
+            raise ValueError(
+                f"L'artefact propriétés ne correspond pas au contrat attendu : {field}."
+            )
     return document
 
 

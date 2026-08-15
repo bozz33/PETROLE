@@ -54,6 +54,20 @@ Le contexte d'exécution fixe exactement :
 
 Un critère rattaché à un autre contexte ne peut pas être matérialisé.
 
+### `ApprovedGasBenchmarkCriteria`
+
+Le paquet matérialisé conserve désormais **le contexte complet et immuable** qui a autorisé son exécution :
+
+- `protocol_ref` ;
+- `model_id` ;
+- `model_version` ;
+- `formulation_ref` ;
+- `case_ref`.
+
+La propriété `context` restitue exactement un `GasBenchmarkProtocolContext` à partir de ces cinq références. Une couche de preuve P6-H peut donc revalider après matérialisation que le paquet APPROVED est toujours utilisé pour le même modèle, la même version, la même formulation et le même cas, sans dépendre de l'historique de l'appel qui l'a créé.
+
+Cette conservation évite notamment qu'un ensemble de critères approuvés pour un cas soit transporté puis réutilisé silencieusement sur un autre cas ou une autre formulation partageant seulement le même protocole.
+
 ### `materialize_approved_gas_benchmark_criteria`
 
 La matérialisation échoue fermée si :
@@ -69,7 +83,7 @@ La matérialisation échoue fermée si :
 
 La fonction ne calcule et ne choisit aucune tolérance. Elle copie uniquement dans le `GasBenchmarkCriterion` bas niveau les limites qui ont déjà été pré-enregistrées et approuvées.
 
-`ApprovedGasBenchmarkCriteria` conserve en parallèle les identifiants des critères, références d'approbation, références d'enregistrement et le protocole utilisé afin que le transport bas niveau ne fasse pas perdre la preuve documentaire.
+`ApprovedGasBenchmarkCriteria` conserve en parallèle les identifiants des critères, références d'approbation, références d'enregistrement et le contexte complet utilisé afin que le transport bas niveau ne fasse pas perdre la preuve documentaire.
 
 ## 3. Relation avec D10
 

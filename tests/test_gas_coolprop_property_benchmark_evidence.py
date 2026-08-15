@@ -206,8 +206,7 @@ def test_property_benchmark_evidence_is_canonical_and_preserves_approved_limits(
     assert first.content == second.content
     assert first.sha256 == second.sha256
     assert (
-        first.evidence_ref
-        == f"{COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_REF_PREFIX}{first.sha256}"
+        first.evidence_ref == f"{COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_REF_PREFIX}{first.sha256}"
     )
 
     document = json.loads(first.content)

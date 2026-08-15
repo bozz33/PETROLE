@@ -84,9 +84,7 @@ def _residual_payload(result: StationaryActiveCompressorGovernedSolveResult) -> 
                 "residual_pa2": item.residual_pa2,
                 "pressure_squared_difference_pa2": item.pressure_squared_difference_pa2,
                 "friction_term_pa2": item.friction_term_pa2,
-                "resistance_coefficient_pa2_per_kg_s2": (
-                    item.resistance_coefficient_pa2_per_kg_s2
-                ),
+                "resistance_coefficient_pa2_per_kg_s2": item.resistance_coefficient_pa2_per_kg_s2,
                 "observation_source_ref": item.observation_source_ref,
                 "parameter_source_ref": item.parameter_source_ref,
                 "equation_ref": item.equation_ref,

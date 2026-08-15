@@ -26,9 +26,7 @@ def _governed_result() -> StationaryActiveCompressorGovernedSolveResult:
             _namespace(node_id="A", pressure_pa=2_000_000.0, source_ref="state://pressure/A"),
             _namespace(node_id="B", pressure_pa=3_000_000.0, source_ref="state://pressure/B"),
         ),
-        pipe_flows=(
-            _namespace(pipe_id="P1", mass_flow_kg_s=1.0, source_ref="state://pipe/P1"),
-        ),
+        pipe_flows=(_namespace(pipe_id="P1", mass_flow_kg_s=1.0, source_ref="state://pipe/P1"),),
         compressor_inputs=(
             _namespace(
                 compressor_id="C1",
@@ -186,9 +184,7 @@ def test_mixed_solver_export_is_canonical_traceable_and_json_safe() -> None:
     assert document["results"]["status"] == "converged"
     assert document["assumptions"]["certification_claim"] is False
     assert document["results"]["candidate"]["compressor_inputs"][0]["speed_rpm"] == 1000.0
-    assert document["diagnostics"]["convergence"]["approval_ref"] == (
-        "approval://criterion/mixed/v1"
-    )
+    assert document["diagnostics"]["convergence"]["approval_ref"] == "approval://criterion/mixed/v1"
     assert document["diagnostics"]["physical_residuals"]["pipe_residuals"][0][
         "resistance_coefficient_pa2_per_kg_s2"
     ] == 5_000_000_000_000.0

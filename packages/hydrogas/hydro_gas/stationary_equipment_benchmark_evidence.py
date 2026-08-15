@@ -34,11 +34,15 @@ class StationaryEquipmentBenchmarkEvidenceArtifact:
         if self.schema_version != STATIONARY_EQUIPMENT_BENCHMARK_EVIDENCE_SCHEMA_VERSION:
             raise ValueError("Version de schéma de preuve benchmark mixte non supportée.")
         if hashlib.sha256(self.content).hexdigest() != self.sha256:
-            raise ValueError("L'empreinte de la preuve benchmark mixte ne correspond pas au contenu.")
+            raise ValueError(
+                "L'empreinte de la preuve benchmark mixte ne correspond pas au contenu."
+            )
         try:
             document = json.loads(self.content)
         except json.JSONDecodeError as exc:
-            raise ValueError("La preuve benchmark mixte doit contenir un objet JSON valide.") from exc
+            raise ValueError(
+                "La preuve benchmark mixte doit contenir un objet JSON valide."
+            ) from exc
         if not isinstance(document, dict):
             raise ValueError("La preuve benchmark mixte doit contenir un objet JSON.")
         if document.get("schema_version") != self.schema_version:

@@ -105,14 +105,10 @@ def evaluate_coolprop_gas_mixture_properties(
     except ValueError:
         raise
     except Exception as exc:
-        raise ValueError(
-            "Échec de l'évaluation CoolProp du mélange au point P/T demandé."
-        ) from exc
+        raise ValueError("Échec de l'évaluation CoolProp du mélange au point P/T demandé.") from exc
 
     density_from_eos = (
-        request.pressure_pa
-        * molar_mass
-        / (compressibility * gas_constant * request.temperature_k)
+        request.pressure_pa * molar_mass / (compressibility * gas_constant * request.temperature_k)
     )
     density_residual = density - density_from_eos
     if not math.isfinite(density_from_eos) or density_from_eos <= 0.0:

@@ -14,7 +14,12 @@ def test_mixed_compressor_facade_exposes_governed_solver_and_evidence_contracts(
     required_symbols = (
         "ApprovedCompressorThermodynamicLimits",
         "CompressorThermodynamicLimitState",
+        "CoolPropCompressorFluid",
         "CoolPropCompressorFluidDefinition",
+        "CoolPropCompressorMixtureComponentBinding",
+        "CoolPropCompressorMixtureDefinition",
+        "GasComponentFraction",
+        "GasComposition",
         "PreRegisteredCompressorThermodynamicLimits",
         "ScipyActiveCompressorLeastSquaresTrfConfiguration",
         "StationaryActiveCompressorProblem",

@@ -100,7 +100,7 @@ def _combined_components(
 ) -> tuple[tuple[str, ...], ...]:
     node_order = tuple(node.node_id for node in network.nodes)
     known_nodes = set(node_order)
-    adjacency = {node_id: set() for node_id in node_order}
+    adjacency: dict[str, set[str]] = {node_id: set() for node_id in node_order}
     for pipe in network.pipes:
         adjacency[pipe.from_node_id].add(pipe.to_node_id)
         adjacency[pipe.to_node_id].add(pipe.from_node_id)

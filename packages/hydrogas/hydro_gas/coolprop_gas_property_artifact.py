@@ -84,7 +84,9 @@ class CoolPropGasMixturePropertyArtifact:
         if mixture.get("composition_source_ref") != self.composition_source_ref:
             raise ValueError("La provenance de composition diffère de l'enveloppe de l'artefact.")
         if mixture.get("mixture_definition_source_ref") != self.mixture_definition_source_ref:
-            raise ValueError("La provenance de définition mélange diffère de l'enveloppe de l'artefact.")
+            raise ValueError(
+                "La provenance de définition mélange diffère de l'enveloppe de l'artefact."
+            )
         claims = _mapping(document.get("claims"), label="claims")
         if claims.get("qualification_claim") is not False:
             raise ValueError("L'artefact P6-A ne peut pas porter de prétention de qualification.")

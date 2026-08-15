@@ -27,7 +27,9 @@ def _approved_criteria(*, observation_ids: tuple[str, ...]) -> ApprovedGasBenchm
     value = SimpleNamespace(
         protocol_ref="protocol://mixed/benchmark/v1",
         runtime_criteria=runtime_criteria,
-        criterion_ids=tuple(f"criterion-{index}" for index, _ in enumerate(observation_ids, start=1)),
+        criterion_ids=tuple(
+            f"criterion-{index}" for index, _ in enumerate(observation_ids, start=1)
+        ),
         approval_refs=tuple(
             f"approval://criterion/{index}" for index, _ in enumerate(observation_ids, start=1)
         ),
@@ -79,7 +81,9 @@ def _export(
     bundle = _bundle(status=status)
     return export_stationary_equipment_benchmark_evidence(
         bundle,
-        _approved_criteria(observation_ids=tuple(item.observation_id for item in bundle.observations)),
+        _approved_criteria(
+            observation_ids=tuple(item.observation_id for item in bundle.observations)
+        ),
         case_ref="case://mixed/reference/v1",
         formulation_ref="formulation://gas/mixed/weymouth-map/v1",
         petrole_result_sha256="1" * 64,
@@ -142,7 +146,9 @@ def test_mixed_benchmark_evidence_requires_exact_criterion_coverage() -> None:
 
 def test_mixed_benchmark_evidence_rejects_invalid_hashes_and_tampering() -> None:
     bundle = _bundle()
-    criteria = _approved_criteria(observation_ids=tuple(item.observation_id for item in bundle.observations))
+    criteria = _approved_criteria(
+        observation_ids=tuple(item.observation_id for item in bundle.observations)
+    )
 
     with pytest.raises(ValueError, match="SHA-256"):
         export_stationary_equipment_benchmark_evidence(

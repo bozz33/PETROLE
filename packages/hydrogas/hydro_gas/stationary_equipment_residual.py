@@ -42,7 +42,9 @@ class StationaryCompressorOperatingInput:
             raise ValueError("Le compresseur et la provenance de son état sont obligatoires.")
         values = (self.mass_flow_kg_s, self.speed_rpm)
         if any(not math.isfinite(value) or value <= 0.0 for value in values):
-            raise ValueError("Le débit et la vitesse d'un compresseur actif doivent être finis et positifs.")
+            raise ValueError(
+                "Le débit et la vitesse d'un compresseur actif doivent être finis et positifs."
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,7 +92,9 @@ def assemble_stationary_equipment_residuals(
     pressure_ids = tuple(item.node_id for item in node_pressures)
     _unique_ids(pressure_ids, label="de pression nodale")
     if set(pressure_ids) != set(node_ids):
-        raise ValueError("Les pressions doivent couvrir exactement tous les noeuds du réseau mixte.")
+        raise ValueError(
+            "Les pressions doivent couvrir exactement tous les noeuds du réseau mixte."
+        )
 
     edge_ids = tuple(edge.compressor_id for edge in compressor_edges)
     input_ids = tuple(item.compressor_id for item in compressor_inputs)
@@ -99,9 +103,13 @@ def assemble_stationary_equipment_residuals(
     _unique_ids(input_ids, label="d'états compresseurs")
     _unique_ids(binding_ids, label="de bindings cartes")
     if set(input_ids) != set(edge_ids):
-        raise ValueError("Les états compresseurs doivent couvrir exactement les compresseurs du réseau.")
+        raise ValueError(
+            "Les états compresseurs doivent couvrir exactement les compresseurs du réseau."
+        )
     if set(binding_ids) != set(edge_ids):
-        raise ValueError("Les bindings de cartes doivent couvrir exactement les compresseurs du réseau.")
+        raise ValueError(
+            "Les bindings de cartes doivent couvrir exactement les compresseurs du réseau."
+        )
 
     pressure_by_node = {item.node_id: item for item in node_pressures}
     input_by_id = {item.compressor_id: item for item in compressor_inputs}

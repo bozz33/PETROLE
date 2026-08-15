@@ -94,7 +94,9 @@ def _artifact() -> CoolPropGasMixturePropertyArtifact:
     )
 
 
-def _bundle(artifact: CoolPropGasMixturePropertyArtifact) -> GasMixturePropertyBenchmarkObservationBundle:
+def _bundle(
+    artifact: CoolPropGasMixturePropertyArtifact,
+) -> GasMixturePropertyBenchmarkObservationBundle:
     return build_coolprop_gas_property_benchmark_observations(
         artifact,
         (
@@ -203,7 +205,10 @@ def test_property_benchmark_evidence_is_canonical_and_preserves_approved_limits(
     assert first.schema_version == COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_SCHEMA_VERSION
     assert first.content == second.content
     assert first.sha256 == second.sha256
-    assert first.evidence_ref == f"{COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_REF_PREFIX}{first.sha256}"
+    assert (
+        first.evidence_ref
+        == f"{COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_REF_PREFIX}{first.sha256}"
+    )
 
     document = json.loads(first.content)
     assert document["protocol"]["protocol_ref"] == _context().protocol_ref

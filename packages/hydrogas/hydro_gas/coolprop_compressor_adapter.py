@@ -1,9 +1,8 @@
 """États thermodynamiques compresseur via CoolProp, avec provenance explicite.
 
-Les fluides purs restent supportés par ``PropsSI``. Les mélanges sont fournis
-comme compositions molaires PETROLE explicites et sont évalués avec l'interface
-bas niveau ``AbstractState`` de CoolProp. Aucune composition, aucun mapping de
-composant et aucun rendement n'est injecté par défaut.
+Les fluides purs restent supportés par ``PropsSI``. Les mélanges réutilisent le
+contrat P6-A partagé et sont évalués avec ``AbstractState``. Aucune composition,
+aucun mapping de composant et aucun rendement n'est injecté par défaut.
 """
 
 from __future__ import annotations
@@ -12,7 +11,12 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
-from hydro_gas.composition import GasComposition
+from hydro_gas.coolprop_gas_mixture import (
+    CoolPropGasMixtureComponentBinding as CoolPropCompressorMixtureComponentBinding,
+)
+from hydro_gas.coolprop_gas_mixture import (
+    CoolPropGasMixtureDefinition as CoolPropCompressorMixtureDefinition,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,82 +36,6 @@ class CoolPropCompressorFluidDefinition:
             raise ValueError(
                 "La définition fluide simple ne peut pas masquer une syntaxe de mélange CoolProp."
             )
-
-
-@dataclass(frozen=True, slots=True)
-class CoolPropCompressorMixtureComponentBinding:
-    """Correspondance explicite entre un composant PETROLE et un fluide CoolProp."""
-
-    composition_component: str
-    coolprop_fluid: str
-
-    def __post_init__(self) -> None:
-        if not self.composition_component.strip() or not self.coolprop_fluid.strip():
-            raise ValueError("Le composant PETROLE et son identifiant CoolProp sont obligatoires.")
-        forbidden = ("::", "&", "[", "]")
-        if any(
-            token in self.coolprop_fluid for token in forbidden
-        ) or self.coolprop_fluid.lower().endswith(".mix"):
-            raise ValueError(
-                "Un binding de composant doit viser un fluide CoolProp simple, sans syntaxe de mélange."
-            )
-
-
-@dataclass(frozen=True, slots=True)
-class CoolPropCompressorMixtureDefinition:
-    """Mélange CoolProp construit à partir d'une composition molaire traçable."""
-
-    composition: GasComposition
-    component_bindings: tuple[CoolPropCompressorMixtureComponentBinding, ...]
-    backend: str
-    source_ref: str
-    mapping_source_ref: str
-
-    def __post_init__(self) -> None:
-        required = (self.backend, self.source_ref, self.mapping_source_ref)
-        if any(not value.strip() for value in required):
-            raise ValueError(
-                "Le backend, la provenance du mélange et la provenance du mapping sont obligatoires."
-            )
-        if "::" in self.backend:
-            raise ValueError("Le backend CoolProp doit être fourni sans séparateur '::'.")
-        if not self.component_bindings:
-            raise ValueError("Le mélange CoolProp exige un binding pour chaque composant.")
-
-        composition_names = tuple(component.component for component in self.composition.components)
-        binding_names = tuple(binding.composition_component for binding in self.component_bindings)
-        if len(binding_names) != len(set(binding_names)):
-            raise ValueError("Les composants PETROLE du mapping CoolProp doivent être uniques.")
-        if set(binding_names) != set(composition_names):
-            raise ValueError(
-                "Le mapping CoolProp doit couvrir exactement les composants de la composition gaz."
-            )
-
-        coolprop_names = tuple(binding.coolprop_fluid for binding in self.component_bindings)
-        if len(coolprop_names) != len(set(coolprop_names)):
-            raise ValueError("Chaque composant PETROLE doit viser un fluide CoolProp distinct.")
-
-    @property
-    def composition_component_names(self) -> tuple[str, ...]:
-        return tuple(component.component for component in self.composition.components)
-
-    @property
-    def coolprop_component_names(self) -> tuple[str, ...]:
-        by_component = {
-            binding.composition_component: binding.coolprop_fluid
-            for binding in self.component_bindings
-        }
-        return tuple(by_component[name] for name in self.composition_component_names)
-
-    @property
-    def mole_fractions(self) -> tuple[float, ...]:
-        return tuple(component.mole_fraction for component in self.composition.components)
-
-    @property
-    def fluid_name(self) -> str:
-        """Identité déterministe du backend et des composants, fractions publiées séparément."""
-
-        return f"{self.backend}::{'&'.join(self.coolprop_component_names)}"
 
 
 CoolPropCompressorFluid = CoolPropCompressorFluidDefinition | CoolPropCompressorMixtureDefinition
@@ -275,9 +203,8 @@ def _evaluate_mixture_states(
     definition: CoolPropCompressorMixtureDefinition,
     request: CoolPropCompressorStateRequest,
 ) -> tuple[Any, float, float, float, float]:
-    component_key = "&".join(definition.coolprop_component_names)
     try:
-        state = coolprop_module.AbstractState(definition.backend, component_key)
+        state = coolprop_module.AbstractState(definition.backend, definition.component_key)
         state.set_mole_fractions(list(definition.mole_fractions))
         state.update(
             coolprop_module.PT_INPUTS,

@@ -160,9 +160,10 @@ def test_thermodynamic_export_is_canonical_traceable_and_non_certifying() -> Non
     assert document["model_version"] == STATIONARY_COMPRESSOR_THERMODYNAMIC_RESULT_MODEL_VERSION
     assert document["results"]["status"] == "converged"
     assert document["results"]["station"]["total_shaft_power_input_w"] == 187_500.0
-    assert document["results"]["compressors"][0]["property_state"][
-        "actual_outlet_temperature_k"
-    ] == 350.0
+    assert (
+        document["results"]["compressors"][0]["property_state"]["actual_outlet_temperature_k"]
+        == 350.0
+    )
     limits = document["diagnostics"]["thermodynamic_limits"]
     assert limits["all_limits_evaluable"] is True
     assert limits["all_approved_limits_passed"] is True

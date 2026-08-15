@@ -92,7 +92,7 @@ def export_stationary_equipment_benchmark_evidence(
         raise ValueError("Les observations de la preuve benchmark mixte doivent être uniques.")
 
     criterion_observation_ids = tuple(
-        criterion.observation_id for criterion in approved_criteria.runtime_criteria
+        criterion.observation_id for criterion in approved_criteria.criteria
     )
     if len(criterion_observation_ids) != len(set(criterion_observation_ids)):
         raise ValueError("Les critères approuvés doivent viser des observations uniques.")
@@ -106,7 +106,7 @@ def export_stationary_equipment_benchmark_evidence(
         criterion_count
         == len(approved_criteria.approval_refs)
         == len(approved_criteria.registration_refs)
-        == len(approved_criteria.runtime_criteria)
+        == len(approved_criteria.criteria)
     ):
         raise ValueError("Les preuves de critères APPROVED sont incomplètes ou désalignées.")
 
@@ -157,7 +157,7 @@ def export_stationary_equipment_benchmark_evidence(
             }
             for criterion_id, runtime_criterion, approval_ref, registration_ref in zip(
                 approved_criteria.criterion_ids,
-                approved_criteria.runtime_criteria,
+                approved_criteria.criteria,
                 approved_criteria.approval_refs,
                 approved_criteria.registration_refs,
                 strict=True,

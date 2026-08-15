@@ -184,7 +184,9 @@ class PreRegisteredStationaryEquipmentInitialGuessArtifact:
             label="L'artefact d'initialisation mixte",
         )
         if not self.layout_sha256.startswith("sha256:") or len(self.layout_sha256) != 71:
-            raise ValueError("L'empreinte du layout mixte doit être une référence sha256 canonique.")
+            raise ValueError(
+                "L'empreinte du layout mixte doit être une référence sha256 canonique."
+            )
         _validate_approval(
             state=self.state,
             approval_ref=self.approval_ref,
@@ -230,7 +232,9 @@ def materialize_approved_stationary_equipment_initial_guess(
     )
     approval_ref = artifact.approval_ref
     if approval_ref is None:
-        raise RuntimeError("Un artefact d'initialisation mixte APPROVED doit porter une approbation.")
+        raise RuntimeError(
+            "Un artefact d'initialisation mixte APPROVED doit porter une approbation."
+        )
     return ApprovedStationaryEquipmentInitialGuessArtifact(
         artifact_ref=artifact.artifact_ref,
         policy_ref=artifact.policy_ref,

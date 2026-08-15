@@ -92,7 +92,9 @@ def test_coolprop_explicit_mixture_uses_exact_composition_and_component_mapping(
     assert result.fluid_name == "HEOS::Methane&Ethane"
     assert result.coolprop_backend == "HEOS"
     assert result.composition_source_ref == "composition://synthetic/methane-ethane/test-only"
-    assert result.component_mapping_source_ref == "mapping://synthetic-components/coolprop/test-only"
+    assert (
+        result.component_mapping_source_ref == "mapping://synthetic-components/coolprop/test-only"
+    )
     assert result.composition_component_names == ("component-a", "component-b")
     assert result.coolprop_component_names == ("Methane", "Ethane")
     assert result.mole_fractions == (0.8, 0.2)
@@ -122,7 +124,7 @@ def test_coolprop_mixture_requires_exact_unique_component_mapping() -> None:
             mapping_source_ref="mapping://invalid/test",
         )
 
-    with pytest.raises(ValueError, match="composants PETROLE du mapping.*uniques"):
+    with pytest.raises(ValueError, match=r"composants PETROLE du mapping.*uniques"):
         CoolPropCompressorMixtureDefinition(
             composition=composition,
             component_bindings=(
@@ -183,7 +185,7 @@ def test_coolprop_mixture_requires_explicit_backend_and_mapping_provenance() -> 
     composition = _synthetic_mixture().composition
     bindings = _synthetic_mixture().component_bindings
 
-    with pytest.raises(ValueError, match="backend.*provenance"):
+    with pytest.raises(ValueError, match=r"backend.*provenance"):
         CoolPropCompressorMixtureDefinition(
             composition=composition,
             component_bindings=bindings,

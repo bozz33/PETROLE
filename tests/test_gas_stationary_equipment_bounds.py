@@ -97,9 +97,7 @@ def test_mixed_bounds_use_map_envelope_intersection_at_fixed_speed() -> None:
             ),
             pipes=(),
         ),
-        compressor_edges=(
-            SteadyGasCompressorEdge("C1", "A", "B", "model://compressor/C1"),
-        ),
+        compressor_edges=(SteadyGasCompressorEdge("C1", "A", "B", "model://compressor/C1"),),
         pressure_slacks=(GasPressureSlack("A", 2_000_000.0, "boundary://pressure/A"),),
         compressor_speed_controls=(
             StationaryCompressorSpeedControl("C1", 1000.0, "control://speed/C1"),

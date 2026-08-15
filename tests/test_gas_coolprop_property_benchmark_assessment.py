@@ -184,9 +184,7 @@ def test_governed_property_assessment_returns_failed_criterion_without_qualifica
 
     assert result.assessment.all_evaluable_criteria_passed is False
     assert result.assessment.observations[0].passed is False
-    assert result.assessment.observations[0].violations == (
-        "absolute_error_above_criterion",
-    )
+    assert result.assessment.observations[0].violations == ("absolute_error_above_criterion",)
     assert result.qualification_claim is False
 
 
@@ -209,7 +207,9 @@ def test_governed_property_assessment_rejects_bundle_or_approval_drift() -> None
         assess_coolprop_gas_property_benchmark_evidence(
             artifact,
             bundle,
-            replace(approved, approval_refs=("approval://synthetic/other", approved.approval_refs[1])),
+            replace(
+                approved, approval_refs=("approval://synthetic/other", approved.approval_refs[1])
+            ),
             _context(),
             campaign_ref="campaign://synthetic/property-assessment/drift-test-only",
             petrole_engine_version="petrole-test-only",

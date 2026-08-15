@@ -142,19 +142,21 @@ def _unique_source_refs(
     station_source_ref: str,
 ) -> list[str]:
     refs = [composition_source_ref, property_method_ref, station_source_ref]
-    for item in assessment.compressors:
+    for compressor_result in assessment.compressors:
         refs.extend(
             (
-                item.property_state.fluid_source_ref,
-                item.property_state.state_source_ref,
-                item.property_state.efficiency_source_ref,
-                item.property_state.property_method_ref,
-                item.energy_balance.state_source_ref,
-                item.energy_balance.equation_ref,
+                compressor_result.property_state.fluid_source_ref,
+                compressor_result.property_state.state_source_ref,
+                compressor_result.property_state.efficiency_source_ref,
+                compressor_result.property_state.property_method_ref,
+                compressor_result.energy_balance.state_source_ref,
+                compressor_result.energy_balance.equation_ref,
             )
         )
-    for item in limits.compressors:
-        refs.extend((item.source_ref, item.registration_ref, item.approval_ref))
+    for limit_result in limits.compressors:
+        refs.extend(
+            (limit_result.source_ref, limit_result.registration_ref, limit_result.approval_ref)
+        )
     return list(dict.fromkeys(ref.strip() for ref in refs if ref.strip()))
 
 

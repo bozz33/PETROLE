@@ -5,6 +5,7 @@ from dataclasses import replace
 import pytest
 
 from hydro_gas.energy_optimization import (
+    GasDispatchConstraintEvidence,
     GasEnergyDispatchCandidate,
     GasEnergySelectionStatus,
     select_minimum_energy_dispatch,
@@ -121,7 +122,11 @@ def _artifact(
     )
 
 
-def _candidate(candidate_id: str, energy_j: float, evidence) -> GasEnergyDispatchCandidate:
+def _candidate(
+    candidate_id: str,
+    energy_j: float,
+    evidence: GasDispatchConstraintEvidence,
+) -> GasEnergyDispatchCandidate:
     return GasEnergyDispatchCandidate(
         candidate_id=candidate_id,
         station_id="station://CS-01",

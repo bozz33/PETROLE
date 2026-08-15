@@ -47,6 +47,17 @@ class CompressorOperatingEnvelope:
 
 
 @dataclass(frozen=True, slots=True)
+class CompressorEnvelopeFlowLimits:
+    """Limites fournisseur interpolées à une vitesse donnée."""
+
+    speed_rpm: float
+    minimum_mass_flow_kg_s: float
+    maximum_mass_flow_kg_s: float
+    source_ref: str
+    envelope_version: str
+
+
+@dataclass(frozen=True, slots=True)
 class CompressorEnvelopeAssessment:
     """Position d'un point par rapport aux limites publiées."""
 
@@ -75,8 +86,12 @@ def _limits_at_speed(
             )
         return points[0].minimum_mass_flow_kg_s, points[0].maximum_mass_flow_kg_s
 
+    for point in points:
+        if math.isclose(speed_rpm, point.speed_rpm, rel_tol=0.0, abs_tol=1e-12):
+            return point.minimum_mass_flow_kg_s, point.maximum_mass_flow_kg_s
+
     for lower, upper in pairwise(points):
-        if lower.speed_rpm <= speed_rpm <= upper.speed_rpm:
+        if lower.speed_rpm < speed_rpm < upper.speed_rpm:
             fraction = (speed_rpm - lower.speed_rpm) / (upper.speed_rpm - lower.speed_rpm)
             minimum_flow = lower.minimum_mass_flow_kg_s + fraction * (
                 upper.minimum_mass_flow_kg_s - lower.minimum_mass_flow_kg_s
@@ -88,6 +103,25 @@ def _limits_at_speed(
     raise RuntimeError("La vitesse n'a pas pu être encadrée par l'enveloppe.")
 
 
+def compressor_envelope_flow_limits_at_speed(
+    envelope: CompressorOperatingEnvelope,
+    *,
+    speed_rpm: float,
+) -> CompressorEnvelopeFlowLimits:
+    """Expose les limites de débit interpolées sans ajouter de marge cachée."""
+
+    if not math.isfinite(speed_rpm) or speed_rpm <= 0:
+        raise ValueError("La vitesse doit être finie et positive.")
+    minimum_flow, maximum_flow = _limits_at_speed(envelope, speed_rpm)
+    return CompressorEnvelopeFlowLimits(
+        speed_rpm=speed_rpm,
+        minimum_mass_flow_kg_s=minimum_flow,
+        maximum_mass_flow_kg_s=maximum_flow,
+        source_ref=envelope.source_ref,
+        envelope_version=envelope.version,
+    )
+
+
 def assess_compressor_envelope(
     envelope: CompressorOperatingEnvelope,
     *,
@@ -96,19 +130,22 @@ def assess_compressor_envelope(
 ) -> CompressorEnvelopeAssessment:
     """Évalue le point sans seuil de marge supplémentaire ni logique de commande."""
 
-    if not math.isfinite(speed_rpm) or speed_rpm <= 0:
-        raise ValueError("La vitesse doit être finie et positive.")
     if not math.isfinite(mass_flow_kg_s) or mass_flow_kg_s <= 0:
         raise ValueError("Le débit massique doit être fini et positif.")
-    minimum_flow, maximum_flow = _limits_at_speed(envelope, speed_rpm)
+    limits = compressor_envelope_flow_limits_at_speed(
+        envelope,
+        speed_rpm=speed_rpm,
+    )
     return CompressorEnvelopeAssessment(
         speed_rpm=speed_rpm,
         mass_flow_kg_s=mass_flow_kg_s,
-        minimum_mass_flow_kg_s=minimum_flow,
-        maximum_mass_flow_kg_s=maximum_flow,
-        minimum_flow_margin_kg_s=mass_flow_kg_s - minimum_flow,
-        maximum_flow_margin_kg_s=maximum_flow - mass_flow_kg_s,
-        inside_envelope=minimum_flow <= mass_flow_kg_s <= maximum_flow,
+        minimum_mass_flow_kg_s=limits.minimum_mass_flow_kg_s,
+        maximum_mass_flow_kg_s=limits.maximum_mass_flow_kg_s,
+        minimum_flow_margin_kg_s=mass_flow_kg_s - limits.minimum_mass_flow_kg_s,
+        maximum_flow_margin_kg_s=limits.maximum_mass_flow_kg_s - mass_flow_kg_s,
+        inside_envelope=(
+            limits.minimum_mass_flow_kg_s <= mass_flow_kg_s <= limits.maximum_mass_flow_kg_s
+        ),
         source_ref=envelope.source_ref,
         envelope_version=envelope.version,
     )
@@ -116,7 +153,9 @@ def assess_compressor_envelope(
 
 __all__ = [
     "CompressorEnvelopeAssessment",
+    "CompressorEnvelopeFlowLimits",
     "CompressorFlowLimitPoint",
     "CompressorOperatingEnvelope",
     "assess_compressor_envelope",
+    "compressor_envelope_flow_limits_at_speed",
 ]

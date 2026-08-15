@@ -64,9 +64,7 @@ def _problem() -> StationaryActiveCompressorProblem:
         compressor_speed_controls=(
             StationaryCompressorSpeedControl("C1", 1000.0, "control://speed/C1"),
         ),
-        map_bindings=(
-            StationaryCompressorMapBinding("C1", compressor_map, "binding://map/C1"),
-        ),
+        map_bindings=(StationaryCompressorMapBinding("C1", compressor_map, "binding://map/C1"),),
         specified_boundary_flows=(
             GasBoundaryMassFlow("DEMAND-C", "C", -1.0, "boundary://demand/C"),
         ),

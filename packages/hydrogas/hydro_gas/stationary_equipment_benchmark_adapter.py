@@ -107,9 +107,7 @@ def build_stationary_equipment_benchmark_observations(
         item.compressor_id: item.operating_point.pressure_ratio
         for item in physical.equipment_residuals.compressor_constraints
     }
-    boundary_flows = {
-        item.boundary_id: item.mass_flow_kg_s for item in candidate.boundary_flows
-    }
+    boundary_flows = {item.boundary_id: item.mass_flow_kg_s for item in candidate.boundary_flows}
 
     observations: list[GasBenchmarkObservation] = []
     for binding in bindings:

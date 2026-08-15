@@ -202,7 +202,7 @@ def test_mixed_solver_export_is_canonical_traceable_and_json_safe() -> None:
 
 
 def test_mixed_solver_export_requires_property_and_composition_provenance() -> None:
-    with pytest.raises(ValueError, match="composition.*méthode de propriétés"):
+    with pytest.raises(ValueError, match=r"composition.*méthode de propriétés"):
         export_stationary_active_compressor_solve_result_json(
             _governed_result(),
             composition_source_ref="",

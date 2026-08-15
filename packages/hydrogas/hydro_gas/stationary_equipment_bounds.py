@@ -44,9 +44,13 @@ class StationaryCompressorFlowBound:
             self.maximum_mass_flow_kg_s,
         )
         if any(not math.isfinite(value) or value <= 0.0 for value in values):
-            raise ValueError("Vitesse et bornes de débit compresseur doivent être finies et positives.")
+            raise ValueError(
+                "Vitesse et bornes de débit compresseur doivent être finies et positives."
+            )
         if self.minimum_mass_flow_kg_s >= self.maximum_mass_flow_kg_s:
-            raise ValueError("La borne compresseur doit définir un intervalle strictement non vide.")
+            raise ValueError(
+                "La borne compresseur doit définir un intervalle strictement non vide."
+            )
         if (self.envelope_source_ref is None) != (self.envelope_version is None):
             raise ValueError("Source et version d'enveloppe doivent être fournies ensemble.")
 
@@ -64,11 +68,18 @@ class StationaryActiveCompressorNumericalBounds:
         if not self.source_ref.strip():
             raise ValueError("La provenance des bornes numériques mixtes est obligatoire.")
         if len(self.lower_values) != len(self.upper_values):
-            raise ValueError("Les vecteurs de bornes inférieures et supérieures doivent avoir même taille.")
+            raise ValueError(
+                "Les vecteurs de bornes inférieures et supérieures doivent avoir même taille."
+            )
         if any(math.isnan(value) for value in self.lower_values + self.upper_values):
             raise ValueError("Les bornes numériques ne peuvent pas contenir NaN.")
-        if any(lower >= upper for lower, upper in zip(self.lower_values, self.upper_values, strict=True)):
-            raise ValueError("Chaque borne inférieure doit être strictement inférieure à sa borne supérieure.")
+        if any(
+            lower >= upper
+            for lower, upper in zip(self.lower_values, self.upper_values, strict=True)
+        ):
+            raise ValueError(
+                "Chaque borne inférieure doit être strictement inférieure à sa borne supérieure."
+            )
 
 
 def build_stationary_active_compressor_numerical_bounds(

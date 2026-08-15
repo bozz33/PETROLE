@@ -125,8 +125,10 @@ def export_coolprop_gas_property_benchmark_evidence(
         )
     if review_ref is not None and not review_ref.strip():
         raise ValueError("Une référence de revue fournie ne peut pas être vide.")
-    if context.protocol_ref != approved_criteria.protocol_ref:
-        raise ValueError("Les critères APPROVED ne correspondent pas au protocole demandé.")
+    if approved_criteria.context != context:
+        raise ValueError(
+            "Les critères APPROVED ne correspondent pas au contexte complet du benchmark."
+        )
     if context.model_id != COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_ID:
         raise ValueError("Le contexte de benchmark ne correspond pas au modèle de propriétés P6-A.")
     if context.model_version != COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_VERSION:

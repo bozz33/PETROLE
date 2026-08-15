@@ -49,7 +49,9 @@ from hydro_gas.stationary_solver_governance import (
 )
 from hydro_gas.weymouth_si import WeymouthSiPipeParameters
 
-ACTIVE_COMPRESSOR_PROBLEM_FAMILY_REF = "problem-family://gas/stationary/weymouth-active-compressors/v1"
+ACTIVE_COMPRESSOR_PROBLEM_FAMILY_REF = (
+    "problem-family://gas/stationary/weymouth-active-compressors/v1"
+)
 ACTIVE_COMPRESSOR_P2_NUMERICAL_REPRESENTATION_REF = "numerics://gas/mixed/psqr-scaled/v1"
 
 JacobianScheme = Literal["2-point", "3-point"]
@@ -87,9 +89,13 @@ class ScipyActiveCompressorLeastSquaresTrfConfiguration:
         if any(not value.strip() for value in references):
             raise ValueError("La configuration solveur mixte doit être entièrement référencée.")
         if self.solver_method_ref != SCIPY_LEAST_SQUARES_TRF_METHOD_REF:
-            raise ValueError("Le solveur mixte doit utiliser exactement la méthode TRF implémentée.")
+            raise ValueError(
+                "Le solveur mixte doit utiliser exactement la méthode TRF implémentée."
+            )
         if self.numerical_representation_ref != ACTIVE_COMPRESSOR_P2_NUMERICAL_REPRESENTATION_REF:
-            raise ValueError("Le solveur mixte doit utiliser exactement la représentation p² mixte.")
+            raise ValueError(
+                "Le solveur mixte doit utiliser exactement la représentation p² mixte."
+            )
 
         machine_epsilon = float(np.finfo(float).eps)
         tolerances = (self.ftol, self.xtol, self.gtol)
@@ -209,7 +215,9 @@ def _validate_execution_context(
     if configuration.scale_policy_ref != context.scale_policy_ref:
         raise ValueError("La politique d'échelle de la configuration diffère du contexte mixte.")
     if configuration.initial_guess_policy_ref != context.initial_guess_policy_ref:
-        raise ValueError("La politique d'initialisation de la configuration diffère du contexte mixte.")
+        raise ValueError(
+            "La politique d'initialisation de la configuration diffère du contexte mixte."
+        )
 
 
 def assess_stationary_active_compressor_convergence(
@@ -221,8 +229,7 @@ def assess_stationary_active_compressor_convergence(
     scaled_inf_norm = max((abs(value) for value in evaluation.residual_vector.values), default=0.0)
     physical: StationaryActiveCompressorEvaluation = evaluation.physical_evaluation
     mass_values = tuple(
-        abs(item.residual_kg_s)
-        for item in physical.equipment_residuals.mass_balance.node_balances
+        abs(item.residual_kg_s) for item in physical.equipment_residuals.mass_balance.node_balances
     )
     pipe_values = tuple(abs(item.residual_pa2) for item in physical.pipe_residuals)
     compressor_values = tuple(

@@ -76,16 +76,17 @@ class WeymouthNetworkResidualAssembly:
     boundary_source_refs: tuple[str, ...]
 
 
-def assemble_weymouth_network_residuals(
+def evaluate_weymouth_pipe_residuals(
     network: SteadyGasNetwork,
     candidate: WeymouthNetworkCandidateState,
     pipe_parameters: tuple[WeymouthSiPipeParameters, ...],
-) -> WeymouthNetworkResidualAssembly:
-    """Évalue les équations de masse et Weymouth sur un état candidat complet.
+) -> tuple[WeymouthSiResidual, ...]:
+    """Évalue uniquement les lois de conduite Weymouth d'un état candidat.
 
-    Les pressions doivent couvrir exactement les nœuds du réseau, les débits et
-    paramètres exactement les conduites. La fonction ne choisit aucune variable
-    inconnue, ne modifie pas l'état fourni et ne conclut jamais à une convergence.
+    Cette variante est utilisée quand la conservation de masse est assemblée
+    par une couche plus riche, par exemple un réseau contenant aussi des
+    compresseurs. Elle ne calcule donc aucun bilan nodal et ne décide jamais de
+    la convergence du réseau.
     """
 
     expected_node_ids = {node.node_id for node in network.nodes}
@@ -94,6 +95,12 @@ def assemble_weymouth_network_residuals(
         raise ValueError("Les pressions candidates doivent couvrir exactement les nœuds du réseau.")
 
     expected_pipe_ids = {pipe.pipe_id for pipe in network.pipes}
+    supplied_pipe_ids = tuple(item.pipe_id for item in candidate.pipe_flows)
+    if len(supplied_pipe_ids) != len(set(supplied_pipe_ids)):
+        raise ValueError("Un seul débit candidat est autorisé par conduite.")
+    if set(supplied_pipe_ids) != expected_pipe_ids:
+        raise ValueError("Les débits candidats doivent couvrir exactement les conduites du réseau.")
+
     parameter_ids = tuple(item.pipe_id for item in pipe_parameters)
     if len(parameter_ids) != len(set(parameter_ids)):
         raise ValueError("Un seul jeu de paramètres Weymouth est autorisé par conduite.")
@@ -102,17 +109,11 @@ def assemble_weymouth_network_residuals(
             "Les paramètres Weymouth doivent couvrir exactement les conduites du réseau."
         )
 
-    mass_balance = assess_stationary_mass_balance(
-        network,
-        candidate.pipe_flows,
-        candidate.boundary_flows,
-    )
-
     pressures_by_node = {item.node_id: item for item in candidate.node_pressures}
     flows_by_pipe = {item.pipe_id: item for item in candidate.pipe_flows}
     parameters_by_pipe = {item.pipe_id: item for item in pipe_parameters}
 
-    pipe_residuals: list[WeymouthSiResidual] = []
+    residuals: list[WeymouthSiResidual] = []
     for pipe in network.pipes:
         from_pressure = pressures_by_node[pipe.from_node_id]
         to_pressure = pressures_by_node[pipe.to_node_id]
@@ -125,12 +126,37 @@ def assemble_weymouth_network_residuals(
             mass_flow_kg_s=flow.mass_flow_kg_s,
             source_ref=candidate.candidate_ref,
         )
-        pipe_residuals.append(evaluate_weymouth_si_residual(parameters, observation))
+        residuals.append(evaluate_weymouth_si_residual(parameters, observation))
+    return tuple(residuals)
+
+
+def assemble_weymouth_network_residuals(
+    network: SteadyGasNetwork,
+    candidate: WeymouthNetworkCandidateState,
+    pipe_parameters: tuple[WeymouthSiPipeParameters, ...],
+) -> WeymouthNetworkResidualAssembly:
+    """Évalue les équations de masse et Weymouth sur un état candidat complet.
+
+    Les pressions doivent couvrir exactement les nœuds du réseau, les débits et
+    paramètres exactement les conduites. La fonction ne choisit aucune variable
+    inconnue, ne modifie pas l'état fourni et ne conclut jamais à une convergence.
+    """
+
+    pipe_residuals = evaluate_weymouth_pipe_residuals(
+        network,
+        candidate,
+        pipe_parameters,
+    )
+    mass_balance = assess_stationary_mass_balance(
+        network,
+        candidate.pipe_flows,
+        candidate.boundary_flows,
+    )
 
     return WeymouthNetworkResidualAssembly(
         candidate_ref=candidate.candidate_ref,
         mass_balance=mass_balance,
-        pipe_residuals=tuple(pipe_residuals),
+        pipe_residuals=pipe_residuals,
         node_pressure_source_refs=tuple(item.source_ref for item in candidate.node_pressures),
         pipe_flow_source_refs=tuple(item.source_ref for item in candidate.pipe_flows),
         boundary_source_refs=tuple(item.source_ref for item in candidate.boundary_flows),
@@ -142,4 +168,5 @@ __all__ = [
     "WeymouthNetworkCandidateState",
     "WeymouthNetworkResidualAssembly",
     "assemble_weymouth_network_residuals",
+    "evaluate_weymouth_pipe_residuals",
 ]

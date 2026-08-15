@@ -74,9 +74,13 @@ class PreRegisteredCompressorThermodynamicLimits:
         )
         if self.state is CompressorThermodynamicLimitState.APPROVED:
             if self.approval_ref is None or not self.approval_ref.strip():
-                raise ValueError("Un jeu de limites thermo APPROVED doit référencer son approbation.")
+                raise ValueError(
+                    "Un jeu de limites thermo APPROVED doit référencer son approbation."
+                )
         elif self.approval_ref is not None:
-            raise ValueError("Un jeu de limites thermo DRAFT ne peut pas porter une approbation active.")
+            raise ValueError(
+                "Un jeu de limites thermo DRAFT ne peut pas porter une approbation active."
+            )
 
 
 @dataclass(frozen=True, slots=True)

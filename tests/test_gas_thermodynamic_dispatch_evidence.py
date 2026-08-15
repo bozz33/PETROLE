@@ -83,9 +83,7 @@ def _artifact(
 ) -> GasResultExportArtifact:
     compressor = assessment.compressors[0]
     all_passed = (
-        assessment.all_approved_limits_passed
-        if exported_passed is Ellipsis
-        else exported_passed
+        assessment.all_approved_limits_passed if exported_passed is Ellipsis else exported_passed
     )
     return export_gas_results_json(
         {

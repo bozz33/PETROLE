@@ -101,13 +101,29 @@ class GasBenchmarkProtocolContext:
 
 @dataclass(frozen=True, slots=True)
 class ApprovedGasBenchmarkCriteria:
-    """Critères bas niveau accompagnés de leurs preuves d'approbation."""
+    """Critères bas niveau accompagnés de leur contexte et de leurs preuves."""
 
     criteria: tuple[GasBenchmarkCriterion, ...]
     criterion_ids: tuple[str, ...]
     approval_refs: tuple[str, ...]
     registration_refs: tuple[str, ...]
     protocol_ref: str
+    model_id: str
+    model_version: str
+    formulation_ref: str
+    case_ref: str
+
+    @property
+    def context(self) -> GasBenchmarkProtocolContext:
+        """Restitue le contexte immuable qui a gouverné la matérialisation."""
+
+        return GasBenchmarkProtocolContext(
+            protocol_ref=self.protocol_ref,
+            model_id=self.model_id,
+            model_version=self.model_version,
+            formulation_ref=self.formulation_ref,
+            case_ref=self.case_ref,
+        )
 
 
 def materialize_approved_gas_benchmark_criteria(
@@ -141,18 +157,18 @@ def materialize_approved_gas_benchmark_criteria(
     approvals: list[str] = []
     registrations: list[str] = []
 
+    expected_context = (
+        context.protocol_ref,
+        context.model_id,
+        context.model_version,
+        context.formulation_ref,
+        context.case_ref,
+    )
     for criterion in criteria:
         if criterion.state is not GasBenchmarkCriterionState.APPROVED:
             raise PermissionError(
                 f"Le critère {criterion.criterion_id} n'est pas APPROVED et ne peut pas être exécuté."
             )
-        expected_context = (
-            context.protocol_ref,
-            context.model_id,
-            context.model_version,
-            context.formulation_ref,
-            context.case_ref,
-        )
         actual_context = (
             criterion.protocol_ref,
             criterion.model_id,
@@ -196,6 +212,10 @@ def materialize_approved_gas_benchmark_criteria(
         approval_refs=tuple(approvals),
         registration_refs=tuple(registrations),
         protocol_ref=context.protocol_ref,
+        model_id=context.model_id,
+        model_version=context.model_version,
+        formulation_ref=context.formulation_ref,
+        case_ref=context.case_ref,
     )
 
 

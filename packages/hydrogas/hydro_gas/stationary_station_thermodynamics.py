@@ -64,7 +64,9 @@ def aggregate_stationary_compressor_thermodynamics(
     if any(not compressor_id.strip() for compressor_id in compressor_ids):
         raise ValueError("Tous les compresseurs de la synthèse doivent être identifiés.")
     if len(compressor_ids) != len(set(compressor_ids)):
-        raise ValueError("Les identifiants compresseurs de la synthèse station doivent être uniques.")
+        raise ValueError(
+            "Les identifiants compresseurs de la synthèse station doivent être uniques."
+        )
 
     for item in assessment.compressors:
         if item.solver_status is not assessment.solver_status:

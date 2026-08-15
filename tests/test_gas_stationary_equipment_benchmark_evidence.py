@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-from types import SimpleNamespace
-from typing import cast
 
 import pytest
 
 from hydro_gas.benchmark_protocol import ApprovedGasBenchmarkCriteria
-from hydro_gas.external_benchmark import GasBenchmarkObservation
+from hydro_gas.external_benchmark import GasBenchmarkCriterion, GasBenchmarkObservation
 from hydro_gas.stationary_equipment_benchmark_adapter import (
     StationaryEquipmentBenchmarkObservationBundle,
 )
@@ -19,34 +17,47 @@ from hydro_gas.stationary_equipment_benchmark_evidence import (
 )
 from hydro_gas.stationary_solver_governance import StationaryWeymouthSolverStatus
 
+_PROTOCOL_REF = "protocol://mixed/benchmark/v1"
 _MODEL_ID = "stationary-active-compressor-network"
 _MODEL_VERSION = "mixed-weymouth-compressor-v1"
 _CASE_REF = "case://mixed/reference/v1"
 _FORMULATION_REF = "formulation://gas/mixed/weymouth-map/v1"
 
 
-def _approved_criteria(*, observation_ids: tuple[str, ...]) -> ApprovedGasBenchmarkCriteria:
-    runtime_criteria = tuple(
-        SimpleNamespace(observation_id=observation_id) for observation_id in observation_ids
+def _runtime_criterion(observation_id: str) -> GasBenchmarkCriterion:
+    if observation_id == "pressure-A":
+        return GasBenchmarkCriterion(
+            observation_id=observation_id,
+            maximum_absolute_error=500.0,
+            source_ref="criterion-source://synthetic/mixed/pressure-A/test-only",
+        )
+    return GasBenchmarkCriterion(
+        observation_id=observation_id,
+        maximum_relative_error_fraction=0.02,
+        source_ref=f"criterion-source://synthetic/mixed/{observation_id}/test-only",
     )
-    value = SimpleNamespace(
-        protocol_ref="protocol://mixed/benchmark/v1",
-        model_id=_MODEL_ID,
-        model_version=_MODEL_VERSION,
-        case_ref=_CASE_REF,
-        formulation_ref=_FORMULATION_REF,
-        criteria=runtime_criteria,
+
+
+def _approved_criteria(*, observation_ids: tuple[str, ...]) -> ApprovedGasBenchmarkCriteria:
+    return ApprovedGasBenchmarkCriteria(
+        criteria=tuple(_runtime_criterion(observation_id) for observation_id in observation_ids),
         criterion_ids=tuple(
             f"criterion-{index}" for index, _ in enumerate(observation_ids, start=1)
         ),
         approval_refs=tuple(
-            f"approval://criterion/{index}" for index, _ in enumerate(observation_ids, start=1)
+            f"approval://synthetic/mixed/{index}/test-only"
+            for index, _ in enumerate(observation_ids, start=1)
         ),
         registration_refs=tuple(
-            f"registration://criterion/{index}" for index, _ in enumerate(observation_ids, start=1)
+            f"registration://synthetic/mixed/{index}/test-only"
+            for index, _ in enumerate(observation_ids, start=1)
         ),
+        protocol_ref=_PROTOCOL_REF,
+        model_id=_MODEL_ID,
+        model_version=_MODEL_VERSION,
+        case_ref=_CASE_REF,
+        formulation_ref=_FORMULATION_REF,
     )
-    return cast(ApprovedGasBenchmarkCriteria, value)
 
 
 def _bundle(
@@ -126,6 +137,14 @@ def test_mixed_benchmark_evidence_is_canonical_deterministic_and_non_certifying(
         "pressure-A",
         "compressor-ratio-C1",
     ]
+    assert document["criteria"][0]["maximum_absolute_error"] == 500.0
+    assert document["criteria"][0]["maximum_relative_error_fraction"] is None
+    assert document["criteria"][0]["criterion_source_ref"].endswith("/test-only")
+    assert document["criteria"][1]["maximum_absolute_error"] is None
+    assert document["criteria"][1]["maximum_relative_error_fraction"] == 0.02
+    assert document["criteria"][1]["criterion_source_ref"].endswith("/test-only")
+    assert document["criteria"][0]["approval_ref"].startswith("approval://synthetic/")
+    assert document["criteria"][0]["registration_ref"].startswith("registration://synthetic/")
     assert document["review_ref"] is None
     assert document["qualification_claim"] is False
     assert document["certification_claim"] is False

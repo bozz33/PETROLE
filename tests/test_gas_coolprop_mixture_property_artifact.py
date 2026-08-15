@@ -13,6 +13,7 @@ from hydro_gas.coolprop_gas_mixture import (
     CoolPropGasMixtureDefinition,
 )
 from hydro_gas.coolprop_gas_properties import (
+    CoolPropGasMixturePropertyResult,
     CoolPropGasMixtureStateRequest,
     evaluate_coolprop_gas_mixture_properties,
 )
@@ -25,7 +26,7 @@ from hydro_gas.coolprop_gas_property_artifact import (
 )
 
 
-def _result():
+def _result() -> CoolPropGasMixturePropertyResult:
     definition = CoolPropGasMixtureDefinition(
         composition=GasComposition(
             source_ref="composition://synthetic/property-artifact/test-only",
@@ -89,7 +90,10 @@ def test_property_artifact_is_canonical_hashed_and_complete() -> None:
     assert first.schema_version == COOLPROP_GAS_MIXTURE_PROPERTY_SCHEMA_VERSION
     assert first.model_id == COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_ID
     assert first.model_version == COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_VERSION
-    assert first.evidence_ref == f"{COOLPROP_GAS_MIXTURE_PROPERTY_EVIDENCE_REF_PREFIX}{first.sha256}"
+    assert (
+        first.evidence_ref
+        == f"{COOLPROP_GAS_MIXTURE_PROPERTY_EVIDENCE_REF_PREFIX}{first.sha256}"
+    )
 
     document = json.loads(first.content)
     assert document["property_state_ref"] == "property-state://gas/PT/test-only"

@@ -27,10 +27,21 @@ from hydro_gas.stationary_thermodynamic_result_export import (
 def _assessment(
     *,
     status: StationaryWeymouthSolverStatus = StationaryWeymouthSolverStatus.CONVERGED,
+    composition_source_ref: str | None = None,
 ) -> StationaryActiveCompressorThermodynamicAssessment:
+    explicit_mixture = composition_source_ref is not None
     property_state = SimpleNamespace(
-        fluid_name="Methane",
+        fluid_name="HEOS::Methane&Ethane" if explicit_mixture else "Methane",
         coolprop_version="8.0.0",
+        coolprop_gitrevision="gitrevision-test",
+        coolprop_backend="HEOS" if explicit_mixture else None,
+        composition_source_ref=composition_source_ref,
+        component_mapping_source_ref=(
+            "mapping://components/coolprop/test" if explicit_mixture else None
+        ),
+        composition_component_names=("component-a", "component-b") if explicit_mixture else (),
+        coolprop_component_names=("Methane", "Ethane") if explicit_mixture else (),
+        mole_fractions=(0.8, 0.2) if explicit_mixture else (),
         inlet_pressure_pa=100_000.0,
         inlet_temperature_k=300.0,
         inlet_enthalpy_j_kg=900_000.0,
@@ -41,10 +52,14 @@ def _assessment(
         actual_outlet_temperature_k=350.0,
         actual_outlet_enthalpy_j_kg=1_025_000.0,
         isentropic_efficiency=0.8,
-        fluid_source_ref="fluid://coolprop/Methane",
+        fluid_source_ref=(
+            "property-definition://coolprop/mixture/test"
+            if explicit_mixture
+            else "fluid://coolprop/Methane"
+        ),
         state_source_ref="state://compressor/C1/thermal",
         efficiency_source_ref="supplier://map/C1#map-version/v1",
-        property_method_ref="property-method://coolprop/PropsSI/v1",
+        property_method_ref="property-method://coolprop/v1",
     )
     energy_balance = SimpleNamespace(
         enthalpy_rise_j_kg=125_000.0,
@@ -80,6 +95,7 @@ def _station_summary(
     status: StationaryWeymouthSolverStatus = StationaryWeymouthSolverStatus.CONVERGED,
     solve_ref: str = "solve://mixed/thermo-export/v1",
     qualification_claim: bool = False,
+    fluid_name: str = "Methane",
 ) -> StationaryCompressorStationThermodynamicSummary:
     return cast(
         StationaryCompressorStationThermodynamicSummary,
@@ -94,8 +110,8 @@ def _station_summary(
             minimum_inlet_temperature_k=300.0,
             maximum_actual_outlet_temperature_k=350.0,
             non_positive_shaft_power_compressor_ids=(),
-            fluid_names=("Methane",),
-            property_method_refs=("property-method://coolprop/PropsSI/v1",),
+            fluid_names=(fluid_name,),
+            property_method_refs=("property-method://coolprop/v1",),
             source_ref="assessment://station/CS-01/thermal/v1",
             qualification_claim=qualification_claim,
             certification_claim=False,
@@ -160,10 +176,12 @@ def test_thermodynamic_export_is_canonical_traceable_and_non_certifying() -> Non
     assert document["model_version"] == STATIONARY_COMPRESSOR_THERMODYNAMIC_RESULT_MODEL_VERSION
     assert document["results"]["status"] == "converged"
     assert document["results"]["station"]["total_shaft_power_input_w"] == 187_500.0
-    assert (
-        document["results"]["compressors"][0]["property_state"]["actual_outlet_temperature_k"]
-        == 350.0
-    )
+    property_state = document["results"]["compressors"][0]["property_state"]
+    assert property_state["actual_outlet_temperature_k"] == 350.0
+    assert property_state["coolprop_gitrevision"] == "gitrevision-test"
+    assert property_state["composition_source_ref"] is None
+    assert property_state["mole_fractions"] == []
+    assert document["assumptions"]["explicit_mixture_composition"] is False
     limits = document["diagnostics"]["thermodynamic_limits"]
     assert limits["all_limits_evaluable"] is True
     assert limits["all_approved_limits_passed"] is True
@@ -171,6 +189,38 @@ def test_thermodynamic_export_is_canonical_traceable_and_non_certifying() -> Non
     assert document["assumptions"]["qualification_claim"] is False
     assert document["assumptions"]["certification_claim"] is False
     assert len(document["source_refs"]) == len(set(document["source_refs"]))
+
+
+def test_thermodynamic_export_publishes_and_verifies_explicit_mixture_provenance() -> None:
+    composition_ref = "composition://gas/explicit-mixture/test"
+    artifact = export_stationary_compressor_thermodynamic_result_json(
+        _assessment(composition_source_ref=composition_ref),
+        _station_summary(fluid_name="HEOS::Methane&Ethane"),
+        _limit_assessment(),
+        composition_source_ref=composition_ref,
+        property_method_ref="property-method://gas/thermo-protocol/v2",
+    )
+
+    document = json.loads(artifact.content)
+    assert document["assumptions"]["explicit_mixture_composition"] is True
+    state = document["results"]["compressors"][0]["property_state"]
+    assert state["coolprop_backend"] == "HEOS"
+    assert state["composition_source_ref"] == composition_ref
+    assert state["component_mapping_source_ref"] == "mapping://components/coolprop/test"
+    assert state["composition_component_names"] == ["component-a", "component-b"]
+    assert state["coolprop_component_names"] == ["Methane", "Ethane"]
+    assert state["mole_fractions"] == [0.8, 0.2]
+    assert composition_ref in document["source_refs"]
+    assert "mapping://components/coolprop/test" in document["source_refs"]
+
+    with pytest.raises(ValueError, match="mélange réellement évalué"):
+        export_stationary_compressor_thermodynamic_result_json(
+            _assessment(composition_source_ref=composition_ref),
+            _station_summary(fluid_name="HEOS::Methane&Ethane"),
+            _limit_assessment(),
+            composition_source_ref="composition://gas/wrong",
+            property_method_ref="property-method://gas/thermo-protocol/v2",
+        )
 
 
 def test_thermodynamic_export_preserves_non_converged_status_and_unevaluable_limits() -> None:

@@ -18,7 +18,7 @@ from hydro_gas.stationary_equipment_benchmark_adapter import (
 )
 
 STATIONARY_EQUIPMENT_BENCHMARK_EVIDENCE_SCHEMA_VERSION = (
-    "phase6/stationary-equipment-benchmark-evidence/1"
+    "phase6/stationary-equipment-benchmark-evidence/2"
 )
 
 
@@ -77,6 +77,10 @@ def export_stationary_equipment_benchmark_evidence(
         external_solver_ref,
         evidence_source_ref,
         approved_criteria.protocol_ref,
+        approved_criteria.model_id,
+        approved_criteria.model_version,
+        approved_criteria.case_ref,
+        approved_criteria.formulation_ref,
         bundle.solve_ref,
         bundle.petrole_source_ref,
     )
@@ -84,6 +88,10 @@ def export_stationary_equipment_benchmark_evidence(
         raise ValueError("Toutes les références de la preuve benchmark mixte sont obligatoires.")
     if review_ref is not None and not review_ref.strip():
         raise ValueError("Une référence de revue fournie ne peut pas être vide.")
+    if case_ref.strip() != approved_criteria.case_ref:
+        raise ValueError("Le cas du benchmark ne correspond pas au contexte APPROVED.")
+    if formulation_ref.strip() != approved_criteria.formulation_ref:
+        raise ValueError("La formulation du benchmark ne correspond pas au contexte APPROVED.")
 
     observation_ids = tuple(item.observation_id for item in bundle.observations)
     if not observation_ids:
@@ -113,8 +121,10 @@ def export_stationary_equipment_benchmark_evidence(
     document = {
         "schema_version": STATIONARY_EQUIPMENT_BENCHMARK_EVIDENCE_SCHEMA_VERSION,
         "protocol_ref": approved_criteria.protocol_ref,
-        "case_ref": case_ref.strip(),
-        "formulation_ref": formulation_ref.strip(),
+        "model_id": approved_criteria.model_id,
+        "model_version": approved_criteria.model_version,
+        "case_ref": approved_criteria.case_ref,
+        "formulation_ref": approved_criteria.formulation_ref,
         "petrole": {
             "solve_ref": bundle.solve_ref,
             "solver_status": bundle.solver_status.value,

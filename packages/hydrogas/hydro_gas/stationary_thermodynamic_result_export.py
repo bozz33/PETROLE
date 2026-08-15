@@ -21,10 +21,10 @@ from hydro_gas.stationary_station_thermodynamics import (
 )
 
 STATIONARY_COMPRESSOR_THERMODYNAMIC_EXPORT_VERSION = (
-    "phase6-gas/stationary-compressor-thermodynamics/1"
+    "phase6-gas/stationary-compressor-thermodynamics/2"
 )
 STATIONARY_COMPRESSOR_THERMODYNAMIC_RESULT_MODEL_VERSION = (
-    "phase6/stationary-compressor-thermodynamics/1"
+    "phase6/stationary-compressor-thermodynamics/2"
 )
 
 
@@ -45,6 +45,13 @@ def _compressor_payload(
                 "property_state": {
                     "fluid_name": state.fluid_name,
                     "coolprop_version": state.coolprop_version,
+                    "coolprop_gitrevision": state.coolprop_gitrevision,
+                    "coolprop_backend": state.coolprop_backend,
+                    "composition_source_ref": state.composition_source_ref,
+                    "component_mapping_source_ref": state.component_mapping_source_ref,
+                    "composition_component_names": list(state.composition_component_names),
+                    "coolprop_component_names": list(state.coolprop_component_names),
+                    "mole_fractions": list(state.mole_fractions),
                     "inlet_pressure_pa": state.inlet_pressure_pa,
                     "inlet_temperature_k": state.inlet_temperature_k,
                     "inlet_enthalpy_j_kg": state.inlet_enthalpy_j_kg,
@@ -133,6 +140,18 @@ def _limits_payload(
     }
 
 
+def _embedded_composition_refs(
+    assessment: StationaryActiveCompressorThermodynamicAssessment,
+) -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys(
+            ref
+            for item in assessment.compressors
+            if (ref := item.property_state.composition_source_ref) is not None and ref.strip()
+        )
+    )
+
+
 def _unique_source_refs(
     assessment: StationaryActiveCompressorThermodynamicAssessment,
     limits: StationaryActiveCompressorThermodynamicLimitAssessment,
@@ -143,12 +162,15 @@ def _unique_source_refs(
 ) -> list[str]:
     refs = [composition_source_ref, property_method_ref, station_source_ref]
     for compressor_result in assessment.compressors:
+        state = compressor_result.property_state
         refs.extend(
             (
-                compressor_result.property_state.fluid_source_ref,
-                compressor_result.property_state.state_source_ref,
-                compressor_result.property_state.efficiency_source_ref,
-                compressor_result.property_state.property_method_ref,
+                state.fluid_source_ref,
+                state.composition_source_ref or "",
+                state.component_mapping_source_ref or "",
+                state.state_source_ref,
+                state.efficiency_source_ref,
+                state.property_method_ref,
                 compressor_result.energy_balance.state_source_ref,
                 compressor_result.energy_balance.equation_ref,
             )
@@ -211,6 +233,16 @@ def export_stationary_compressor_thermodynamic_result_json(
             "L'export P6-G ne peut pas propager une prétention de qualification/certification."
         )
 
+    embedded_composition_refs = _embedded_composition_refs(assessment)
+    if len(embedded_composition_refs) > 1:
+        raise ValueError(
+            "Un export thermo P6-G ne peut pas masquer plusieurs compositions gaz sous une seule provenance globale."
+        )
+    if embedded_composition_refs and embedded_composition_refs[0] != normalized_composition_ref:
+        raise ValueError(
+            "La provenance de composition de l'export doit correspondre au mélange réellement évalué."
+        )
+
     payload: dict[str, Any] = {
         "calculation_ref": assessment.solve_ref,
         "model_version": STATIONARY_COMPRESSOR_THERMODYNAMIC_RESULT_MODEL_VERSION,
@@ -219,6 +251,7 @@ def export_stationary_compressor_thermodynamic_result_json(
         "assumptions": {
             "stationary": True,
             "thermodynamic_post_processing": True,
+            "explicit_mixture_composition": bool(embedded_composition_refs),
             "vendor_limits_required": True,
             "qualification_claim": False,
             "certification_claim": False,

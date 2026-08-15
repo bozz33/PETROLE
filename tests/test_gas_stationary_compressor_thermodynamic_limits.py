@@ -6,6 +6,7 @@ from typing import cast
 import pytest
 
 from hydro_gas.stationary_compressor_thermodynamic_limits import (
+    ApprovedCompressorThermodynamicLimits,
     CompressorThermodynamicLimitState,
     PreRegisteredCompressorThermodynamicLimits,
     assess_compressor_thermodynamic_limits,
@@ -24,7 +25,7 @@ def _approved_limits(
     *,
     maximum_power_w: float | None = 200_000.0,
     maximum_temperature_k: float | None = 350.0,
-):
+) -> ApprovedCompressorThermodynamicLimits:
     return materialize_approved_compressor_thermodynamic_limits(
         PreRegisteredCompressorThermodynamicLimits(
             limit_set_id=f"limits-{compressor_id}",

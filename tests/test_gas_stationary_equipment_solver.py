@@ -26,10 +26,13 @@ from hydro_gas.stationary_equipment_solver import (
     solve_stationary_active_compressor_with_approved_inputs,
 )
 from hydro_gas.stationary_equipment_solver_governance import (
+    ApprovedStationaryEquipmentConvergenceCriterion,
     PreRegisteredStationaryEquipmentConvergenceCriterion,
     materialize_approved_stationary_equipment_convergence_criterion,
 )
 from hydro_gas.stationary_equipment_solver_inputs import (
+    ApprovedStationaryEquipmentInitialGuessArtifact,
+    ApprovedStationaryEquipmentScaleArtifact,
     PreRegisteredStationaryEquipmentInitialGuessArtifact,
     PreRegisteredStationaryEquipmentScaleArtifact,
     materialize_approved_stationary_equipment_initial_guess,
@@ -148,7 +151,7 @@ def _configuration() -> ScipyActiveCompressorLeastSquaresTrfConfiguration:
     )
 
 
-def _approved_scale():
+def _approved_scale() -> ApprovedStationaryEquipmentScaleArtifact:
     artifact = PreRegisteredStationaryEquipmentScaleArtifact(
         artifact_ref="artifact://scale/mixed/solver-test",
         policy_ref=_context().scale_policy_ref,
@@ -166,7 +169,11 @@ def _approved_scale():
     return materialize_approved_stationary_equipment_scale(artifact)
 
 
-def _approved_initial(problem: StationaryActiveCompressorProblem, *, flow: float = 1.0):
+def _approved_initial(
+    problem: StationaryActiveCompressorProblem,
+    *,
+    flow: float = 1.0,
+) -> ApprovedStationaryEquipmentInitialGuessArtifact:
     layout = build_stationary_active_compressor_unknown_layout(problem)
     artifact = PreRegisteredStationaryEquipmentInitialGuessArtifact(
         artifact_ref="artifact://initial/mixed/solver-test",
@@ -187,7 +194,7 @@ def _approved_initial(problem: StationaryActiveCompressorProblem, *, flow: float
     )
 
 
-def _approved_criterion():
+def _approved_criterion() -> ApprovedStationaryEquipmentConvergenceCriterion:
     context = _context()
     criterion = PreRegisteredStationaryEquipmentConvergenceCriterion(
         criterion_id="mixed-solver-synthetic",

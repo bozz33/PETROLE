@@ -62,6 +62,12 @@ from hydro_gas.coolprop_gas_property_benchmark_adapter import (
     GasMixturePropertyBenchmarkQuantity,
     build_coolprop_gas_property_benchmark_observations,
 )
+from hydro_gas.coolprop_gas_property_benchmark_evidence import (
+    COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_REF_PREFIX,
+    COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_SCHEMA_VERSION,
+    CoolPropGasPropertyBenchmarkEvidenceArtifact,
+    export_coolprop_gas_property_benchmark_evidence,
+)
 from hydro_gas.energy_optimization import (
     GasDispatchConstraintEvidence,
     GasEnergyDispatchCandidate,
@@ -198,6 +204,8 @@ __all__ = [
     "COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_ID",
     "COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_VERSION",
     "COOLPROP_GAS_MIXTURE_PROPERTY_SCHEMA_VERSION",
+    "COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_REF_PREFIX",
+    "COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_SCHEMA_VERSION",
     "SCIPY_LEAST_SQUARES_TRF_METHOD_REF",
     "WEYMOUTH_P2_NUMERICAL_REPRESENTATION_REF",
     "WEYMOUTH_SI_MODEL_ID",
@@ -223,6 +231,7 @@ __all__ = [
     "CoolPropGasMixturePropertyArtifact",
     "CoolPropGasMixturePropertyResult",
     "CoolPropGasMixtureStateRequest",
+    "CoolPropGasPropertyBenchmarkEvidenceArtifact",
     "CoolPropPropertyResult",
     "CoolPropPureFluidDefinition",
     "ExternalGasBenchmarkAssessment",
@@ -319,6 +328,7 @@ __all__ = [
     "evaluate_stationary_weymouth_unknown_state",
     "evaluate_weymouth_si_residual",
     "export_coolprop_gas_mixture_property_artifact",
+    "export_coolprop_gas_property_benchmark_evidence",
     "export_gas_results_json",
     "export_weymouth_si_parameter_artifact",
     "gas_density_from_z",

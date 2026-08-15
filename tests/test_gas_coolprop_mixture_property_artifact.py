@@ -91,8 +91,7 @@ def test_property_artifact_is_canonical_hashed_and_complete() -> None:
     assert first.model_id == COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_ID
     assert first.model_version == COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_VERSION
     assert (
-        first.evidence_ref
-        == f"{COOLPROP_GAS_MIXTURE_PROPERTY_EVIDENCE_REF_PREFIX}{first.sha256}"
+        first.evidence_ref == f"{COOLPROP_GAS_MIXTURE_PROPERTY_EVIDENCE_REF_PREFIX}{first.sha256}"
     )
 
     document = json.loads(first.content)

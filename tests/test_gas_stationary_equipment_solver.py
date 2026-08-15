@@ -249,9 +249,7 @@ def test_governed_mixed_solver_converges_on_exact_synthetic_state() -> None:
     assert result.solve.convergence.all_approved_criteria_passed is True
     assert result.solve.final_evaluation.residual_vector.values == pytest.approx((0.0,) * 5)
     assert result.solve.missing_operational_envelope_compressor_ids == ()
-    assert (
-        result.solve.numerical_bounds.compressor_flow_bounds[0].minimum_mass_flow_kg_s == 0.5
-    )
+    assert result.solve.numerical_bounds.compressor_flow_bounds[0].minimum_mass_flow_kg_s == 0.5
     assert result.scale_approval_ref == "approval://scale/mixed/solver-test"
     assert result.initial_guess_approval_ref == "approval://initial/mixed/solver-test"
 

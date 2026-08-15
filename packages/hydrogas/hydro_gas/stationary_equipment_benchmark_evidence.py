@@ -18,7 +18,7 @@ from hydro_gas.stationary_equipment_benchmark_adapter import (
 )
 
 STATIONARY_EQUIPMENT_BENCHMARK_EVIDENCE_SCHEMA_VERSION = (
-    "phase6/stationary-equipment-benchmark-evidence/2"
+    "phase6/stationary-equipment-benchmark-evidence/3"
 )
 
 
@@ -162,6 +162,11 @@ def export_stationary_equipment_benchmark_evidence(
             {
                 "criterion_id": criterion_id,
                 "observation_id": runtime_criterion.observation_id,
+                "maximum_absolute_error": runtime_criterion.maximum_absolute_error,
+                "maximum_relative_error_fraction": (
+                    runtime_criterion.maximum_relative_error_fraction
+                ),
+                "criterion_source_ref": runtime_criterion.source_ref,
                 "approval_ref": approval_ref,
                 "registration_ref": registration_ref,
             }

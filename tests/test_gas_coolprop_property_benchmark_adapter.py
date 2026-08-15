@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 
 import pytest
@@ -21,6 +22,7 @@ from hydro_gas.coolprop_gas_properties import (
     evaluate_coolprop_gas_mixture_properties,
 )
 from hydro_gas.coolprop_gas_property_artifact import (
+    CoolPropGasMixturePropertyArtifact,
     export_coolprop_gas_mixture_property_artifact,
 )
 from hydro_gas.coolprop_gas_property_benchmark_adapter import (
@@ -30,7 +32,7 @@ from hydro_gas.coolprop_gas_property_benchmark_adapter import (
 )
 
 
-def _artifact():
+def _artifact() -> CoolPropGasMixturePropertyArtifact:
     definition = CoolPropGasMixtureDefinition(
         composition=GasComposition(
             source_ref="composition://synthetic/property-benchmark/test-only",
@@ -144,7 +146,7 @@ def test_property_benchmark_adapter_reads_exact_artifact_values_without_conversi
         "eos-coefficient",
     )
 
-    document = __import__("json").loads(artifact.content)
+    document = json.loads(artifact.content)
     expected_values = (
         document["properties"]["density_kg_m3"],
         document["properties"]["compressibility_factor"],
@@ -168,7 +170,7 @@ def test_property_benchmark_adapter_enforces_exact_units_and_unique_observation_
         )
 
     duplicate = _binding("same", GasMixturePropertyBenchmarkQuantity.DENSITY, 0.75, "kg/m3")
-    with pytest.raises(ValueError, match="identifiants d'observations.*uniques"):
+    with pytest.raises(ValueError, match=r"identifiants d'observations.*uniques"):
         build_coolprop_gas_property_benchmark_observations(
             artifact,
             (

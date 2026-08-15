@@ -23,9 +23,7 @@ def _problem() -> StationaryActiveCompressorProblem:
     return cast(
         StationaryActiveCompressorProblem,
         _namespace(
-            compressor_edges=(
-                _namespace(compressor_id="C1", from_node_id="A", to_node_id="B"),
-            )
+            compressor_edges=(_namespace(compressor_id="C1", from_node_id="A", to_node_id="B"),)
         ),
     )
 
@@ -39,9 +37,7 @@ def _result(
             _namespace(node_id="A", pressure_pa=100_000.0),
             _namespace(node_id="B", pressure_pa=200_000.0),
         ),
-        compressor_inputs=(
-            _namespace(compressor_id="C1", mass_flow_kg_s=1.5),
-        ),
+        compressor_inputs=(_namespace(compressor_id="C1", mass_flow_kg_s=1.5),),
     )
     constraint = _namespace(
         compressor_id="C1",
@@ -82,7 +78,9 @@ def _input() -> StationaryCompressorThermodynamicInput:
     )
 
 
-def test_mixed_post_processing_uses_solver_pressures_map_efficiency_and_explicit_energy_terms() -> None:
+def test_mixed_post_processing_uses_solver_pressures_map_efficiency_and_explicit_energy_terms() -> (
+    None
+):
     assessment = evaluate_stationary_active_compressor_thermodynamics(
         _problem(),
         _result(),

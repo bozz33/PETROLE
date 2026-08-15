@@ -202,7 +202,9 @@ def test_property_benchmark_adapter_rejects_nonfinite_reference_and_tampered_art
         replace(artifact, content=artifact.content + b" ")
 
 
-def test_property_observation_can_only_become_evaluable_through_explicit_approved_criterion() -> None:
+def test_property_observation_can_only_become_evaluable_through_explicit_approved_criterion() -> (
+    None
+):
     artifact = _artifact()
     bundle = build_coolprop_gas_property_benchmark_observations(
         artifact,

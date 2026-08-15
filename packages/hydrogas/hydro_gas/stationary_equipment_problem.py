@@ -27,9 +27,13 @@ class StationaryCompressorSpeedControl:
 
     def __post_init__(self) -> None:
         if not self.compressor_id.strip() or not self.source_ref.strip():
-            raise ValueError("Le contrôle de vitesse compresseur et sa provenance sont obligatoires.")
+            raise ValueError(
+                "Le contrôle de vitesse compresseur et sa provenance sont obligatoires."
+            )
         if not math.isfinite(self.speed_rpm) or self.speed_rpm <= 0.0:
-            raise ValueError("La vitesse compresseur imposée doit être finie et strictement positive.")
+            raise ValueError(
+                "La vitesse compresseur imposée doit être finie et strictement positive."
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,9 +144,13 @@ def build_stationary_active_compressor_unknown_layout(
     _require_unique(speed_ids, label="de contrôles de vitesse")
     _require_unique(binding_ids, label="de bindings cartes")
     if set(speed_ids) != set(compressor_ids):
-        raise ValueError("Les contrôles de vitesse doivent couvrir exactement les compresseurs actifs.")
+        raise ValueError(
+            "Les contrôles de vitesse doivent couvrir exactement les compresseurs actifs."
+        )
     if set(binding_ids) != set(compressor_ids):
-        raise ValueError("Les bindings de cartes doivent couvrir exactement les compresseurs actifs.")
+        raise ValueError(
+            "Les bindings de cartes doivent couvrir exactement les compresseurs actifs."
+        )
 
     boundary_ids = tuple(item.boundary_id for item in problem.specified_boundary_flows)
     _require_unique(boundary_ids, label="de frontières gaz")
@@ -152,7 +160,9 @@ def build_stationary_active_compressor_unknown_layout(
     slack_node_ids = tuple(item.node_id for item in problem.pressure_slacks)
     _require_unique(slack_node_ids, label="de noeuds slack")
     if any(node_id not in known_nodes for node_id in slack_node_ids):
-        raise ValueError("Chaque slack de pression doit référencer un noeud présent dans le réseau.")
+        raise ValueError(
+            "Chaque slack de pression doit référencer un noeud présent dans le réseau."
+        )
 
     components = _combined_components(problem.network, problem.compressor_edges)
     for component in components:
@@ -176,7 +186,9 @@ def build_stationary_active_compressor_unknown_layout(
         compressor_equation_ids=compressor_ids,
     )
     if not layout.structurally_square:
-        raise ValueError("Le problème réseau mixte doit produire un système structurellement carré.")
+        raise ValueError(
+            "Le problème réseau mixte doit produire un système structurellement carré."
+        )
     return layout
 
 

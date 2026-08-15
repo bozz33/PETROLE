@@ -56,14 +56,18 @@ def _validate_compressor_limit_rows(
         raise ValueError("La preuve thermo doit contenir une liste de limites par compresseur.")
     rows = tuple(_mapping(row, label="limite compresseur") for row in rows_value)
     row_ids = tuple(row.get("compressor_id") for row in rows)
-    if any(not isinstance(compressor_id, str) or not compressor_id.strip() for compressor_id in row_ids):
+    if any(
+        not isinstance(compressor_id, str) or not compressor_id.strip() for compressor_id in row_ids
+    ):
         raise ValueError("Chaque ligne de limite thermo exportée doit identifier son compresseur.")
     if len(row_ids) != len(set(row_ids)):
         raise ValueError("Les compresseurs de la preuve thermo exportée doivent être uniques.")
 
     expected_by_id = {item.compressor_id: item for item in assessment.compressors}
     if set(row_ids) != set(expected_by_id):
-        raise ValueError("La preuve thermo exportée doit couvrir exactement les compresseurs évalués.")
+        raise ValueError(
+            "La preuve thermo exportée doit couvrir exactement les compresseurs évalués."
+        )
 
     for row in rows:
         compressor_id = cast(str, row["compressor_id"])
@@ -108,15 +112,17 @@ def build_thermodynamic_limit_dispatch_constraint_evidence(
         raise ValueError("L'évaluabilité thermo exportée diffère de l'évaluation source.")
     if limits.get("all_approved_limits_passed") is not assessment.all_approved_limits_passed:
         raise ValueError("Le verdict thermo exporté diffère de l'évaluation source.")
-    if limits.get("qualification_claim") is not False or limits.get("certification_claim") is not False:
-        raise ValueError("Une preuve P6-F ne peut pas porter de prétention de qualification/certification.")
+    if (
+        limits.get("qualification_claim") is not False
+        or limits.get("certification_claim") is not False
+    ):
+        raise ValueError(
+            "Une preuve P6-F ne peut pas porter de prétention de qualification/certification."
+        )
 
     _validate_compressor_limit_rows(limits.get("compressors"), assessment)
 
-    passed = (
-        assessment.all_limits_evaluable
-        and assessment.all_approved_limits_passed is True
-    )
+    passed = assessment.all_limits_evaluable and assessment.all_approved_limits_passed is True
     return GasDispatchConstraintEvidence(
         constraint_id=THERMODYNAMIC_LIMIT_DISPATCH_CONSTRAINT_ID,
         passed=passed,

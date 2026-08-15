@@ -80,9 +80,7 @@ def materialize_stationary_active_compressor_candidate(
     if set(flow_by_pipe) != set(layout.pipe_flow_ids):
         raise ValueError("Les débits de conduite doivent couvrir exactement le layout mixte.")
 
-    compressor_flow_by_id = {
-        item.compressor_id: item for item in unknown_state.compressor_flows
-    }
+    compressor_flow_by_id = {item.compressor_id: item for item in unknown_state.compressor_flows}
     if set(compressor_flow_by_id) != set(layout.compressor_flow_ids):
         raise ValueError("Les débits compresseurs doivent couvrir exactement le layout mixte.")
 
@@ -105,9 +103,7 @@ def materialize_stationary_active_compressor_candidate(
         )
         for slack in problem.pressure_slacks
     }
-    speed_by_compressor = {
-        item.compressor_id: item for item in problem.compressor_speed_controls
-    }
+    speed_by_compressor = {item.compressor_id: item for item in problem.compressor_speed_controls}
 
     node_pressures = tuple(
         fixed_pressure_by_node[node.node_id]

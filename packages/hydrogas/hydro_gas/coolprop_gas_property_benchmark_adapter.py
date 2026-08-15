@@ -47,7 +47,11 @@ class GasMixturePropertyBenchmarkBinding:
     reference_source_ref: str
 
     def __post_init__(self) -> None:
-        if not self.observation_id.strip() or not self.unit.strip() or not self.reference_source_ref.strip():
+        if (
+            not self.observation_id.strip()
+            or not self.unit.strip()
+            or not self.reference_source_ref.strip()
+        ):
             raise ValueError("L'observation, son unité et sa référence externe sont obligatoires.")
         if not math.isfinite(self.reference_value):
             raise ValueError("La valeur de référence du benchmark doit être finie.")

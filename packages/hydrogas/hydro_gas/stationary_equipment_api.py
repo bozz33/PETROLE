@@ -10,6 +10,13 @@ from hydro_gas.compressor_limits import (
     compressor_envelope_flow_limits_at_speed,
 )
 from hydro_gas.compressor_map import CompressorMapFlowDomain, compressor_map_flow_domain_at_speed
+from hydro_gas.coolprop_compressor_adapter import CoolPropCompressorFluidDefinition
+from hydro_gas.stationary_compressor_thermodynamics import (
+    StationaryActiveCompressorThermodynamicAssessment,
+    StationaryCompressorThermodynamicInput,
+    StationaryCompressorThermodynamicResult,
+    evaluate_stationary_active_compressor_thermodynamics,
+)
 from hydro_gas.stationary_equipment_benchmark_adapter import (
     StationaryEquipmentBenchmarkBinding,
     StationaryEquipmentBenchmarkObservationBundle,
@@ -63,6 +70,14 @@ from hydro_gas.stationary_equipment_result_export import (
     MIXED_STATIONARY_GAS_RESULT_MODEL_VERSION,
     export_stationary_active_compressor_solve_result_json,
 )
+from hydro_gas.stationary_equipment_result_tables import (
+    StationaryActiveCompressorResultTables,
+    StationaryGasBoundaryResultRow,
+    StationaryGasCompressorResultRow,
+    StationaryGasNodeResultRow,
+    StationaryGasPipeResultRow,
+    build_stationary_active_compressor_result_tables,
+)
 from hydro_gas.stationary_equipment_solver import (
     ACTIVE_COMPRESSOR_P2_NUMERICAL_REPRESENTATION_REF,
     ACTIVE_COMPRESSOR_PROBLEM_FAMILY_REF,
@@ -87,6 +102,10 @@ from hydro_gas.stationary_equipment_solver_inputs import (
     materialize_approved_stationary_equipment_scale,
     stationary_active_compressor_layout_sha256,
 )
+from hydro_gas.stationary_station_thermodynamics import (
+    StationaryCompressorStationThermodynamicSummary,
+    aggregate_stationary_compressor_thermodynamics,
+)
 
 __all__ = [
     "ACTIVE_COMPRESSOR_P2_NUMERICAL_REPRESENTATION_REF",
@@ -99,6 +118,7 @@ __all__ = [
     "ApprovedStationaryEquipmentScaleArtifact",
     "CompressorEnvelopeFlowLimits",
     "CompressorMapFlowDomain",
+    "CoolPropCompressorFluidDefinition",
     "PreRegisteredStationaryEquipmentConvergenceCriterion",
     "PreRegisteredStationaryEquipmentInitialGuessArtifact",
     "PreRegisteredStationaryEquipmentScaleArtifact",
@@ -112,21 +132,32 @@ __all__ = [
     "StationaryActiveCompressorNumericalScale",
     "StationaryActiveCompressorNumericalVector",
     "StationaryActiveCompressorProblem",
+    "StationaryActiveCompressorResultTables",
     "StationaryActiveCompressorSolveResult",
+    "StationaryActiveCompressorThermodynamicAssessment",
     "StationaryActiveCompressorUnknownLayout",
     "StationaryActiveCompressorUnknownState",
     "StationaryCompressorFlowBound",
     "StationaryCompressorMapBinding",
     "StationaryCompressorOperatingInput",
     "StationaryCompressorSpeedControl",
+    "StationaryCompressorStationThermodynamicSummary",
+    "StationaryCompressorThermodynamicInput",
+    "StationaryCompressorThermodynamicResult",
     "StationaryEquipmentBenchmarkBinding",
     "StationaryEquipmentBenchmarkEvidenceArtifact",
     "StationaryEquipmentBenchmarkObservationBundle",
     "StationaryEquipmentBenchmarkQuantity",
     "StationaryEquipmentResidualAssembly",
+    "StationaryGasBoundaryResultRow",
+    "StationaryGasCompressorResultRow",
+    "StationaryGasNodeResultRow",
+    "StationaryGasPipeResultRow",
+    "aggregate_stationary_compressor_thermodynamics",
     "assemble_stationary_equipment_residuals",
     "assess_stationary_active_compressor_convergence",
     "build_stationary_active_compressor_numerical_bounds",
+    "build_stationary_active_compressor_result_tables",
     "build_stationary_active_compressor_unknown_layout",
     "build_stationary_equipment_benchmark_observations",
     "compressor_envelope_flow_limits_at_speed",
@@ -135,6 +166,7 @@ __all__ = [
     "encode_stationary_active_compressor_residuals",
     "encode_stationary_active_compressor_unknown_state",
     "evaluate_stationary_active_compressor_numerical_vector",
+    "evaluate_stationary_active_compressor_thermodynamics",
     "evaluate_stationary_active_compressor_unknown_state",
     "export_stationary_active_compressor_solve_result_json",
     "export_stationary_equipment_benchmark_evidence",

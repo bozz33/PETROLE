@@ -64,7 +64,9 @@ class StationaryCompressorThermodynamicInput:
         if any(not math.isfinite(value) for value in values):
             raise ValueError("Les contributions énergétiques fournies doivent être finies.")
         if self.inlet_kinetic_energy_j_kg < 0.0 or self.outlet_kinetic_energy_j_kg < 0.0:
-            raise ValueError("Les énergies cinétiques spécifiques doivent être positives ou nulles.")
+            raise ValueError(
+                "Les énergies cinétiques spécifiques doivent être positives ou nulles."
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,7 +101,9 @@ def evaluate_stationary_active_compressor_thermodynamics(
     expected_ids = tuple(edge.compressor_id for edge in problem.compressor_edges)
     input_ids = tuple(item.compressor_id for item in inputs)
     if len(input_ids) != len(set(input_ids)):
-        raise ValueError("Les entrées thermodynamiques compresseurs doivent avoir des identifiants uniques.")
+        raise ValueError(
+            "Les entrées thermodynamiques compresseurs doivent avoir des identifiants uniques."
+        )
     if set(input_ids) != set(expected_ids):
         raise ValueError(
             "Les entrées thermodynamiques doivent couvrir exactement les compresseurs actifs."
@@ -114,7 +118,9 @@ def evaluate_stationary_active_compressor_thermodynamics(
         item.compressor_id: item for item in physical.equipment_residuals.compressor_constraints
     }
     external_input_by_id = {item.compressor_id: item for item in inputs}
-    if set(compressor_input_by_id) != set(expected_ids) or set(constraint_by_id) != set(expected_ids):
+    if set(compressor_input_by_id) != set(expected_ids) or set(constraint_by_id) != set(
+        expected_ids
+    ):
         raise ValueError(
             "Le résultat réseau doit couvrir exactement les compresseurs actifs avant le post-traitement."
         )

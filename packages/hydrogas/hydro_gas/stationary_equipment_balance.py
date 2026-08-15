@@ -35,9 +35,7 @@ class SteadyGasCompressorEdge:
             self.source_ref,
         )
         if any(not value.strip() for value in values):
-            raise ValueError(
-                "Le compresseur, ses extrémités et sa provenance sont obligatoires."
-            )
+            raise ValueError("Le compresseur, ses extrémités et sa provenance sont obligatoires.")
         if self.from_node_id == self.to_node_id:
             raise ValueError("Un compresseur ne peut pas relier un noeud à lui-même.")
 
@@ -106,15 +104,11 @@ def assess_stationary_equipment_mass_balance(
     if len(supplied_pipe_ids) != len(set(supplied_pipe_ids)):
         raise ValueError("Un seul débit massique doit être fourni par conduite.")
     if set(supplied_pipe_ids) != expected_pipe_ids:
-        raise ValueError(
-            "Les débits fournis doivent couvrir exactement les conduites du réseau."
-        )
+        raise ValueError("Les débits fournis doivent couvrir exactement les conduites du réseau.")
 
     compressor_ids = tuple(edge.compressor_id for edge in compressor_edges)
     if len(compressor_ids) != len(set(compressor_ids)):
-        raise ValueError(
-            "Les identifiants de compresseurs stationnaires doivent être uniques."
-        )
+        raise ValueError("Les identifiants de compresseurs stationnaires doivent être uniques.")
     for edge in compressor_edges:
         if edge.from_node_id not in known_node_ids or edge.to_node_id not in known_node_ids:
             raise ValueError(
@@ -133,14 +127,10 @@ def assess_stationary_equipment_mass_balance(
     if len(boundary_ids) != len(set(boundary_ids)):
         raise ValueError("Les identifiants de frontières gaz doivent être uniques.")
     if any(flow.node_id not in known_node_ids for flow in boundary_flows):
-        raise ValueError(
-            "Chaque frontière gaz doit référencer un noeud présent dans le réseau."
-        )
+        raise ValueError("Chaque frontière gaz doit référencer un noeud présent dans le réseau.")
 
     pipe_flow_by_id = {flow.pipe_id: flow.mass_flow_kg_s for flow in pipe_flows}
-    compressor_flow_by_id = {
-        flow.compressor_id: flow.mass_flow_kg_s for flow in compressor_flows
-    }
+    compressor_flow_by_id = {flow.compressor_id: flow.mass_flow_kg_s for flow in compressor_flows}
 
     incoming_pipe = dict.fromkeys(known_node_ids, 0.0)
     outgoing_pipe = dict.fromkeys(known_node_ids, 0.0)

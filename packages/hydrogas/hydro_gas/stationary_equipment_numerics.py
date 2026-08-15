@@ -57,7 +57,9 @@ class StationaryActiveCompressorNumericalVector:
         if not self.source_ref.strip():
             raise ValueError("La provenance du vecteur numérique mixte est obligatoire.")
         if any(not math.isfinite(value) for value in self.values):
-            raise ValueError("Le vecteur numérique mixte doit contenir uniquement des valeurs finies.")
+            raise ValueError(
+                "Le vecteur numérique mixte doit contenir uniquement des valeurs finies."
+            )
 
 
 def _validate_state_layout(
@@ -95,7 +97,7 @@ def encode_stationary_active_compressor_unknown_state(
     slack_flow_by_node = {item.node_id: item for item in state.slack_external_flows}
 
     pressure_values = tuple(
-        pressure_by_node[node_id].pressure_pa**2 / scale.pressure_squared_scale_pa2
+        pressure_by_node[node_id].pressure_pa ** 2 / scale.pressure_squared_scale_pa2
         for node_id in layout.unknown_pressure_node_ids
     )
     pipe_values = tuple(

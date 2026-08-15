@@ -185,9 +185,12 @@ def test_mixed_solver_export_is_canonical_traceable_and_json_safe() -> None:
     assert document["assumptions"]["certification_claim"] is False
     assert document["results"]["candidate"]["compressor_inputs"][0]["speed_rpm"] == 1000.0
     assert document["diagnostics"]["convergence"]["approval_ref"] == "approval://criterion/mixed/v1"
-    assert document["diagnostics"]["physical_residuals"]["pipe_residuals"][0][
-        "resistance_coefficient_pa2_per_kg_s2"
-    ] == 5_000_000_000_000.0
+    assert (
+        document["diagnostics"]["physical_residuals"]["pipe_residuals"][0][
+            "resistance_coefficient_pa2_per_kg_s2"
+        ]
+        == 5_000_000_000_000.0
+    )
     assert document["diagnostics"]["numerical_bounds"]["null_bound_semantics"] == "unbounded"
     assert document["diagnostics"]["numerical_bounds"]["lower_values"] == [0.0, None, 0.5, None]
     assert document["diagnostics"]["numerical_bounds"]["upper_values"] == [None, None, 2.0, None]

@@ -10,14 +10,21 @@ def test_mixed_compressor_facade_exposes_governed_solver_and_evidence_contracts(
     assert mixed_api.STATIONARY_EQUIPMENT_BENCHMARK_EVIDENCE_SCHEMA_VERSION.startswith("phase6/")
 
     required_symbols = (
+        "CoolPropCompressorFluidDefinition",
         "StationaryActiveCompressorProblem",
+        "StationaryActiveCompressorResultTables",
+        "StationaryActiveCompressorThermodynamicAssessment",
         "StationaryActiveCompressorUnknownState",
+        "StationaryCompressorStationThermodynamicSummary",
         "ScipyActiveCompressorLeastSquaresTrfConfiguration",
-        "solve_stationary_active_compressor_with_approved_inputs",
-        "export_stationary_active_compressor_solve_result_json",
-        "StationaryEquipmentBenchmarkBinding",
+        "aggregate_stationary_compressor_thermodynamics",
+        "build_stationary_active_compressor_result_tables",
         "build_stationary_equipment_benchmark_observations",
+        "evaluate_stationary_active_compressor_thermodynamics",
+        "export_stationary_active_compressor_solve_result_json",
         "export_stationary_equipment_benchmark_evidence",
+        "solve_stationary_active_compressor_with_approved_inputs",
+        "StationaryEquipmentBenchmarkBinding",
     )
     for symbol in required_symbols:
         assert hasattr(mixed_api, symbol)

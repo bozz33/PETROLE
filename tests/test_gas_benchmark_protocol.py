@@ -82,6 +82,11 @@ def test_approved_criterion_materializes_without_creating_new_thresholds() -> No
     )
 
     assert result.protocol_ref == _CONTEXT.protocol_ref
+    assert result.model_id == _CONTEXT.model_id
+    assert result.model_version == _CONTEXT.model_version
+    assert result.formulation_ref == _CONTEXT.formulation_ref
+    assert result.case_ref == _CONTEXT.case_ref
+    assert result.context == _CONTEXT
     assert result.criterion_ids == ("criterion-pipe-1",)
     assert result.approval_refs == ("approval://thermofluids/review-17",)
     assert result.registration_refs == (

@@ -133,6 +133,9 @@ def materialize_approved_gas_benchmark_criteria(
     if len(observation_ids) != len(set(observation_ids)):
         raise ValueError("Une observation ne peut recevoir qu'un critère dans un protocole.")
 
+    runtime_observation_ids = tuple(observation.observation_id for observation in observations)
+    if len(runtime_observation_ids) != len(set(runtime_observation_ids)):
+        raise ValueError("Les observations du benchmark doivent avoir des identifiants uniques.")
     observations_by_id = {observation.observation_id: observation for observation in observations}
     runtime: list[GasBenchmarkCriterion] = []
     approvals: list[str] = []

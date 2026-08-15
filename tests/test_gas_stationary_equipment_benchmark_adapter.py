@@ -28,12 +28,8 @@ def _governed_result(
             _namespace(node_id="B", pressure_pa=2_600_000.0),
         ),
         pipe_flows=(_namespace(pipe_id="P1", mass_flow_kg_s=-1.2),),
-        compressor_inputs=(
-            _namespace(compressor_id="C1", mass_flow_kg_s=1.5, speed_rpm=1000.0),
-        ),
-        boundary_flows=(
-            _namespace(boundary_id="SUPPLY-A", node_id="A", mass_flow_kg_s=1.5),
-        ),
+        compressor_inputs=(_namespace(compressor_id="C1", mass_flow_kg_s=1.5, speed_rpm=1000.0),),
+        boundary_flows=(_namespace(boundary_id="SUPPLY-A", node_id="A", mass_flow_kg_s=1.5),),
     )
     physical = _namespace(
         candidate=candidate,
@@ -191,7 +187,7 @@ def test_mixed_benchmark_adapter_rejects_missing_entity_duplicate_ids_and_empty_
         reference_value=-1.2,
         reference_source_ref="external://reference/P1",
     )
-    with pytest.raises(ValueError, match="identifiants d'observation.*uniques"):
+    with pytest.raises(ValueError, match=r"identifiants d'observation.*uniques"):
         build_stationary_equipment_benchmark_observations(
             _governed_result(),
             (first, second),

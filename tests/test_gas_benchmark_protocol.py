@@ -184,6 +184,18 @@ def test_materialization_rejects_duplicate_criteria_or_observation_assignment() 
         )
 
 
+def test_materialization_rejects_duplicate_runtime_observation_ids() -> None:
+    with pytest.raises(ValueError, match="observations du benchmark"):
+        hydro_gas.materialize_approved_gas_benchmark_criteria(
+            context=_CONTEXT,
+            criteria=(_criterion(),),
+            observations=(
+                _observation(),
+                _observation(),
+            ),
+        )
+
+
 def test_materialization_rejects_empty_protocol_slice() -> None:
     with pytest.raises(ValueError, match="Au moins un critère"):
         hydro_gas.materialize_approved_gas_benchmark_criteria(

@@ -272,6 +272,34 @@ def test_property_benchmark_evidence_rejects_protocol_or_model_context_mismatch(
         )
 
 
+def test_property_benchmark_evidence_rejects_full_approved_context_drift() -> None:
+    artifact = _artifact()
+    bundle = _bundle(artifact)
+    approved = _approved(bundle)
+
+    with pytest.raises(ValueError, match="contexte complet"):
+        export_coolprop_gas_property_benchmark_evidence(
+            bundle,
+            replace(approved, formulation_ref="formulation://coolprop/other"),
+            _context(),
+            reference_system_ref="reference-system://synthetic/test-only",
+            reference_input_sha256="a" * 64,
+            reference_output_sha256="b" * 64,
+            evidence_source_ref="evidence-source://synthetic/test-only",
+        )
+
+    with pytest.raises(ValueError, match="contexte complet"):
+        export_coolprop_gas_property_benchmark_evidence(
+            bundle,
+            replace(approved, case_ref="case://gas/properties/other"),
+            _context(),
+            reference_system_ref="reference-system://synthetic/test-only",
+            reference_input_sha256="a" * 64,
+            reference_output_sha256="b" * 64,
+            evidence_source_ref="evidence-source://synthetic/test-only",
+        )
+
+
 def test_property_benchmark_evidence_rejects_bad_hash_blank_review_and_source_drift() -> None:
     artifact = _artifact()
     bundle = _bundle(artifact)

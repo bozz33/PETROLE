@@ -55,14 +55,11 @@ def _problem() -> StationaryActiveCompressorProblem:
         problem_ref="problem://mixed/governance-test",
         network=SteadyGasNetwork(
             nodes=tuple(
-                SteadyGasNode(node_id, f"model://node/{node_id}")
-                for node_id in ("A", "B", "C")
+                SteadyGasNode(node_id, f"model://node/{node_id}") for node_id in ("A", "B", "C")
             ),
             pipes=(SteadyGasPipe("P1", "A", "B", "model://pipe/P1"),),
         ),
-        compressor_edges=(
-            SteadyGasCompressorEdge("C1", "B", "C", "model://compressor/C1"),
-        ),
+        compressor_edges=(SteadyGasCompressorEdge("C1", "B", "C", "model://compressor/C1"),),
         pressure_slacks=(GasPressureSlack("A", 2_000_000.0, "boundary://pressure/A"),),
         compressor_speed_controls=(
             StationaryCompressorSpeedControl("C1", 1000.0, "control://speed/C1"),
@@ -84,12 +81,8 @@ def _state() -> StationaryActiveCompressorUnknownState:
             GasNodePressure("C", 3_000_000.0, "state://pressure/C"),
         ),
         pipe_flows=(GasPipeMassFlow("P1", 1.0, "state://pipe/P1"),),
-        compressor_flows=(
-            GasCompressorMassFlow("C1", 1.0, "state://compressor/C1"),
-        ),
-        slack_external_flows=(
-            GasBoundaryMassFlow("SLACK-A", "A", 1.0, "state://slack/A"),
-        ),
+        compressor_flows=(GasCompressorMassFlow("C1", 1.0, "state://compressor/C1"),),
+        slack_external_flows=(GasBoundaryMassFlow("SLACK-A", "A", 1.0, "state://slack/A"),),
     )
 
 

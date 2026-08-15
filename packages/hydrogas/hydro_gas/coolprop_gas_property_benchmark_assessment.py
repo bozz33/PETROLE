@@ -76,7 +76,10 @@ def _load_evidence_document(
     if document.get("schema_version") != COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_SCHEMA_VERSION:
         raise ValueError("La preuve benchmark propriétés utilise un schéma inattendu.")
     claims = _mapping(document.get("claims"), label="claims")
-    if claims.get("qualification_claim") is not False or claims.get("certification_claim") is not False:
+    if (
+        claims.get("qualification_claim") is not False
+        or claims.get("certification_claim") is not False
+    ):
         raise ValueError("La preuve benchmark ne peut pas porter de qualification/certification.")
     return document
 

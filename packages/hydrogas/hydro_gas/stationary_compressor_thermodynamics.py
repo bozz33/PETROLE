@@ -1,9 +1,9 @@
 """Post-traitement thermodynamique des compresseurs du solveur gaz mixte.
 
 Les pressions, débits et rendements de carte proviennent du résultat scientifique
-déjà calculé. Les températures d'aspiration, fluides et autres termes du bilan
-d'énergie restent des entrées explicites. Cette couche ne modifie pas le solveur
-réseau et ne déduit aucune limite machine.
+déjà calculé. Les températures d'aspiration, fluides/compositions et autres
+termes du bilan d'énergie restent des entrées explicites. Cette couche ne
+modifie pas le solveur réseau et ne déduit aucune limite machine.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from hydro_gas.compressor_thermodynamics import (
     evaluate_steady_compressor_energy_balance,
 )
 from hydro_gas.coolprop_compressor_adapter import (
-    CoolPropCompressorFluidDefinition,
+    CoolPropCompressorFluid,
     CoolPropCompressorStateRequest,
     CoolPropCompressorStateResult,
     evaluate_coolprop_compressor_states,
@@ -33,7 +33,7 @@ class StationaryCompressorThermodynamicInput:
 
     compressor_id: str
     inlet_temperature_k: float
-    fluid: CoolPropCompressorFluidDefinition
+    fluid: CoolPropCompressorFluid
     inlet_kinetic_energy_j_kg: float
     outlet_kinetic_energy_j_kg: float
     inlet_potential_energy_j_kg: float

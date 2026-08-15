@@ -5,7 +5,12 @@ from typing import cast
 
 import pytest
 
-from hydro_gas.coolprop_compressor_adapter import CoolPropCompressorFluidDefinition
+from hydro_gas.composition import GasComponentFraction, GasComposition
+from hydro_gas.coolprop_compressor_adapter import (
+    CoolPropCompressorFluidDefinition,
+    CoolPropCompressorMixtureComponentBinding,
+    CoolPropCompressorMixtureDefinition,
+)
 from hydro_gas.stationary_compressor_thermodynamics import (
     StationaryCompressorThermodynamicInput,
     evaluate_stationary_active_compressor_thermodynamics,
@@ -78,6 +83,52 @@ def _input() -> StationaryCompressorThermodynamicInput:
     )
 
 
+def _mixture_input() -> StationaryCompressorThermodynamicInput:
+    composition = GasComposition(
+        source_ref="composition://synthetic/methane-ethane/station-test-only",
+        components=(
+            GasComponentFraction(
+                component="component-a",
+                mole_fraction=0.8,
+                molar_mass_kg_mol=0.01,
+            ),
+            GasComponentFraction(
+                component="component-b",
+                mole_fraction=0.2,
+                molar_mass_kg_mol=0.02,
+            ),
+        ),
+    )
+    return StationaryCompressorThermodynamicInput(
+        compressor_id="C1",
+        inlet_temperature_k=300.0,
+        fluid=CoolPropCompressorMixtureDefinition(
+            composition=composition,
+            component_bindings=(
+                CoolPropCompressorMixtureComponentBinding(
+                    composition_component="component-a",
+                    coolprop_fluid="Methane",
+                ),
+                CoolPropCompressorMixtureComponentBinding(
+                    composition_component="component-b",
+                    coolprop_fluid="Ethane",
+                ),
+            ),
+            backend="HEOS",
+            source_ref="property-definition://coolprop/explicit-mixture/station-test-only",
+            mapping_source_ref="mapping://synthetic-components/coolprop/station-test-only",
+        ),
+        inlet_kinetic_energy_j_kg=0.0,
+        outlet_kinetic_energy_j_kg=0.0,
+        inlet_potential_energy_j_kg=0.0,
+        outlet_potential_energy_j_kg=0.0,
+        heat_transfer_to_gas_w=0.0,
+        state_source_ref="state://compressor/C1/thermal-mixture-input",
+        property_method_ref="property-method://coolprop/AbstractState/test",
+        energy_equation_ref="equation://steady-flow-energy/test",
+    )
+
+
 def test_mixed_post_processing_uses_solver_pressures_map_efficiency_and_explicit_energy_terms() -> (
     None
 ):
@@ -100,6 +151,27 @@ def test_mixed_post_processing_uses_solver_pressures_map_efficiency_and_explicit
     assert item.property_state.actual_outlet_temperature_k > 300.0
     assert item.energy_balance.shaft_power_input_w > 0.0
     assert item.energy_balance.heat_transfer_to_gas_w == 0.0
+
+
+def test_mixed_post_processing_accepts_explicit_coolprop_mixture_without_default_composition() -> None:
+    assessment = evaluate_stationary_active_compressor_thermodynamics(
+        _problem(),
+        _result(),
+        (_mixture_input(),),
+    )
+
+    item = assessment.compressors[0]
+    assert item.property_state.fluid_name == "HEOS::Methane&Ethane"
+    assert item.property_state.coolprop_backend == "HEOS"
+    assert (
+        item.property_state.composition_source_ref
+        == "composition://synthetic/methane-ethane/station-test-only"
+    )
+    assert item.property_state.composition_component_names == ("component-a", "component-b")
+    assert item.property_state.coolprop_component_names == ("Methane", "Ethane")
+    assert item.property_state.mole_fractions == (0.8, 0.2)
+    assert item.property_state.actual_outlet_temperature_k > 300.0
+    assert item.energy_balance.shaft_power_input_w > 0.0
 
 
 def test_mixed_post_processing_preserves_non_converged_source_status() -> None:

@@ -153,7 +153,9 @@ def test_mixed_post_processing_uses_solver_pressures_map_efficiency_and_explicit
     assert item.energy_balance.heat_transfer_to_gas_w == 0.0
 
 
-def test_mixed_post_processing_accepts_explicit_coolprop_mixture_without_default_composition() -> None:
+def test_mixed_post_processing_accepts_explicit_coolprop_mixture_without_default_composition() -> (
+    None
+):
     assessment = evaluate_stationary_active_compressor_thermodynamics(
         _problem(),
         _result(),

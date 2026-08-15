@@ -33,9 +33,13 @@ class SteadyCompressorEnergyObservation:
     def __post_init__(self) -> None:
         required = (self.compressor_id, self.state_source_ref, self.equation_ref)
         if any(not value.strip() for value in required):
-            raise ValueError("Le bilan énergétique compresseur et ses références sont obligatoires.")
+            raise ValueError(
+                "Le bilan énergétique compresseur et ses références sont obligatoires."
+            )
         if not math.isfinite(self.mass_flow_kg_s) or self.mass_flow_kg_s <= 0.0:
-            raise ValueError("Le débit massique du compresseur doit être fini et strictement positif.")
+            raise ValueError(
+                "Le débit massique du compresseur doit être fini et strictement positif."
+            )
         values = (
             self.inlet_enthalpy_j_kg,
             self.outlet_enthalpy_j_kg,
@@ -46,7 +50,9 @@ class SteadyCompressorEnergyObservation:
             self.heat_transfer_to_gas_w,
         )
         if any(not math.isfinite(value) for value in values):
-            raise ValueError("Toutes les grandeurs énergétiques du compresseur doivent être finies.")
+            raise ValueError(
+                "Toutes les grandeurs énergétiques du compresseur doivent être finies."
+            )
         if any(
             value < 0.0
             for value in (
@@ -54,7 +60,9 @@ class SteadyCompressorEnergyObservation:
                 self.outlet_kinetic_energy_j_kg,
             )
         ):
-            raise ValueError("Les énergies cinétiques spécifiques doivent être positives ou nulles.")
+            raise ValueError(
+                "Les énergies cinétiques spécifiques doivent être positives ou nulles."
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,9 +91,7 @@ def evaluate_steady_compressor_energy_balance(
     """
 
     enthalpy_rise = observation.outlet_enthalpy_j_kg - observation.inlet_enthalpy_j_kg
-    kinetic_change = (
-        observation.outlet_kinetic_energy_j_kg - observation.inlet_kinetic_energy_j_kg
-    )
+    kinetic_change = observation.outlet_kinetic_energy_j_kg - observation.inlet_kinetic_energy_j_kg
     potential_change = (
         observation.outlet_potential_energy_j_kg - observation.inlet_potential_energy_j_kg
     )
@@ -126,7 +132,9 @@ class IsentropicCompressorEnthalpyClosure:
             self.equation_ref,
         )
         if any(not value.strip() for value in required):
-            raise ValueError("La fermeture isentropique et toutes ses références sont obligatoires.")
+            raise ValueError(
+                "La fermeture isentropique et toutes ses références sont obligatoires."
+            )
         if any(
             not math.isfinite(value)
             for value in (self.inlet_enthalpy_j_kg, self.isentropic_outlet_enthalpy_j_kg)

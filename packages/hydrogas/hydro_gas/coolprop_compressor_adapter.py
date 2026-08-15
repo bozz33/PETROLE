@@ -46,14 +46,18 @@ class CoolPropCompressorStateRequest:
             self.property_method_ref,
         )
         if any(not value.strip() for value in required):
-            raise ValueError("La requête thermodynamique compresseur doit être entièrement référencée.")
+            raise ValueError(
+                "La requête thermodynamique compresseur doit être entièrement référencée."
+            )
         values = (
             self.inlet_pressure_pa,
             self.inlet_temperature_k,
             self.outlet_pressure_pa,
         )
         if any(not math.isfinite(value) or value <= 0.0 for value in values):
-            raise ValueError("Pressions et température compresseur doivent être finies et positives.")
+            raise ValueError(
+                "Pressions et température compresseur doivent être finies et positives."
+            )
         if self.outlet_pressure_pa <= self.inlet_pressure_pa:
             raise ValueError(
                 "La sortie d'un compresseur actif doit avoir une pression supérieure à l'entrée."
@@ -94,7 +98,9 @@ def _load_coolprop() -> tuple[Any, Any]:
         import CoolProp  # type: ignore[import-not-found]
         from CoolProp.CoolProp import PropsSI  # type: ignore[import-not-found]
     except ImportError as exc:  # pragma: no cover - dépend de l'environnement d'installation
-        raise RuntimeError("CoolProp doit être installé pour évaluer les états compresseur.") from exc
+        raise RuntimeError(
+            "CoolProp doit être installé pour évaluer les états compresseur."
+        ) from exc
     return CoolProp, PropsSI
 
 
@@ -162,9 +168,10 @@ def evaluate_coolprop_compressor_states(
             "La propriété isentropique retournée est incompatible avec une compression active."
         )
 
-    actual_outlet_enthalpy = inlet_enthalpy + (
-        isentropic_outlet_enthalpy - inlet_enthalpy
-    ) / request.isentropic_efficiency
+    actual_outlet_enthalpy = (
+        inlet_enthalpy
+        + (isentropic_outlet_enthalpy - inlet_enthalpy) / request.isentropic_efficiency
+    )
     actual_outlet_temperature = _finite_property(
         props_si(
             "T",

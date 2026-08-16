@@ -59,10 +59,13 @@ def test_single_org_ne_demande_aucune_approbation(api_client_factory) -> None:
             # Valeur SQL historique conservée pour compatibilité ; aucune action
             # humaine n'a été effectuée pour obtenir ce statut.
             assert fluid.json()["status"] == "approved"
-            assert client.post(
-                f"/api/v1/catalog/items/{fluid.json()['id']}/approve",
-                headers=headers,
-            ).status_code == 404
+            assert (
+                client.post(
+                    f"/api/v1/catalog/items/{fluid.json()['id']}/approve",
+                    headers=headers,
+                ).status_code
+                == 404
+            )
 
             standard = client.post(
                 "/api/v1/standards",

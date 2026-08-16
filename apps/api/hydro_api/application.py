@@ -47,9 +47,7 @@ def _without_approval_routes(router: APIRouter) -> APIRouter:
 
     filtered = APIRouter()
     filtered.routes.extend(
-        route
-        for route in router.routes
-        if not str(getattr(route, "path", "")).endswith("/approve")
+        route for route in router.routes if not str(getattr(route, "path", "")).endswith("/approve")
     )
     return filtered
 

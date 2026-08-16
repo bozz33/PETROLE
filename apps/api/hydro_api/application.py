@@ -27,6 +27,7 @@ from hydro_api.routers.reports import router as reports_router
 from hydro_api.routers.resources import router as resources_router
 from hydro_api.routers.sites import router as sites_router
 from hydro_api.security import authorize_application_request
+from hydro_api.single_user_mode import configure_single_user_workflow
 from hydro_shared.errors import HydroError
 from hydro_shared.observability import bound_context, configure_logging, get_logger
 
@@ -45,6 +46,8 @@ def create_application(settings: Settings | None = None) -> FastAPI:
     """Construit une application isolable dans les tests et les processus web."""
 
     active_settings = settings or get_settings()
+    single_user = active_settings.deployment_mode == "single_org"
+    configure_single_user_workflow(single_user)
     configure_logging(
         json_output=active_settings.environment != "development",
         level=_LOG_LEVELS[active_settings.log_level],
@@ -245,6 +248,17 @@ def create_application(settings: Settings | None = None) -> FastAPI:
         prefix="/api/v1",
         dependencies=protected_dependencies,
     )
+
+    if single_user:
+        # Les routes historiques restent dans les modules pour une éventuelle
+        # réactivation multi-utilisateur, mais elles n'existent pas dans
+        # l'application réellement servie en mode single_org.
+        application.router.routes[:] = [
+            route
+            for route in application.router.routes
+            if not str(getattr(route, "path", "")).endswith("/approve")
+        ]
+
     return application
 
 

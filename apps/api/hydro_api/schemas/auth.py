@@ -8,7 +8,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-OrganizationRole = Literal["admin", "engineer", "operator", "approver", "viewer"]
+# Le MVP actif est mono-utilisateur. Le rôle historique ``approver`` reste
+# éventuellement présent dans d'anciennes bases, mais il ne peut plus être créé
+# ni attribué via le contrat API courant.
+OrganizationRole = Literal["admin", "engineer", "operator", "viewer"]
 
 
 class AuthStatus(BaseModel):

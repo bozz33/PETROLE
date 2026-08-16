@@ -38,6 +38,18 @@ def test_single_org_ne_demande_aucune_approbation(api_client_factory) -> None:
             openapi = client.get("/api/v1/openapi.json").json()
             assert not [path for path in openapi["paths"] if path.endswith("/approve")]
 
+            approver = client.post(
+                f"/api/v1/organizations/{organization['id']}/members",
+                headers=headers,
+                json={
+                    "email": "approver@petrole.example.com",
+                    "full_name": "Ancien approbateur",
+                    "password": "mot-de-passe-approver-1234",
+                    "role": "approver",
+                },
+            )
+            assert approver.status_code == 422, approver.text
+
             fluid = client.post(
                 "/api/v1/catalog/fluids",
                 headers=headers,

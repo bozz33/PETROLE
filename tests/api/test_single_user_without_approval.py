@@ -9,7 +9,7 @@ def _bootstrap(client) -> tuple[dict, dict[str, str]]:
     response = client.post(
         "/api/v1/auth/bootstrap",
         json={
-            "email": "ingenieur@petrole.local",
+            "email": "ingenieur@petrole.example.com",
             "full_name": "Ingénieur PETROLE",
             "password": "mot-de-passe-recette-1234",
             "organization_name": "Valeur ignorée en single_org",

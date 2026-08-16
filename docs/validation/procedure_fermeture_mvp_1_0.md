@@ -3,35 +3,30 @@
 ## But
 
 Cette procédure ferme les dernières portes du cahier des charges fonctionnel
-D04 sans étendre le périmètre du produit. Les fonctions F01 à F07 sont déjà
-développées ; il reste à produire les preuves de recette sur le candidat final,
-puis à obtenir l'acceptation d'un ingénieur métier extérieur à l'équipe.
+D04 sans étendre le périmètre du produit. Le déploiement cible du MVP est
+**mono-organisation et mono-utilisateur** : l'ingénieur utilisateur prépare,
+calcule, analyse et documente directement ses études.
 
-## Branche de travail
-
-Les derniers compléments de fermeture sont développés sur :
-
-`feat/mvp-final-closure`
+Le workflow historique Engineer → Approver est désactivé dans ce périmètre. Il
+ne faut pas créer un second compte uniquement pour simuler une validation qui
+n'existe pas dans l'usage réel.
 
 Aucun tag `v1.0.0-mvp` ne doit être créé avant la fin de cette procédure.
 
 ## 1. Préparer le dossier de référence
 
-Sur une instance de recette propre, créer les deux comptes séparés :
-
-- Engineer ;
-- Approver.
-
-Monter le dossier de référence avec le script existant :
+Utiliser le compte de l'ingénieur utilisateur :
 
 ```bash
-python deployment/scripts/vps/projet_reference.py \
+python deployment/scripts/vps/projet_reference_single_user.py \
   --base-url https://petrole.distesage.com/api/v1 \
   --email "$RECETTE_ENGINEER_EMAIL" \
-  --password "$RECETTE_ENGINEER_PASSWORD" \
-  --approver-email "$RECETTE_APPROVER_EMAIL" \
-  --approver-password "$RECETTE_APPROVER_PASSWORD"
+  --password "$RECETTE_ENGINEER_PASSWORD"
 ```
+
+Le script historique `projet_reference.py` reste conservé dans le dépôt pour
+compatibilité avec les anciens essais multi-utilisateurs, mais il n'est plus le
+point d'entrée du MVP mono-utilisateur.
 
 Le dossier attendu contient au minimum 101 nœuds, 100 tronçons, 5 stations,
 15 pompes et 10 réservoirs.
@@ -62,10 +57,11 @@ Il vérifie ou exécute :
 6. une optimisation bornée, une comparaison persistée et une recommandation ;
 7. la note de calcul, les rapports opérationnels et les exports XLSX, CSV et JSON.
 
-## 3. Vérifier la même version local / serveur
+## 3. Vérifier la même version sur deux déploiements
 
-D04 exige le déploiement de la même version sur un poste local et un serveur de
-test. Démarrer localement exactement le même commit et relancer :
+D04 exige de vérifier le même build sur l'instance principale et une instance
+secondaire isolée. Cette seconde instance est une **preuve technique**, pas une
+seconde personne ni un second rôle métier.
 
 ```bash
 python deployment/scripts/vps/recette_mvp_finale.py \
@@ -74,22 +70,22 @@ python deployment/scripts/vps/recette_mvp_finale.py \
   --password "$RECETTE_ENGINEER_PASSWORD" \
   --expected-git-sha "$(git rev-parse HEAD)" \
   --require-same-build \
-  --secondary-base-url http://127.0.0.1:8000/api/v1 \
-  --secondary-email "$LOCAL_ENGINEER_EMAIL" \
-  --secondary-password "$LOCAL_ENGINEER_PASSWORD"
+  --secondary-base-url "$SECONDARY_BASE_URL" \
+  --secondary-email "$SECONDARY_EMAIL" \
+  --secondary-password "$SECONDARY_PASSWORD"
 ```
 
 La recette échoue si l'API primaire ne sert pas le SHA candidat, ou si les deux
 instances diffèrent sur la version applicative, le SHA Git, la version du noyau
 scientifique ou la révision de migration publiés par `/api/v1/version`.
 
+Pour une preuve renforcée, archiver également l'identifiant digest de l'image
+API lorsque la même image binaire est utilisée sur les deux instances.
+
 ## 4. Rejouer la qualification complète sur le SHA final
 
-Après les derniers commits et avant tout tag final :
-
-`deployment/scripts/vps/deploy.sh` scelle l'image avec le SHA, la référence Git
-et la date UTC du candidat courant. Vérifier que `GET /api/v1/version` publie ce
-SHA avant de lancer cette campagne.
+Après les derniers commits et avant tout tag final, déployer le candidat et
+vérifier que `GET /api/v1/version` publie son SHA exact, puis lancer :
 
 ```bash
 ./deployment/scripts/vps/qualify.sh production
@@ -112,9 +108,9 @@ Le rapport final doit mentionner le **SHA exact** ayant passé :
 Une campagne portant sur un commit parent ne qualifie pas un HEAD ayant reçu des
 modifications applicatives ultérieures.
 
-## 5. Acceptation par l'ingénieur métier
+## 5. Recette métier par l'ingénieur utilisateur
 
-Remettre à l'ingénieur extérieur :
+Remettre à l'ingénieur utilisateur :
 
 - le projet `REF-MVP-01` ;
 - la note de calcul ;
@@ -124,6 +120,11 @@ Remettre à l'ingénieur extérieur :
 - la fiche `docs/validation/acceptation_ingenieur_mvp.md`.
 
 La release est bloquée tant qu'une réserve S0, S1 ou S2 reste ouverte.
+
+Cette recette interne ne doit pas être présentée comme une validation
+indépendante. Une revue par un autre ingénieur est recommandée avant un pilote
+industriel, une utilisation décisionnelle réelle ou une revendication externe
+de validation.
 
 ## 6. SBOM et signature
 
@@ -162,7 +163,7 @@ Le MVP peut être déclaré terminé uniquement lorsque :
 - toutes les exigences MUST du périmètre MVP sont implémentées ;
 - le dossier de référence passe les portes automatisables ;
 - la qualification complète porte sur le SHA final ;
-- l'ingénieur extérieur accepte le dossier sans réserve S0/S1/S2 ;
+- l'ingénieur utilisateur termine la recette sans réserve S0/S1/S2 ;
 - les artefacts de release sont identifiés, hachés et signés pour une diffusion à un tiers ;
 - le tag final pointe exactement sur le commit qualifié et accepté.
 
@@ -170,5 +171,5 @@ La mention à utiliser est alors :
 
 > **PETROLE MVP 1.0 — MVP logiciel terminé, qualifié et accepté sur son périmètre défini.**
 
-Cette mention ne vaut pas certification industrielle ni autorisation d'exploiter
-un site réel.
+Cette mention ne vaut pas certification industrielle, validation indépendante,
+ni autorisation d'exploiter un site réel.

@@ -7,7 +7,7 @@ import re
 import time
 import uuid
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
@@ -40,6 +40,18 @@ _LOG_LEVELS = {
     "debug": logging.DEBUG,
     "trace": logging.DEBUG,
 }
+
+
+def _without_approval_routes(router: APIRouter) -> APIRouter:
+    """Copie un routeur sans exposer les anciennes actions ``/approve``."""
+
+    filtered = APIRouter()
+    filtered.routes.extend(
+        route
+        for route in router.routes
+        if not str(getattr(route, "path", "")).endswith("/approve")
+    )
+    return filtered
 
 
 def create_application(settings: Settings | None = None) -> FastAPI:
@@ -208,56 +220,23 @@ def create_application(settings: Settings | None = None) -> FastAPI:
     application.include_router(health_router, prefix="/api/v1")
     application.include_router(version_router, prefix="/api/v1")
     application.include_router(auth_router, prefix="/api/v1")
-    application.include_router(
-        catalog_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
-        data_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
-        governance_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
-        resources_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
-        sites_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
-        network_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
-        operations_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
-        reports_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
 
-    if single_user:
-        # Les routes historiques restent dans les modules pour une éventuelle
-        # réactivation multi-utilisateur, mais elles n'existent pas dans
-        # l'application réellement servie en mode single_org.
-        application.router.routes[:] = [
-            route
-            for route in application.router.routes
-            if not str(getattr(route, "path", "")).endswith("/approve")
-        ]
+    protected_routers = (
+        catalog_router,
+        data_router,
+        governance_router,
+        resources_router,
+        sites_router,
+        network_router,
+        operations_router,
+        reports_router,
+    )
+    for router in protected_routers:
+        application.include_router(
+            _without_approval_routes(router) if single_user else router,
+            prefix="/api/v1",
+            dependencies=protected_dependencies,
+        )
 
     return application
 

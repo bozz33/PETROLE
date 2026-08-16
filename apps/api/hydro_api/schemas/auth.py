@@ -8,9 +8,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-# Le MVP actif est mono-utilisateur. Le rôle historique ``approver`` reste
-# éventuellement présent dans d'anciennes bases, mais il ne peut plus être créé
-# ni attribué via le contrat API courant.
+# Le rôle historique ``approver`` reste lisible si une ancienne base le contient,
+# mais il ne peut plus être créé ni réattribué par le contrat d'écriture actif.
+StoredOrganizationRole = Literal["admin", "engineer", "operator", "approver", "viewer"]
 OrganizationRole = Literal["admin", "engineer", "operator", "viewer"]
 
 
@@ -60,7 +60,7 @@ class MembershipRead(BaseModel):
 
     id: uuid.UUID
     organization_id: uuid.UUID
-    role: OrganizationRole
+    role: StoredOrganizationRole
     created_at: datetime
 
 
@@ -102,7 +102,7 @@ class MemberRead(BaseModel):
     email: StoredEmail
     full_name: str
     is_active: bool
-    role: OrganizationRole
+    role: StoredOrganizationRole
     membership_id: uuid.UUID
     created_at: datetime
 
@@ -118,6 +118,7 @@ __all__ = [
     "MembershipRead",
     "OrganizationRole",
     "RefreshRequest",
+    "StoredOrganizationRole",
     "TokenPair",
     "UserRead",
 ]

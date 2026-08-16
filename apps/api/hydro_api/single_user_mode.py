@@ -13,7 +13,8 @@ utilisateurs.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -21,7 +22,6 @@ from hydro_api.database.base import utc_now
 from hydro_api.services import catalog, governance
 
 CatalogCallable = Callable[..., Any]
-GovernanceCallable = Callable[..., Any]
 
 _ORIGINAL_CREATE_CATALOG_ITEM = catalog.create_catalog_item
 _ORIGINAL_CREATE_CATALOG_VERSION = catalog.create_catalog_version

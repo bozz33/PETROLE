@@ -7,14 +7,14 @@ import {
 
 import { AuthProvider } from "./auth";
 import { Shell } from "./components/Shell";
-import { AdministrationPage } from "./pages/AdministrationPage";
-import { BibliothequesPage } from "./pages/BibliothequesPage";
-import { CalculPage } from "./pages/CalculPage";
+import { SingleUserAdministrationPage } from "./pages/SingleUserAdministrationPage";
+import { SingleUserBibliothequesPage } from "./pages/SingleUserBibliothequesPage";
+import { SingleUserCalculPage } from "./pages/SingleUserCalculPage";
 import { DecisionPage } from "./pages/DecisionPage";
 import { DonneesPage } from "./pages/DonneesPage";
 import { ModelisationPage } from "./pages/ModelisationPage";
-import { ProjetsPage } from "./pages/ProjetsPage";
-import { RapportsPage } from "./pages/RapportsPage";
+import { SingleUserProjetsPage } from "./pages/SingleUserProjetsPage";
+import { SingleUserRapportsPage } from "./pages/SingleUserRapportsPage";
 import { ScenariosPage } from "./pages/ScenariosPage";
 import { StockagePage } from "./pages/StockagePage";
 import { TableauBordPage } from "./pages/TableauBordPage";
@@ -40,7 +40,7 @@ const dashboardRoute = createRoute({
 const projectsRoute = createRoute({
   getParentRoute: () => applicationRoute,
   path: "projets",
-  component: ProjetsPage,
+  component: SingleUserProjetsPage,
 });
 
 const modelingRoute = createRoute({
@@ -58,7 +58,7 @@ const networkVisualisationRoute = createRoute({
 const librariesRoute = createRoute({
   getParentRoute: () => applicationRoute,
   path: "bibliotheques",
-  component: BibliothequesPage,
+  component: SingleUserBibliothequesPage,
 });
 
 const scenariosRoute = createRoute({
@@ -70,7 +70,7 @@ const scenariosRoute = createRoute({
 const calculationRoute = createRoute({
   getParentRoute: () => applicationRoute,
   path: "calcul",
-  component: CalculPage,
+  component: SingleUserCalculPage,
 });
 
 const storageRoute = createRoute({
@@ -94,13 +94,13 @@ const dataRoute = createRoute({
 const reportsRoute = createRoute({
   getParentRoute: () => applicationRoute,
   path: "rapports",
-  component: RapportsPage,
+  component: SingleUserRapportsPage,
 });
 
 const administrationRoute = createRoute({
   getParentRoute: () => applicationRoute,
   path: "administration",
-  component: AdministrationPage,
+  component: SingleUserAdministrationPage,
 });
 
 const applicationTree = applicationRoute.addChildren([

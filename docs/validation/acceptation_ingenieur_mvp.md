@@ -1,13 +1,19 @@
-# Fiche d'acceptation métier — PETROLE MVP 1.0
+# Fiche de recette métier — PETROLE MVP 1.0
 
 ## Objet
 
-Cette fiche matérialise la dernière porte **humaine** de la recette du MVP. Elle
-ne doit être signée qu'après examen du dossier `REF-MVP-01`, des résultats, des
-avertissements et des preuves de qualification associées au commit candidat.
+Cette fiche matérialise la revue **humaine** du MVP par l'ingénieur utilisateur de
+PETROLE. Dans le périmètre actuel, la plateforme est mono-utilisateur : le même
+ingénieur prépare ses études, exécute les calculs, examine les résultats et
+consigne sa décision de recette.
 
-Elle ne constitue ni une certification ASME/API/ISO, ni une autorisation
-d'exploiter une installation réelle.
+Aucun rôle `Approver`, aucune seconde identité et aucune double validation ne
+sont requis par le MVP.
+
+Cette fiche ne constitue ni une certification ASME/API/ISO, ni une autorisation
+d'exploiter une installation réelle. Une validation indépendante reste
+recommandée avant un pilote industriel ou un usage décisionnel sur une
+installation réelle.
 
 ## Identification
 
@@ -17,8 +23,7 @@ d'exploiter une installation réelle.
 | Tag candidat | |
 | URL de l'instance examinée | |
 | Date de l'examen | |
-| Nom de l'ingénieur | |
-| Société / organisme | |
+| Nom de l'ingénieur utilisateur | |
 | Fonction | |
 | Domaine de compétence | |
 | Référence interne de l'examen | |
@@ -31,7 +36,7 @@ Le dossier de référence doit au minimum contenir :
 - 5 stations ;
 - 15 pompes ;
 - 10 réservoirs ;
-- un produit et des références de catalogue approuvés ;
+- un produit et des références techniques traçables ;
 - un scénario nominal ;
 - un scénario pompe indisponible ;
 - un scénario marche en secours ;
@@ -48,6 +53,7 @@ Cocher uniquement après examen effectif.
 - [ ] La topologie représente correctement le réseau de référence.
 - [ ] Les équipements sont correctement rattachés aux stations et tronçons.
 - [ ] Les hypothèses et unités sont compréhensibles et traçables.
+- [ ] Les sources des propriétés produit, pompes, matériaux et règles sont identifiables.
 - [ ] Le scénario nominal est physiquement cohérent.
 - [ ] Le comportement en pompe indisponible est correctement signalé.
 - [ ] Le scénario de secours rétablit le service de manière compréhensible.
@@ -60,7 +66,7 @@ Cocher uniquement après examen effectif.
 - [ ] L'optimisation publie l'objectif, les contraintes, le solveur, la configuration retenue et le caractère complet ou borné de la recherche.
 - [ ] La note de calcul restitue les entrées, méthodes, résultats, avertissements et empreintes attendus.
 - [ ] Les exports sont exploitables sans accès direct à la base ou au code.
-- [ ] Les rôles Engineer et Approver sont effectivement séparés.
+- [ ] Aucune étape artificielle d'approbation par un second compte n'est nécessaire dans le parcours mono-utilisateur.
 - [ ] Les erreurs et non-convergences ne sont pas silencieuses.
 
 ## Réserves
@@ -76,7 +82,7 @@ Sévérités recommandées :
 - **S2** : défaut important de parcours ou de traçabilité ; à corriger avant acceptation ;
 - **S3** : amélioration non bloquante ; peut être planifiée après MVP.
 
-## Décision
+## Décision de recette
 
 Choisir une seule décision :
 
@@ -90,7 +96,7 @@ Commentaire de décision :
 
 ## Signature
 
-Nom :
+Nom de l'ingénieur utilisateur :
 Date :
 Signature / validation électronique :
 
@@ -99,6 +105,7 @@ Signature / validation électronique :
 - `summary.json` et `summary.md` produits par `recette_mvp_finale.py` ;
 - rapport de qualification final ;
 - empreinte de validation scientifique ;
+- preuve d'identité du build primaire/secondaire ;
 - SBOM CycloneDX ;
 - `SHA256SUMS` et signature de release lorsque la clé mainteneur est désignée ;
 - note de calcul et exports du projet `REF-MVP-01` ;

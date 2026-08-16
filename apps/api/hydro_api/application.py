@@ -7,7 +7,7 @@ import re
 import time
 import uuid
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
@@ -27,6 +27,7 @@ from hydro_api.routers.reports import router as reports_router
 from hydro_api.routers.resources import router as resources_router
 from hydro_api.routers.sites import router as sites_router
 from hydro_api.security import authorize_application_request
+from hydro_api.single_user_mode import configure_single_user_workflow
 from hydro_shared.errors import HydroError
 from hydro_shared.observability import bound_context, configure_logging, get_logger
 
@@ -41,10 +42,22 @@ _LOG_LEVELS = {
 }
 
 
+def _without_approval_routes(router: APIRouter) -> APIRouter:
+    """Copie un routeur sans exposer les anciennes actions ``/approve``."""
+
+    filtered = APIRouter()
+    filtered.routes.extend(
+        route for route in router.routes if not str(getattr(route, "path", "")).endswith("/approve")
+    )
+    return filtered
+
+
 def create_application(settings: Settings | None = None) -> FastAPI:
     """Construit une application isolable dans les tests et les processus web."""
 
     active_settings = settings or get_settings()
+    single_user = active_settings.deployment_mode == "single_org"
+    configure_single_user_workflow(single_user)
     configure_logging(
         json_output=active_settings.environment != "development",
         level=_LOG_LEVELS[active_settings.log_level],
@@ -205,46 +218,24 @@ def create_application(settings: Settings | None = None) -> FastAPI:
     application.include_router(health_router, prefix="/api/v1")
     application.include_router(version_router, prefix="/api/v1")
     application.include_router(auth_router, prefix="/api/v1")
-    application.include_router(
+
+    protected_routers = (
         catalog_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
         data_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
         governance_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
         resources_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
         sites_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
         network_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
         operations_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
-    )
-    application.include_router(
         reports_router,
-        prefix="/api/v1",
-        dependencies=protected_dependencies,
     )
+    for router in protected_routers:
+        application.include_router(
+            _without_approval_routes(router) if single_user else router,
+            prefix="/api/v1",
+            dependencies=protected_dependencies,
+        )
+
     return application
 
 

@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+import hydro_gas.stationary_equipment_api as mixed_api
+
+
+def test_mixed_compressor_facade_exposes_governed_solver_and_evidence_contracts() -> None:
+    assert mixed_api.ACTIVE_COMPRESSOR_PROBLEM_FAMILY_REF.startswith("problem-family://gas/")
+    assert mixed_api.ACTIVE_COMPRESSOR_P2_NUMERICAL_REPRESENTATION_REF.startswith("numerics://gas/")
+    assert mixed_api.MIXED_STATIONARY_GAS_EXPORT_VERSION.startswith("phase6-gas/")
+    assert mixed_api.STATIONARY_COMPRESSOR_THERMODYNAMIC_EXPORT_VERSION.startswith("phase6-gas/")
+    assert mixed_api.STATIONARY_EQUIPMENT_BENCHMARK_EVIDENCE_SCHEMA_VERSION.startswith("phase6/")
+    assert mixed_api.THERMODYNAMIC_LIMIT_EVIDENCE_REF_PREFIX.startswith("sha256://")
+
+    required_symbols = (
+        "ApprovedCompressorThermodynamicLimits",
+        "CompressorThermodynamicLimitState",
+        "CoolPropCompressorFluid",
+        "CoolPropCompressorFluidDefinition",
+        "CoolPropCompressorMixtureComponentBinding",
+        "CoolPropCompressorMixtureDefinition",
+        "GasComponentFraction",
+        "GasComposition",
+        "PreRegisteredCompressorThermodynamicLimits",
+        "ScipyActiveCompressorLeastSquaresTrfConfiguration",
+        "StationaryActiveCompressorProblem",
+        "StationaryActiveCompressorResultTables",
+        "StationaryActiveCompressorThermodynamicAssessment",
+        "StationaryActiveCompressorThermodynamicLimitAssessment",
+        "StationaryActiveCompressorUnknownState",
+        "StationaryCompressorStationThermodynamicSummary",
+        "StationaryEquipmentBenchmarkBinding",
+        "aggregate_stationary_compressor_thermodynamics",
+        "assess_stationary_active_compressor_thermodynamic_limits",
+        "build_stationary_active_compressor_result_tables",
+        "build_stationary_equipment_benchmark_observations",
+        "build_thermodynamic_limit_dispatch_constraint_evidence",
+        "evaluate_stationary_active_compressor_thermodynamics",
+        "export_stationary_active_compressor_solve_result_json",
+        "export_stationary_compressor_thermodynamic_result_json",
+        "export_stationary_equipment_benchmark_evidence",
+        "materialize_approved_compressor_thermodynamic_limits",
+        "solve_stationary_active_compressor_with_approved_inputs",
+    )
+    for symbol in required_symbols:
+        assert hasattr(mixed_api, symbol)
+        assert symbol in mixed_api.__all__
+
+
+def test_mixed_compressor_facade_has_no_duplicate_public_symbols() -> None:
+    assert len(mixed_api.__all__) == len(set(mixed_api.__all__))

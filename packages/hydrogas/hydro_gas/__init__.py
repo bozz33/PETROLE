@@ -1,0 +1,353 @@
+"""Fondations scientifiques du domaine gaz PETROLE.
+
+Le paquet est volontairement séparé de ``hydroliquid`` : un réseau gaz ne doit
+pas être modélisé en remplaçant simplement la densité d'un liquide.
+"""
+
+from hydro_gas.benchmark_protocol import (
+    ApprovedGasBenchmarkCriteria,
+    GasBenchmarkCriterionState,
+    GasBenchmarkProtocolContext,
+    PreRegisteredGasBenchmarkCriterion,
+    materialize_approved_gas_benchmark_criteria,
+)
+from hydro_gas.composition import GasComponentFraction, GasComposition
+from hydro_gas.compressor_limits import (
+    CompressorEnvelopeAssessment,
+    CompressorFlowLimitPoint,
+    CompressorOperatingEnvelope,
+    assess_compressor_envelope,
+)
+from hydro_gas.compressor_map import (
+    CompressorMap,
+    CompressorMapPoint,
+    CompressorOperatingPoint,
+    CompressorSpeedLine,
+    interpolate_compressor_map,
+)
+from hydro_gas.constitutive_models import (
+    GasConstitutiveManifest,
+    GasConstitutiveManifestAssessment,
+    GasConstitutiveQualification,
+    GasPipeConstitutiveBinding,
+    GasPipeConstitutiveModelDescriptor,
+    assess_constitutive_manifest,
+)
+from hydro_gas.coolprop_adapter import (
+    CoolPropEvaluationEnvelope,
+    CoolPropPropertyResult,
+    CoolPropPureFluidDefinition,
+    evaluate_coolprop_properties,
+)
+from hydro_gas.coolprop_gas_mixture import (
+    CoolPropGasMixtureComponentBinding,
+    CoolPropGasMixtureDefinition,
+)
+from hydro_gas.coolprop_gas_properties import (
+    CoolPropGasMixturePropertyResult,
+    CoolPropGasMixtureStateRequest,
+    evaluate_coolprop_gas_mixture_properties,
+)
+from hydro_gas.coolprop_gas_property_artifact import (
+    COOLPROP_GAS_MIXTURE_PROPERTY_EVIDENCE_REF_PREFIX,
+    COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_ID,
+    COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_VERSION,
+    COOLPROP_GAS_MIXTURE_PROPERTY_SCHEMA_VERSION,
+    CoolPropGasMixturePropertyArtifact,
+    export_coolprop_gas_mixture_property_artifact,
+)
+from hydro_gas.coolprop_gas_property_benchmark_adapter import (
+    GasMixturePropertyBenchmarkBinding,
+    GasMixturePropertyBenchmarkObservationBundle,
+    GasMixturePropertyBenchmarkQuantity,
+    build_coolprop_gas_property_benchmark_observations,
+)
+from hydro_gas.coolprop_gas_property_benchmark_assessment import (
+    CoolPropGasPropertyBenchmarkAssessmentResult,
+    assess_coolprop_gas_property_benchmark_evidence,
+)
+from hydro_gas.coolprop_gas_property_benchmark_evidence import (
+    COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_REF_PREFIX,
+    COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_SCHEMA_VERSION,
+    CoolPropGasPropertyBenchmarkEvidenceArtifact,
+    export_coolprop_gas_property_benchmark_evidence,
+)
+from hydro_gas.energy_optimization import (
+    GasDispatchConstraintEvidence,
+    GasEnergyDispatchCandidate,
+    GasEnergySelectionResult,
+    GasEnergySelectionStatus,
+    RankedGasEnergyCandidate,
+    RejectedGasEnergyCandidate,
+    select_minimum_energy_dispatch,
+)
+from hydro_gas.external_benchmark import (
+    ExternalGasBenchmarkAssessment,
+    ExternalGasSolverEvidence,
+    GasBenchmarkCriterion,
+    GasBenchmarkObservation,
+    GasBenchmarkObservationAssessment,
+    assess_external_gas_benchmark,
+)
+from hydro_gas.linepack import GasLinepackCell, GasLinepackResult, compute_segmented_linepack
+from hydro_gas.network_balance import (
+    GasBoundaryMassFlow,
+    GasNetworkMassBalanceResult,
+    GasNodeMassBalance,
+    GasPipeMassFlow,
+    SteadyGasNetwork,
+    SteadyGasNode,
+    SteadyGasPipe,
+    assess_stationary_mass_balance,
+)
+from hydro_gas.properties import GasState, gas_density_from_z, linepack_mass
+from hydro_gas.result_export import GasResultExportArtifact, export_gas_results_json
+from hydro_gas.station import (
+    CompressorStationConfiguration,
+    CompressorUnitConfiguration,
+    CompressorUnitRole,
+    StationCoolerConfiguration,
+    StationValveConfiguration,
+    StationValveRole,
+)
+from hydro_gas.stationary_benchmark_adapter import (
+    StationaryGasBenchmarkBinding,
+    StationaryGasBenchmarkObservationBundle,
+    StationaryGasBenchmarkQuantity,
+    build_stationary_weymouth_benchmark_observations,
+)
+from hydro_gas.stationary_candidate import (
+    StationaryWeymouthUnknownState,
+    materialize_stationary_weymouth_candidate,
+)
+from hydro_gas.stationary_compressor_constraint import (
+    StationaryCompressorMapConstraint,
+    StationaryCompressorState,
+    evaluate_stationary_compressor_map_constraint,
+)
+from hydro_gas.stationary_equipment_balance import (
+    GasCompressorMassFlow,
+    GasNetworkEquipmentMassBalanceResult,
+    GasNodeEquipmentMassBalance,
+    SteadyGasCompressorEdge,
+    assess_stationary_equipment_mass_balance,
+)
+from hydro_gas.stationary_evaluation import (
+    StationaryWeymouthEvaluation,
+    evaluate_stationary_weymouth_unknown_state,
+)
+from hydro_gas.stationary_numerical_evaluation import (
+    StationaryWeymouthNumericalEvaluation,
+    evaluate_stationary_weymouth_numerical_vector,
+)
+from hydro_gas.stationary_numerics import (
+    StationaryWeymouthNumericalScale,
+    StationaryWeymouthNumericalVector,
+    decode_stationary_weymouth_numerical_vector,
+    encode_stationary_weymouth_residuals,
+    encode_stationary_weymouth_unknown_state,
+)
+from hydro_gas.stationary_problem import (
+    GasPressureSlack,
+    StationaryWeymouthProblem,
+    StationaryWeymouthUnknownLayout,
+    build_stationary_weymouth_unknown_layout,
+)
+from hydro_gas.stationary_solver import (
+    SCIPY_LEAST_SQUARES_TRF_METHOD_REF,
+    WEYMOUTH_P2_NUMERICAL_REPRESENTATION_REF,
+    ScipyLeastSquaresTrfConfiguration,
+    StationaryWeymouthConvergenceAssessment,
+    StationaryWeymouthGovernedSolveResult,
+    StationaryWeymouthSolveResult,
+    assess_stationary_weymouth_convergence,
+    solve_stationary_weymouth_least_squares_trf,
+    solve_stationary_weymouth_with_approved_inputs,
+)
+from hydro_gas.stationary_solver_governance import (
+    ApprovedStationaryConvergenceCriterion,
+    PreRegisteredStationaryConvergenceCriterion,
+    StationarySolverPolicyState,
+    StationarySolverQualificationContext,
+    StationaryWeymouthSolverStatus,
+    materialize_approved_stationary_convergence_criterion,
+)
+from hydro_gas.stationary_solver_inputs import (
+    ApprovedStationaryWeymouthInitialGuessArtifact,
+    ApprovedStationaryWeymouthScaleArtifact,
+    PreRegisteredStationaryWeymouthInitialGuessArtifact,
+    PreRegisteredStationaryWeymouthScaleArtifact,
+    materialize_approved_stationary_weymouth_initial_guess,
+    materialize_approved_stationary_weymouth_scale,
+    stationary_weymouth_layout_sha256,
+)
+from hydro_gas.weymouth_network_residual import (
+    GasNodePressure,
+    WeymouthNetworkCandidateState,
+    WeymouthNetworkResidualAssembly,
+    assemble_weymouth_network_residuals,
+)
+from hydro_gas.weymouth_parameter_artifact import (
+    WEYMOUTH_SI_MODEL_ID,
+    WEYMOUTH_SI_MODEL_VERSION,
+    WEYMOUTH_SI_PARAMETER_SCHEMA_VERSION,
+    WeymouthSiParameterArtifact,
+    build_weymouth_si_binding,
+    export_weymouth_si_parameter_artifact,
+    weymouth_si_reference_descriptor,
+)
+from hydro_gas.weymouth_si import (
+    WeymouthSiObservation,
+    WeymouthSiPipeParameters,
+    WeymouthSiResidual,
+    evaluate_weymouth_si_residual,
+)
+
+__all__ = [
+    "COOLPROP_GAS_MIXTURE_PROPERTY_EVIDENCE_REF_PREFIX",
+    "COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_ID",
+    "COOLPROP_GAS_MIXTURE_PROPERTY_MODEL_VERSION",
+    "COOLPROP_GAS_MIXTURE_PROPERTY_SCHEMA_VERSION",
+    "COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_REF_PREFIX",
+    "COOLPROP_GAS_PROPERTY_BENCHMARK_EVIDENCE_SCHEMA_VERSION",
+    "SCIPY_LEAST_SQUARES_TRF_METHOD_REF",
+    "WEYMOUTH_P2_NUMERICAL_REPRESENTATION_REF",
+    "WEYMOUTH_SI_MODEL_ID",
+    "WEYMOUTH_SI_MODEL_VERSION",
+    "WEYMOUTH_SI_PARAMETER_SCHEMA_VERSION",
+    "ApprovedGasBenchmarkCriteria",
+    "ApprovedStationaryConvergenceCriterion",
+    "ApprovedStationaryWeymouthInitialGuessArtifact",
+    "ApprovedStationaryWeymouthScaleArtifact",
+    "CompressorEnvelopeAssessment",
+    "CompressorFlowLimitPoint",
+    "CompressorMap",
+    "CompressorMapPoint",
+    "CompressorOperatingEnvelope",
+    "CompressorOperatingPoint",
+    "CompressorSpeedLine",
+    "CompressorStationConfiguration",
+    "CompressorUnitConfiguration",
+    "CompressorUnitRole",
+    "CoolPropEvaluationEnvelope",
+    "CoolPropGasMixtureComponentBinding",
+    "CoolPropGasMixtureDefinition",
+    "CoolPropGasMixturePropertyArtifact",
+    "CoolPropGasMixturePropertyResult",
+    "CoolPropGasMixtureStateRequest",
+    "CoolPropGasPropertyBenchmarkAssessmentResult",
+    "CoolPropGasPropertyBenchmarkEvidenceArtifact",
+    "CoolPropPropertyResult",
+    "CoolPropPureFluidDefinition",
+    "ExternalGasBenchmarkAssessment",
+    "ExternalGasSolverEvidence",
+    "GasBenchmarkCriterion",
+    "GasBenchmarkCriterionState",
+    "GasBenchmarkObservation",
+    "GasBenchmarkObservationAssessment",
+    "GasBenchmarkProtocolContext",
+    "GasBoundaryMassFlow",
+    "GasComponentFraction",
+    "GasComposition",
+    "GasCompressorMassFlow",
+    "GasConstitutiveManifest",
+    "GasConstitutiveManifestAssessment",
+    "GasConstitutiveQualification",
+    "GasDispatchConstraintEvidence",
+    "GasEnergyDispatchCandidate",
+    "GasEnergySelectionResult",
+    "GasEnergySelectionStatus",
+    "GasLinepackCell",
+    "GasLinepackResult",
+    "GasMixturePropertyBenchmarkBinding",
+    "GasMixturePropertyBenchmarkObservationBundle",
+    "GasMixturePropertyBenchmarkQuantity",
+    "GasNetworkEquipmentMassBalanceResult",
+    "GasNetworkMassBalanceResult",
+    "GasNodeEquipmentMassBalance",
+    "GasNodeMassBalance",
+    "GasNodePressure",
+    "GasPipeConstitutiveBinding",
+    "GasPipeConstitutiveModelDescriptor",
+    "GasPipeMassFlow",
+    "GasPressureSlack",
+    "GasResultExportArtifact",
+    "GasState",
+    "PreRegisteredGasBenchmarkCriterion",
+    "PreRegisteredStationaryConvergenceCriterion",
+    "PreRegisteredStationaryWeymouthInitialGuessArtifact",
+    "PreRegisteredStationaryWeymouthScaleArtifact",
+    "RankedGasEnergyCandidate",
+    "RejectedGasEnergyCandidate",
+    "ScipyLeastSquaresTrfConfiguration",
+    "StationCoolerConfiguration",
+    "StationValveConfiguration",
+    "StationValveRole",
+    "StationaryCompressorMapConstraint",
+    "StationaryCompressorState",
+    "StationaryGasBenchmarkBinding",
+    "StationaryGasBenchmarkObservationBundle",
+    "StationaryGasBenchmarkQuantity",
+    "StationarySolverPolicyState",
+    "StationarySolverQualificationContext",
+    "StationaryWeymouthConvergenceAssessment",
+    "StationaryWeymouthEvaluation",
+    "StationaryWeymouthGovernedSolveResult",
+    "StationaryWeymouthNumericalEvaluation",
+    "StationaryWeymouthNumericalScale",
+    "StationaryWeymouthNumericalVector",
+    "StationaryWeymouthProblem",
+    "StationaryWeymouthSolveResult",
+    "StationaryWeymouthSolverStatus",
+    "StationaryWeymouthUnknownLayout",
+    "StationaryWeymouthUnknownState",
+    "SteadyGasCompressorEdge",
+    "SteadyGasNetwork",
+    "SteadyGasNode",
+    "SteadyGasPipe",
+    "WeymouthNetworkCandidateState",
+    "WeymouthNetworkResidualAssembly",
+    "WeymouthSiObservation",
+    "WeymouthSiParameterArtifact",
+    "WeymouthSiPipeParameters",
+    "WeymouthSiResidual",
+    "assemble_weymouth_network_residuals",
+    "assess_compressor_envelope",
+    "assess_constitutive_manifest",
+    "assess_coolprop_gas_property_benchmark_evidence",
+    "assess_external_gas_benchmark",
+    "assess_stationary_equipment_mass_balance",
+    "assess_stationary_mass_balance",
+    "assess_stationary_weymouth_convergence",
+    "build_coolprop_gas_property_benchmark_observations",
+    "build_stationary_weymouth_benchmark_observations",
+    "build_stationary_weymouth_unknown_layout",
+    "build_weymouth_si_binding",
+    "compute_segmented_linepack",
+    "decode_stationary_weymouth_numerical_vector",
+    "encode_stationary_weymouth_residuals",
+    "encode_stationary_weymouth_unknown_state",
+    "evaluate_coolprop_gas_mixture_properties",
+    "evaluate_coolprop_properties",
+    "evaluate_stationary_compressor_map_constraint",
+    "evaluate_stationary_weymouth_numerical_vector",
+    "evaluate_stationary_weymouth_unknown_state",
+    "evaluate_weymouth_si_residual",
+    "export_coolprop_gas_mixture_property_artifact",
+    "export_coolprop_gas_property_benchmark_evidence",
+    "export_gas_results_json",
+    "export_weymouth_si_parameter_artifact",
+    "gas_density_from_z",
+    "interpolate_compressor_map",
+    "linepack_mass",
+    "materialize_approved_gas_benchmark_criteria",
+    "materialize_approved_stationary_convergence_criterion",
+    "materialize_approved_stationary_weymouth_initial_guess",
+    "materialize_approved_stationary_weymouth_scale",
+    "materialize_stationary_weymouth_candidate",
+    "select_minimum_energy_dispatch",
+    "solve_stationary_weymouth_least_squares_trf",
+    "solve_stationary_weymouth_with_approved_inputs",
+    "stationary_weymouth_layout_sha256",
+    "weymouth_si_reference_descriptor",
+]

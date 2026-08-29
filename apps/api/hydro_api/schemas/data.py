@@ -113,6 +113,37 @@ class DatasetRowsRead(BaseModel):
     offset: int
 
 
+class MeasurementQualityIssue(BaseModel):
+    """Anomalie descriptive détectée dans une série de mesures."""
+
+    code: str
+    severity: Literal["information", "warning", "error"]
+    count: int = Field(ge=1)
+    message: str
+
+
+class MeasurementQualitySummary(BaseModel):
+    """Synthèse descriptive d'un dataset de mesures normalisé vers le SI."""
+
+    dataset_id: uuid.UUID
+    dimension: str
+    si_unit: str
+    sample_count: int = Field(ge=0)
+    usable_sample_count: int = Field(ge=0)
+    excluded_sample_count: int = Field(ge=0)
+    quality_counts: dict[str, int]
+    source_counts: dict[str, int]
+    start_timestamp: datetime | None
+    end_timestamp: datetime | None
+    minimum_value_si: float | None
+    maximum_value_si: float | None
+    mean_value_si: float | None
+    stddev_value_si: float | None
+    duplicate_timestamp_count: int = Field(ge=0)
+    out_of_order_count: int = Field(ge=0)
+    issues: list[MeasurementQualityIssue]
+
+
 __all__ = [
     "DatasetCreate",
     "DatasetImportRead",
@@ -121,5 +152,7 @@ __all__ = [
     "DatasetPreview",
     "DatasetRead",
     "DatasetRowsRead",
+    "MeasurementQualityIssue",
+    "MeasurementQualitySummary",
     "StoredFileRead",
 ]

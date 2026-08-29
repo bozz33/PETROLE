@@ -1,0 +1,5 @@
+flow_gpm,velocity_m_s,experimental_friction_pressure_drop_pa,published_predicted_pressure_drop_pa,published_error_percent,provenance
+40,0.47,248.84,225.5,-9.4,PUBLISHED
+60,0.70,472.80,506.3,5.8,PUBLISHED
+80,0.93,796.29,894.4,11.0,PUBLISHED
+100,1.17,1144.66,1374.2,20.0,PUBLISHED

@@ -1,0 +1,10 @@
+pump_id,from_junction,to_junction,station_id,rotation_coefficient_m,flow_coefficient_s2_m5,flow_nom_m3_s,flow_max_m3_s,delta_head_min_m,delta_head_max_m,pump_efficiency_min,pump_efficiency_max,rotation_nom_rps,rotation_min_rps,rotation_max_rps,electricity_price_per_kw_s,status,motor_efficiency,mechanical_transmission_efficiency
+21,21,22,1,276.8,92,1.0,1.2,144,217,0.6,0.87,50,40,60,0.00000039,available,0.966,0.95
+19,19,20,1,276.8,92,1.0,1.2,144,217,0.6,0.87,50,40,60,0.00000022,available,0.966,0.95
+13,13,14,1,276.8,92,1.0,1.2,144,217,0.6,0.87,50,40,60,0.00000042,available,0.966,0.95
+12,12,13,1,276.8,92,1.0,1.2,144,217,0.6,0.87,50,40,60,0.00000042,available,0.966,0.95
+10,10,11,1,276.8,92,1.0,1.2,144,217,0.6,0.87,50,40,60,0.00000033,available,0.966,0.95
+7,7,8,1,276.8,92,1.0,1.2,144,217,0.6,0.87,50,40,60,0.00000031,available,0.966,0.95
+4,4,5,1,276.8,92,1.0,1.2,144,217,0.6,0.87,50,40,60,0.00000036,available,0.966,0.95
+2,2,3,1,276.8,92,1.0,1.2,144,217,0.6,0.87,50,40,60,0.00000033,available,0.966,0.95
+1,1,2,1,276.8,92,1.0,1.2,144,217,0.6,0.87,50,40,60,0.00000033,available,0.966,0.95

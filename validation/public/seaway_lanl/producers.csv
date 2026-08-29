@@ -1,0 +1,4 @@
+producer_id,junction_id,injection_min_m3_s,injection_max_m3_s,injection_nominal_m3_s,status,dispatchable,offer_price_per_m3
+1,1,0.1,0.8333,0.4,available,true,300
+2,9,0.1,0.8333,0.4,available,true,300
+3,18,0.1,0.8333,0.4,available,true,300

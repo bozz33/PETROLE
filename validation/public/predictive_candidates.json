@@ -1,0 +1,120 @@
+{
+  "campaign": "PUBLIC-VALIDATION-02",
+  "as_of": "2026-08-09",
+  "status": "OPEN_BLOCKED_PUBLIC_DATA",
+  "strict_closure_required_independent_predictive_cases": 3,
+  "strict_predictive_cases_completed": 0,
+  "certification": false,
+  "candidates": [
+    {
+      "id": "FIELD-BN1-2022",
+      "class": "industrial_crude_pipeline",
+      "doi": "10.3390/en15165880",
+      "eligibility_status": "BLOCKED_CRITICAL_INPUTS",
+      "measured_truth_available": true,
+      "raw_pressures_available": true,
+      "geometry_complete": false,
+      "fluid_properties_complete": false,
+      "current_engine_scope": true,
+      "blockers": [
+        "NUMERIC_ELEVATION_DIFFERENCE_NOT_PUBLISHED",
+        "CRUDE_VISCOSITY_TEMPERATURE_RELATION_NOT_PUBLISHED",
+        "FULL_2791_RECORD_DATASET_NOT_PUBLIC"
+      ],
+      "predictive_validation_verdict": "NOT_EVALUATED"
+    },
+    {
+      "id": "FIELD-GUANGDONG-NO1-2021",
+      "class": "industrial_refined_product_pipeline",
+      "doi": "10.3390/en14185871",
+      "eligibility_status": "BLOCKED_RAW_SCADA",
+      "measured_truth_available": false,
+      "raw_pressures_available": false,
+      "geometry_complete": true,
+      "fluid_properties_complete": true,
+      "current_engine_scope": true,
+      "blockers": [
+        "SCADA_NUMERIC_SERIES_RESTRICTED_BY_FUNDER"
+      ],
+      "predictive_validation_verdict": "NOT_EVALUATED"
+    },
+    {
+      "id": "FIELD-QINGTIE-2022",
+      "class": "industrial_heated_crude_pipeline",
+      "doi": "10.3390/en15207453",
+      "eligibility_status": "BLOCKED_SCOPE_AND_INPUTS",
+      "measured_truth_available": true,
+      "raw_pressures_available": true,
+      "geometry_complete": false,
+      "fluid_properties_complete": false,
+      "current_engine_scope": false,
+      "blockers": [
+        "AXIAL_THERMAL_MODEL_OUTSIDE_CURRENT_HYDROLIQUID_SCOPE",
+        "STATION_CHAINAGE_AND_ELEVATIONS_INCOMPLETE",
+        "CRUDE_RHEOLOGY_TEMPERATURE_DATA_INCOMPLETE"
+      ],
+      "predictive_validation_verdict": "NOT_EVALUATED"
+    },
+    {
+      "id": "LAB-WELLBORE-WATER-2020",
+      "class": "laboratory_single_phase_water",
+      "doi": "10.1016/j.petrol.2020.107822",
+      "eligibility_status": "SUPPORTING_ONLY",
+      "measured_truth_available": true,
+      "raw_pressures_available": false,
+      "geometry_complete": true,
+      "fluid_properties_complete": false,
+      "current_engine_scope": true,
+      "blockers": [
+        "PUBLISHED_DELTA_P_IS_FRICTION_COMPONENT",
+        "EXACT_WATER_STATE_AND_ROUGHNESS_NOT_FULLY_TABULATED"
+      ],
+      "predictive_validation_verdict": "NOT_EVALUATED"
+    },
+    {
+      "id": "LAB-WATERLOO-2019",
+      "class": "laboratory_newtonian_emulsion",
+      "doi": "10.3390/fluids4020103",
+      "eligibility_status": "BLOCKED_NUMERIC_SERIES",
+      "measured_truth_available": false,
+      "raw_pressures_available": false,
+      "geometry_complete": true,
+      "fluid_properties_complete": true,
+      "current_engine_scope": true,
+      "blockers": [
+        "PRESSURE_DROP_FLOW_SERIES_ONLY_AVAILABLE_AS_FIGURES_IN_PUBLIC_ARTICLE"
+      ],
+      "predictive_validation_verdict": "NOT_EVALUATED"
+    },
+    {
+      "id": "LAB-FITTINGS-2026",
+      "class": "laboratory_single_phase_water_fittings",
+      "doi": "10.5281/zenodo.20917487",
+      "eligibility_status": "BLOCKED_RAW_NUMBERS",
+      "measured_truth_available": false,
+      "raw_pressures_available": false,
+      "geometry_complete": false,
+      "fluid_properties_complete": false,
+      "current_engine_scope": true,
+      "blockers": [
+        "MACHINE_READABLE_RAW_TABLE_NOT_EXPOSED_IN_REPOSITORY_METADATA"
+      ],
+      "predictive_validation_verdict": "NOT_EVALUATED"
+    },
+    {
+      "id": "FIELD-DRIP-2024",
+      "class": "field_water_distribution",
+      "doi": "10.17632/w9594tjkwp.2",
+      "eligibility_status": "BLOCKED_GEOMETRY",
+      "measured_truth_available": true,
+      "raw_pressures_available": true,
+      "geometry_complete": false,
+      "fluid_properties_complete": true,
+      "current_engine_scope": true,
+      "blockers": [
+        "PIPE_LENGTH_DIAMETER_AND_ELEVATION_NOT_DOCUMENTED"
+      ],
+      "predictive_validation_verdict": "NOT_EVALUATED"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -365,6 +366,12 @@ def test_calcul_persistant_et_lecture_des_resultats(client):
     assert "profile" not in summary.json()["summary"]
     assert results.json()["result"]["profile"]
     assert results.json()["result"]["explanation"]["summary"]
+    first_segment = results.json()["result"]["segments"][0]
+    # Les bornes et la limite configurée sont publiées par le résultat : V1-D
+    # peut tracer l'enveloppe sans reconstruire ni recalculer la conduite.
+    assert first_segment["start_chainage_m"] == pytest.approx(0.0)
+    assert first_segment["end_chainage_m"] > first_segment["start_chainage_m"]
+    assert first_segment["maop_pa"] is not None
     assert isinstance(results.json()["result"]["physical_approvable"], bool)
     assert results.json()["result"]["compliance_status"] == "not_evaluated"
     assert results.json()["result"]["decision_eligible"] is False

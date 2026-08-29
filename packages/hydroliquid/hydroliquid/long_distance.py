@@ -936,6 +936,9 @@ class LongDistanceLiquidEngine(HydraulicEngine):
                     maop_margin_pa=(
                         None if segment.maop_pa is None else segment.maop_pa - max(pressures)
                     ),
+                    start_chainage_m=segment.start_chainage_m,
+                    end_chainage_m=segment.end_chainage_m,
+                    maop_pa=segment.maop_pa,
                 )
             )
         return results

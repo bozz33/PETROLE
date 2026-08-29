@@ -523,6 +523,23 @@ export interface CalculationProfilePoint {
   gravity_zone: boolean;
 }
 
+/** Zone gravitaire signalée par HydroLiquid, sans modèle transitoire associé. */
+export interface CalculationGravityZone {
+  start_chainage_m: number;
+  end_chainage_m: number;
+  length_m: number;
+  /** Indication du moteur, jamais présentée comme une validation industrielle. */
+  fill_ratio: number | null;
+}
+
+/** Propriété évaluée et figée par le moteur pour le calcul affiché. */
+export interface CalculationFluidState {
+  vapor_pressure_pa?: number;
+  vapor_pressure_source?: string;
+  extrapolated?: boolean;
+  [key: string]: unknown;
+}
+
 export interface CalculationIssue {
   code: string;
   message: string;
@@ -581,6 +598,11 @@ export interface CalculationPayload {
   profile: CalculationProfilePoint[];
   segments?: SegmentResultRow[];
   stations?: StationResultRow[];
+  gravity_zones?: CalculationGravityZone[];
+  assumptions?: {
+    fluid_state?: CalculationFluidState;
+    [key: string]: unknown;
+  };
   diagnostics?: SolverDiagnosticsPayload;
   energy?: {
     total_hydraulic_power_w?: number | null;
@@ -972,6 +994,11 @@ export interface SegmentResultRow {
   min_pressure_pa: number;
   max_pressure_pa: number;
   maop_margin_pa: number | null;
+  /** Bornes publiées par le moteur : aucune reconstitution côté écran. */
+  start_chainage_m?: number | null;
+  end_chainage_m?: number | null;
+  /** Limite configurée dans le modèle, absente si elle n'est pas renseignée. */
+  maop_pa?: number | null;
   flow_regime: string;
 }
 

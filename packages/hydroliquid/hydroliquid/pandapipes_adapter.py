@@ -407,6 +407,9 @@ class PandapipesEngine(HydraulicEngine):
                         if segment.maop_pa is None
                         else segment.maop_pa - max(inlet_bar, outlet_bar) * 1e5
                     ),
+                    start_chainage_m=segment.start_chainage_m,
+                    end_chainage_m=segment.end_chainage_m,
+                    maop_pa=segment.maop_pa,
                 )
             )
             points.append(

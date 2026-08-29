@@ -1039,6 +1039,15 @@ summary {
   overflow-x: auto;
 }
 
+.chart-export {
+  display: grid;
+  gap: 8px;
+}
+
+.chart-export > .button {
+  justify-self: end;
+}
+
 .profile-chart {
   width: 100%;
   min-width: 680px;

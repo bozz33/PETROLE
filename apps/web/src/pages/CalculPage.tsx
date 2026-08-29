@@ -8,6 +8,7 @@ import {
   PumpEfficiencyPowerChart,
 } from "../components/charts/HydraulicCharts";
 import {
+  EngineeringDiagnosticsPanel,
   NumericalSummaryPanel,
   SegmentResultsPanel,
   StationResultsPanel,
@@ -149,6 +150,27 @@ export function CalculPage() {
   const engineVersion = lastCalculation?.engine_version ?? "non publié";
   const inputHash = lastCalculation?.input_hash ?? "non publiée";
   const profile = useMemo(() => summary?.profile ?? [], [summary]);
+  const segments = summary?.segments ?? [];
+  const stations = summary?.stations ?? [];
+  const gravityZones = summary?.gravity_zones ?? [];
+  const vaporPressurePa = summary?.assumptions?.fluid_state?.vapor_pressure_pa;
+  const vaporPressure =
+    typeof vaporPressurePa === "number" && Number.isFinite(vaporPressurePa)
+      ? {
+          pressurePa: vaporPressurePa,
+          source: summary?.assumptions?.fluid_state?.vapor_pressure_source ?? null,
+          extrapolated: summary?.assumptions?.fluid_state?.extrapolated === true,
+        }
+      : null;
+  const selectedScenario = scenarios.find((scenario) => scenario.id === scenarioId);
+  const engineeringContext = result
+    ? {
+        calculationId: result.calculation_id,
+        scenarioName: selectedScenario?.name ?? scenarioId,
+        resultTimestamp: lastCalculation?.finished_at ?? lastCalculation?.created_at ?? null,
+      }
+    : undefined;
+  const chartFileStem = result ? "calcul-" + result.calculation_id.slice(0, 8) : undefined;
   const violations = summary?.violations ?? [];
   const warnings = summary?.warnings ?? [];
   const ruleEvaluations = summary?.rule_evaluations ?? [];
@@ -301,20 +323,44 @@ export function CalculPage() {
 
           <Panel
             title="Profil hydraulique"
-            description="Ligne piézométrique et profil du terrain suivant le chaînage."
+            description="Terrain, ligne piézométrique, stations et zones signalées suivant le chaînage."
           >
-            <HydraulicProfileChart points={profile} />
+            <HydraulicProfileChart
+              points={profile}
+              stations={stations}
+              gravityZones={gravityZones}
+              context={engineeringContext}
+              exportFileName={chartFileStem ? chartFileStem + "-profil-hydraulique.png" : undefined}
+            />
           </Panel>
 
           <Panel
-            title="Pression et vitesse"
-            description="Pression absolue et vitesse d'écoulement suivant le chaînage."
+            title="Pression et enveloppes opératoires"
+            description="Pression, vitesse, stations, MAOP/MAWP configurée et seuil vapeur traçable."
           >
-            <PressureDistanceChart points={profile} />
+            <PressureDistanceChart
+              points={profile}
+              segments={segments}
+              stations={stations}
+              gravityZones={gravityZones}
+              vaporPressure={vaporPressure}
+              context={engineeringContext}
+              exportFileName={chartFileStem ? chartFileStem + "-pression-enveloppes.png" : undefined}
+            />
           </Panel>
 
-          <SegmentResultsPanel segments={summary.segments ?? []} />
-          <StationResultsPanel stations={summary.stations ?? []} />
+          <EngineeringDiagnosticsPanel
+            profile={profile}
+            segments={segments}
+            stations={stations}
+            gravityZones={gravityZones}
+            vaporPressurePa={vaporPressure?.pressurePa ?? null}
+            vaporPressureSource={vaporPressure?.source ?? null}
+            vaporPressureExtrapolated={vaporPressure?.extrapolated ?? false}
+          />
+
+          <SegmentResultsPanel segments={segments} />
+          <StationResultsPanel stations={stations} />
 
           {runningPumps.length ? (
             <>

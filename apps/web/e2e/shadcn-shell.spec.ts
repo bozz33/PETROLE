@@ -303,3 +303,205 @@ test("confine les longues ressources de scénarios dans leurs défilements", asy
   // 100 lignes de tronçons de redevenir un défilement de page géant.
   expect(bodyHeight).toBeLessThan(6_000);
 });
+
+test("restitue les enveloppes ingénieur et exporte les graphiques sans inventer de limite", async ({ page }) => {
+  const scenario = {
+    id: "scenario-engineering-1",
+    model_version_id: model.id,
+    name: "Régime stationnaire multi-stations",
+    description: null,
+    payload: {},
+    status: "approved",
+    created_at: now,
+    updated_at: now,
+  };
+  const calculation = {
+    id: "calculation-engineering-1",
+    scenario_id: scenario.id,
+    engine: "long_distance_liquid",
+    engine_version: "long-distance-liquid-1.0.0",
+    status: "SIM_CONVERGED",
+    phase: "completed",
+    progress_percent: 100,
+    input_hash: "engineering-result-hash",
+    approval_status: "pending",
+    approval_comment: null,
+    approved_at: null,
+    created_at: now,
+    started_at: now,
+    finished_at: now,
+  };
+  const engineeringResult = {
+    calculation_id: calculation.id,
+    status: calculation.status,
+    diagnostics: {},
+    result: {
+      status: calculation.status,
+      flow_m3_s: 0.2,
+      min_pressure_pa: 1_200_000,
+      max_pressure_pa: 3_500_000,
+      total_head_loss_m: 45,
+      total_power_w: 150_000,
+      residual: 0.000001,
+      feasible: true,
+      physical_approvable: true,
+      compliance_status: "not_evaluated",
+      decision_eligible: false,
+      approvable: false,
+      compliance: {
+        status: "not_evaluated",
+        counts: { total: 0, compliant: 0, non_compliant: 0, not_applicable: 0, errors: 0 },
+        blocking_failure_count: 0,
+        reservation_count: 0,
+        blocking_rule_ids: [],
+      },
+      rule_evaluations: [],
+      violations: [],
+      warnings: [],
+      profile: [
+        {
+          chainage_m: 0,
+          elevation_m: 18,
+          pressure_pa: 3_500_000,
+          hydraulic_grade_m: 430,
+          flow_m3_s: 0.2,
+          velocity_m_s: 1.55,
+          below_vapor_pressure: false,
+          gravity_zone: false,
+        },
+        {
+          chainage_m: 132_000,
+          elevation_m: 145,
+          pressure_pa: 1_200_000,
+          hydraulic_grade_m: 285,
+          flow_m3_s: 0.2,
+          velocity_m_s: 1.55,
+          below_vapor_pressure: true,
+          gravity_zone: true,
+        },
+        {
+          chainage_m: 350_000,
+          elevation_m: 310,
+          pressure_pa: 3_000_000,
+          hydraulic_grade_m: 660,
+          flow_m3_s: 0.2,
+          velocity_m_s: 1.55,
+          below_vapor_pressure: false,
+          gravity_zone: false,
+        },
+      ],
+      segments: [
+        {
+          segment_id: "L-001",
+          label: "Tronçon Sud",
+          flow_m3_s: 0.2,
+          velocity_m_s: 1.55,
+          reynolds: 125_000,
+          friction_factor: 0.018,
+          friction_model: "colebrook_white",
+          friction_head_loss_m: 20,
+          minor_head_loss_m: 2,
+          total_head_loss_m: 22,
+          elevation_change_m: 127,
+          inlet_pressure_pa: 3_500_000,
+          outlet_pressure_pa: 1_200_000,
+          min_pressure_pa: 1_200_000,
+          max_pressure_pa: 3_500_000,
+          maop_margin_pa: 4_500_000,
+          maop_pa: 8_000_000,
+          start_chainage_m: 0,
+          end_chainage_m: 132_000,
+          flow_regime: "turbulent",
+        },
+        {
+          segment_id: "L-002",
+          label: "Tronçon Nord",
+          flow_m3_s: 0.2,
+          velocity_m_s: 1.55,
+          reynolds: 125_000,
+          friction_factor: 0.018,
+          friction_model: "colebrook_white",
+          friction_head_loss_m: 23,
+          minor_head_loss_m: 0,
+          total_head_loss_m: 23,
+          elevation_change_m: 165,
+          inlet_pressure_pa: 3_000_000,
+          outlet_pressure_pa: 2_400_000,
+          min_pressure_pa: 2_400_000,
+          max_pressure_pa: 3_000_000,
+          maop_margin_pa: null,
+          maop_pa: null,
+          start_chainage_m: 132_000,
+          end_chainage_m: 350_000,
+          flow_regime: "turbulent",
+        },
+      ],
+      stations: [
+        {
+          station_id: "ST-01",
+          name: "Station intermédiaire",
+          chainage_m: 132_000,
+          elevation_m: 145,
+          in_service: true,
+          bypassed: false,
+          flow_m3_s: 0.2,
+          suction_pressure_pa: 1_200_000,
+          discharge_pressure_pa: 3_000_000,
+          differential_pressure_pa: 1_800_000,
+          head_m: 210,
+          hydraulic_power_w: 150_000,
+          absorbed_power_w: 180_000,
+          efficiency: 0.78,
+          active_pump_count: 1,
+          pumps: [],
+        },
+      ],
+      gravity_zones: [
+        { start_chainage_m: 130_000, end_chainage_m: 132_000, length_m: 2_000, fill_ratio: null },
+      ],
+      assumptions: {
+        fluid_state: {
+          vapor_pressure_pa: 1_500_000,
+          vapor_pressure_source: "laboratoire",
+          extrapolated: false,
+        },
+      },
+    },
+  };
+
+  await page.route(/\/api\/v1\/models\/model-1\/scenarios/, (route) =>
+    respond(route, pageOf([scenario])),
+  );
+  await page.route(/\/api\/v1\/scenarios\/scenario-engineering-1\/calculations/, (route) =>
+    respond(route, calculation),
+  );
+  await page.route(/\/api\/v1\/calculations\/calculation-engineering-1\/results/, (route) =>
+    respond(route, engineeringResult),
+  );
+
+  await page.goto("/calcul");
+  await page.getByRole("button", { name: "Exécuter HydroLiquid Core" }).click();
+
+  await expect(page.getByRole("heading", { level: 2, name: "Diagnostics ingénieur" })).toBeVisible();
+  await expect(page.getByText("Marge MAOP/MAWP minimale")).toBeVisible();
+  await expect(page.getByText("Propriété produit · laboratoire")).toBeVisible();
+  await expect(
+    page.getByRole("img", {
+      name: "Profil hydraulique, terrain, stations et zones signalées",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("img", {
+      name: "Pression absolue, limites configurées, stations et zones suivant le chaînage",
+    }),
+  ).toBeVisible();
+
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Exporter le profil hydraulique PNG" }).click();
+  expect((await download).suggestedFilename()).toMatch(/calcul-calculat-profil-hydraulique\.png/);
+
+  const dimensions = await page.locator(".chart-export").evaluateAll((charts) =>
+    charts.map((chart) => ({ clientWidth: chart.clientWidth, scrollWidth: chart.scrollWidth })),
+  );
+  expect(dimensions.every(({ clientWidth, scrollWidth }) => scrollWidth <= clientWidth)).toBe(true);
+});

@@ -8,12 +8,125 @@
 
 import { EmptyState, Panel, StatusBadge } from "../Shell";
 import type {
+  CalculationGravityZone,
   CalculationPayload,
+  CalculationProfilePoint,
   PumpResultRow,
   SegmentResultRow,
   StationResultRow,
 } from "../../types";
 import { formatNumber } from "../../types";
+
+export function EngineeringDiagnosticsPanel({
+  profile,
+  segments,
+  stations,
+  gravityZones,
+  vaporPressurePa,
+  vaporPressureSource,
+  vaporPressureExtrapolated,
+}: {
+  profile: CalculationProfilePoint[];
+  segments: SegmentResultRow[];
+  stations: StationResultRow[];
+  gravityZones: CalculationGravityZone[];
+  vaporPressurePa: number | null;
+  vaporPressureSource: string | null;
+  vaporPressureExtrapolated: boolean;
+}) {
+  const minimum = profile.reduce<CalculationProfilePoint | null>(
+    (current, point) => (!current || point.pressure_pa < current.pressure_pa ? point : current),
+    null,
+  );
+  const maximum = profile.reduce<CalculationProfilePoint | null>(
+    (current, point) => (!current || point.pressure_pa > current.pressure_pa ? point : current),
+    null,
+  );
+  const margins = segments.filter((segment) => segment.maop_margin_pa !== null);
+  const minimumMaopMargin = margins.reduce<SegmentResultRow | null>(
+    (current, segment) =>
+      !current || segment.maop_margin_pa! < current.maop_margin_pa! ? segment : current,
+    null,
+  );
+  const belowVaporCount = profile.filter((point) => point.below_vapor_pressure).length;
+  const totalGravityLengthM = gravityZones.reduce((total, zone) => total + zone.length_m, 0);
+  const vaporMarginPa =
+    minimum && vaporPressurePa !== null ? minimum.pressure_pa - vaporPressurePa : null;
+
+  return (
+    <Panel
+      title="Diagnostics ingénieur"
+      description="Synthèse des valeurs publiées par le calcul et des limites configurées, sans nouvelle physique."
+    >
+      <div className="resource-summary engineering-diagnostics">
+        <div>
+          <span>Pression minimale</span>
+          <strong>{minimum ? formatNumber(minimum.pressure_pa / 100000) + " bar abs." : "—"}</strong>
+          <small>
+            {minimum
+              ? "Calcul · PK " + formatNumber(minimum.chainage_m / 1000, 3) + " km"
+              : "Calcul indisponible"}
+          </small>
+        </div>
+        <div>
+          <span>Pression maximale</span>
+          <strong>{maximum ? formatNumber(maximum.pressure_pa / 100000) + " bar abs." : "—"}</strong>
+          <small>
+            {maximum
+              ? "Calcul · PK " + formatNumber(maximum.chainage_m / 1000, 3) + " km"
+              : "Calcul indisponible"}
+          </small>
+        </div>
+        <div>
+          <span>Marge MAOP/MAWP minimale</span>
+          <strong>
+            {minimumMaopMargin?.maop_margin_pa === null || !minimumMaopMargin
+              ? "Indisponible"
+              : formatNumber(minimumMaopMargin.maop_margin_pa / 100000) + " bar"}
+          </strong>
+          <small>
+            {minimumMaopMargin
+              ? "Limite configurée · " + minimumMaopMargin.segment_id
+              : "Aucune limite publiée par le modèle"}
+          </small>
+        </div>
+        <div>
+          <span>Marge à la vapeur</span>
+          <strong>
+            {vaporMarginPa === null ? "Indisponible" : formatNumber(vaporMarginPa / 100000) + " bar"}
+          </strong>
+          <small>
+            {vaporMarginPa === null
+              ? "Seuil vapeur non publié"
+              : "Propriété produit · " + (vaporPressureSource ?? "source publiée")}
+          </small>
+          {vaporPressureExtrapolated ? <small>Valeur hors domaine signalée par le moteur.</small> : null}
+        </div>
+        <div>
+          <span>Points sous vapeur</span>
+          <strong>{belowVaporCount}</strong>
+          <small>Indicateur calculé sur le profil</small>
+        </div>
+        <div>
+          <span>Zones gravitaires signalées</span>
+          <strong>{gravityZones.length}</strong>
+          <small>{formatNumber(totalGravityLengthM / 1000, 3)} km cumulés · moteur</small>
+        </div>
+        <div>
+          <span>Stations restituées</span>
+          <strong>{stations.length}</strong>
+          <small>
+            {stations.filter((station) => station.in_service && !station.bypassed).length} en service
+          </small>
+        </div>
+      </div>
+      <p className="field-help">
+        Les zones gravitaires sont des alertes du modèle stationnaire ; elles ne constituent pas
+        une validation d'écoulement diphasique, de séparation de colonne ou de transitoire.
+      </p>
+    </Panel>
+  );
+}
 
 export function SegmentResultsPanel({ segments }: { segments: SegmentResultRow[] }) {
   if (!segments.length) {

@@ -63,7 +63,7 @@ dev = [
     "types-python-dateutil",
 ]
 # Moteur secondaire : plage validée par la preuve de concept POC-OS-04.
-pandapipes = ["pandapipes>=0.14,<0.15"]
+pandapipes = ["pandapipes>=0.14,<0.17"]
 
 [project.scripts]
 hydro-validate = "hydro_validation.cli:main"
